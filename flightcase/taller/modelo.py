@@ -956,7 +956,7 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         w_low=_w_low, cierre_m_sup=cierre_m_sup, cierre_h_sup=cierre_h_sup, ext_alto_cuerpo=ext_alto_cuerpo,
         ruedas_en_base=[list(c) for c in ruedas_en_base], rueda_placa=list(E_rueda_placa),
         rueda_diametro=E_rueda_diametro, rueda_frenos=rueda_frenos,
-        pies=[list(c) for c in pies_centros], pie_d=_pie_d, pie_h=_pie_h,
+        pies=[list(c) for c in pies_centros], pie_d=_pie_d, pie_h=_pie_h, encastre_ala=E_encastre_ala, encastre_prof=E_encastre_profundidad,
         bandejas=[dict(cx=(ext_alto - _bc) if _hz else ext_ancho / 2, cy=_bc if _fr else ext_prof / 2,
                        z=pared + b[2] - _band_esp(b), ancho=b[0], fondo=b[1], esp=_band_esp(b))
                   for b in bandejas],

@@ -428,7 +428,7 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
         ax = fig.add_axes([0.62, 0.12, 0.36, 0.66])
         ax.imshow(img)
         ax.axis("off")
-    pdf.savefig(fig)
+    pdf.savefig(fig, dpi=220)  # imágenes nítidas (por defecto se bajan a 100 dpi)
     plt.close(fig)
     pag += 1
 
@@ -442,7 +442,7 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
         fig.text(0.05, 0.05, "Los rótulos P1, P2... coinciden con las hojas de cada pieza y con los "
                              "nombres de los DXF. Colores neutros para distinguir los paneles.",
                  fontsize=9, color="#333")
-        pdf.savefig(fig)
+        pdf.savefig(fig, dpi=220)  # imágenes nítidas (por defecto se bajan a 100 dpi)
         plt.close(fig)
         pag += 1
 
@@ -458,7 +458,7 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
             ax.axis("off")
             fig.text(0.05, 0.095 + extra_v, "\n".join(lns_v), fontsize=9, color="#333", va="top",
                      linespacing=1.4)
-            pdf.savefig(fig)
+            pdf.savefig(fig, dpi=220)  # imágenes nítidas (por defecto se bajan a 100 dpi)
             plt.close(fig)
             pag += 1
 
@@ -473,7 +473,7 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
         fig.text(0.05, 0.06, f"Dos cases iguales apilados. Las ruedas del de arriba entran {prof} mm en "
                              f"los platos del de abajo. Solo encastran cases con las mismas medidas "
                              f"exteriores y la misma disposición de ruedas.", fontsize=9, color="#333")
-        pdf.savefig(fig)
+        pdf.savefig(fig, dpi=220)  # imágenes nítidas (por defecto se bajan a 100 dpi)
         plt.close(fig)
         pag += 1
 
@@ -666,7 +666,7 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
         for ln in lns:
             fig.text(0.06, yn, ln, fontsize=fs_n, color="#333")
             yn -= dy_n
-        pdf.savefig(fig)
+        pdf.savefig(fig, dpi=220)  # imágenes nítidas (por defecto se bajan a 100 dpi)
         plt.close(fig)
         pag += 1
 
@@ -702,7 +702,7 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
         fig.text(0.04, 0.06, f"Kerf {info['placa'][2]} mm entre piezas, margen "
                              f"{info['placa'][3]} mm al borde. 'Girada' = pieza rotada 90°; "
                              f"usá --sin-rotar si importa la veta.", fontsize=8, color="#333")
-        pdf.savefig(fig)
+        pdf.savefig(fig, dpi=220)  # imágenes nítidas (por defecto se bajan a 100 dpi)
         plt.close(fig)
         pag += 1
 
@@ -748,7 +748,7 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
     fig.text(0.04, 0.04, "Los perfiles de cierre se cortan a inglete: el largo es la punta larga "
                          "(cara exterior). Alterná el sentido del inglete al cortar para aprovechar "
                          "la barra.", fontsize=8, color="#333")
-    pdf.savefig(fig)
+    pdf.savefig(fig, dpi=220)  # imágenes nítidas (por defecto se bajan a 100 dpi)
     plt.close(fig)
     pag += 1
 
@@ -772,7 +772,7 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
     nota = "Cantidades para " + (f"{Nc} cases." if Nc > 1 else "1 case.") + \
         " Las referencias son las del catálogo de herrajes cargado (flightcase_gen/catalogo_fr.scad)."
     fig.text(0.03, 0.06, nota, fontsize=8, color="#333")
-    pdf.savefig(fig)
+    pdf.savefig(fig, dpi=220)  # imágenes nítidas (por defecto se bajan a 100 dpi)
     plt.close(fig)
     pdf.close()
 

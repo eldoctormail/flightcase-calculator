@@ -229,6 +229,16 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
             cara = _mul(fuera, 0.2)
             k.contorno([_sum(o, cara, _mul(u, a), _mul(vv, b)) for a, b in ((x0, y0), (x1, y0), (x1, y1), (x0, y1))],
                        "profile", f"{p.nombre}: {c.tipo}")
+            if c.tipo == "encastre" and k.visible(P_RUEDAS):
+                # plato de apilado: reborde por fuera y cubeta metida en la tapa (encastre de flightcase.scad)
+                ala, prof = geo.get("encastre_ala", 10), geo.get("encastre_prof", 30)
+                col_p = k.color(P_RUEDAS, "herraje")
+                for a0, b0, aw, bh in ((x0 - ala, y0 - ala, c.ancho + 2 * ala, ala), (x0 - ala, y1, c.ancho + 2 * ala, ala),
+                                       (x0 - ala, y0, ala, c.alto), (x1, y0, ala, c.alto)):
+                    k.caja(_sum(o, _mul(u, a0), _mul(vv, b0), _mul(fuera, 1.5)), u, vv, n, aw, bh, 1.5, col_p,
+                           ComponentLayer.BASE_ALU, "Plato")
+                k.caja(_sum(o, _mul(u, x0 + 0.5), _mul(vv, y0 + 0.5), _mul(n, prof - 1.5)), u, vv, n,
+                       c.ancho - 1, c.alto - 1, 1.5, col_p, ComponentLayer.BASE_ALU, "Plato")
             if c.tipo == "manija" and k.visible(P_MANIJAS):
                 k.caja(_sum(o, _mul(u, x0 - 10), _mul(vv, y0 - 10), _mul(fuera, 2)), u, vv, n,
                        c.ancho + 20, c.alto + 20, 2, k.color(P_MANIJAS, "herraje"), ComponentLayer.BASE_ALU, "Manija")
