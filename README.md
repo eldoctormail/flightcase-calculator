@@ -131,6 +131,11 @@ En GitHub corren solos en cada PR y en cada cambio a main (`.github/workflows/te
 - `lista_cortes.csv` y `materiales.csv` (separador `;`, se abren directo en Excel)
 - `planos.pdf`: piezas acotadas, aprovechamiento de placas, cortes de perfiles y materiales
 - `instructivo_montaje.pdf`: perspectiva explotada y pasos de armado con sus láminas 3D (`montaje/*.png`, dibujadas por la app; el aluminio y los herrajes van simplificados)
+- `case_3d.step`: el case armado en 3D para abrir en Fusion, SolidWorks o FreeCAD (ver abajo)
+
+### Exportar a STEP
+
+Con el botón **Exportar STEP…** de la pestaña Taller (o **Archivo → Exportar case del taller a STEP**) se guarda el case armado, con las tapas cerradas, como un ensamble STEP (AP214, en milímetros). Cada pieza es un sólido de caras planas con su nombre y su color: los paneles con sus calados pasantes, los aros y ángulos de aluminio, los esquineros, cierres, manijas y ruedas (simplificados, igual que en la vista 3D) y el interior (equipos, espuma con sus bolsillos, cajones y rack). El archivo lo escribe la app directamente, sin librerías de CAD; los tests lo validan con OpenCASCADE (el motor de FreeCAD) cuando está instalado.
 
 ### Interiores
 

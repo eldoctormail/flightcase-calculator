@@ -214,6 +214,11 @@ class FlightCaseMainWindow(QMainWindow):
         taller_pack_action.triggered.connect(self._export_taller_pack)
         self.file_menu.addAction(taller_pack_action)
 
+        taller_step_action = QAction("Exportar case del taller a STEP (3D para CAD)...", self)
+        taller_step_action.setShortcut("Ctrl+Alt+S")
+        taller_step_action.triggered.connect(self._export_taller_step)
+        self.file_menu.addAction(taller_step_action)
+
         self.file_menu.addSeparator()
 
         exit_action = QAction("&Salir", self)
@@ -686,6 +691,11 @@ class FlightCaseMainWindow(QMainWindow):
     def _open_taller_project(self) -> None:
         self.center_tabs.setCurrentWidget(self.taller_widget)
         self.taller_widget.abrir()
+
+    def _export_taller_step(self) -> None:
+        """El case de la pestaña Taller como modelo 3D STEP (Fusion, SolidWorks, FreeCAD)."""
+        self.center_tabs.setCurrentWidget(self.taller_widget)
+        self.taller_widget.exportar_step()
 
     def _export_taller_pack(self) -> None:
         """Arma DXF, listas y planos.pdf de un proyecto .scad con las reglas del taller."""

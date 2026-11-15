@@ -34,7 +34,7 @@ def test_paquete_igual_que_generar_py(caso, tmp_path):
         # OpenSCAD aproxima las esquinas redondeadas con polígonos de 32 lados
         largo = largo_contornos((tmp_path / "dxf" / nombre).read_text(encoding="utf-8"))
         assert largo == pytest.approx(largo_os, rel=2e-3), nombre
-    assert len(paq.archivos) == len(largos) + 2
+    assert len(paq.archivos) == len(largos) + 3     # + lista_cortes, materiales y case_3d.step
 
 
 def test_dxf_panel_con_calados_y_rebaje():
