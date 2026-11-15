@@ -908,6 +908,18 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
             panelmat.append([f"bandeja{i}", _band_mat(b), _band_esp(b)])
         bandejas_out.append([f"bandeja{i}", b[2], bandeja_soportes])
 
+    # ---- interiores (equipos, espuma, cajones, rack 19"): no están en flightcase.scad ----
+    interior = None
+    from . import interiores as _int
+    if _int.hay_interiores(P):
+        interior = _int.calcular(P, dict(
+            horizontal=_hz, frontal=_fr, dos_tapas=_2t, ext_ancho=ext_ancho, ext_prof=ext_prof, ext_alto=ext_alto,
+            pared=pared, espuma=_espuma, z_cierre=z_cierre, z_cierre2=z_cierre2, bandejas=bandejas,
+            band_esp=_band_esp), cat)
+        extras_p += interior.extras
+        herrajes += [Herraje(*h) for h in interior.herrajes]
+        A += interior.avisos
+
     # Ubicación 3D de cada panel (como colocar()/paredes() de flightcase.scad, case cerrado):
     # o = esquina local (0,0), u = dirección del ancho, v = del alto, n = normal hacia adentro.
     z0_tapa = z_cierre + cierre_h_sup
@@ -957,9 +969,12 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         ruedas_en_base=[list(c) for c in ruedas_en_base], rueda_placa=list(E_rueda_placa),
         rueda_diametro=E_rueda_diametro, rueda_frenos=rueda_frenos,
         pies=[list(c) for c in pies_centros], pie_d=_pie_d, pie_h=_pie_h, encastre_ala=E_encastre_ala, encastre_prof=E_encastre_profundidad,
-        bandejas=[dict(cx=(ext_alto - _bc) if _hz else ext_ancho / 2, cy=_bc if _fr else ext_prof / 2,
+        # en un case frontal el eje de las tapas queda en -Y (ubicar): el centro del cuerpo está en
+        # ext_alto - _bc (flightcase.scad usa _bc, que sólo coincide con dos tapas iguales)
+        bandejas=[dict(cx=(ext_alto - _bc) if _hz else ext_ancho / 2, cy=(ext_alto - _bc) if _fr else ext_prof / 2,
                        z=pared + b[2] - _band_esp(b), ancho=b[0], fondo=b[1], esp=_band_esp(b))
                   for b in bandejas],
+        interior=interior,
     )
 
     return ResultadoTaller(
@@ -969,5 +984,5 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
                  "placa_largo": E_placa_largo, "placa_ancho": E_placa_ancho, "placa_esp": E_placa_esp,
                  "placa_material": E_placa_material, "placa_kerf": placa_kerf, "placa_margen": placa_margen,
                  "barra_largo": barra_largo, "sierra_kerf": sierra_kerf, "cantidad_cases": cantidad_cases,
-                 "remache_ref": E_remache_ref, "geo": geo},
+                 "remache_ref": E_remache_ref, "geo": geo, "interiores": interior},
     )

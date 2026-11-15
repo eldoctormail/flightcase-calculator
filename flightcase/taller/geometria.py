@@ -42,6 +42,7 @@ class Opciones3D:
     vista_parte: str = ""           # "fija" o "cubierta"
     cubierta_abierta: float = 0.0
     etiquetas: Dict[str, str] = field(default_factory=dict)   # id de panel -> "P3"
+    interior: bool = True           # equipos, espuma, cajones y rack (sólo con paso = 99)
 
     @classmethod
     def desde_defs(cls, defs: dict) -> "Opciones3D":
@@ -476,10 +477,101 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
                    (0, 0, 1), b["ancho"], b["fondo"], b["esp"], col,
                    ComponentLayer.INTERNAL_DIVIDERS, f"Bandeja {i + 1}", mundo=True)
 
+    # Interiores (equipos, espuma, cajones, rack), en coordenadas del mundo
+    if geo.get("interior") is not None and op.interior and op.paso >= 99 and not op.resaltar_que \
+            and not op.vista_parte:
+        _interior_3d(k, geo["interior"], lift)
+
     pts = [p for f in k.caras for p in f.vertices] or [Point3D(0, 0, 0)]
     caja = (Point3D(min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)),
             Point3D(max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
     return Malla3D(faces=k.caras, segments=k.segmentos, bounding_box=caja, rotulos=k.rotulos, calados=k.calados)
+
+
+_COLOR_INTERIOR = {"equipo": "equipo", "rack": "equipo", "riel": "aluminio", "corredera": "aluminio",
+                   "cajon": "cajon", "suplemento": "cajon", "caratula": "herraje"}
+
+
+def _interior_3d(k: _Constructor, interior, lift: float = 0.0) -> None:
+    """Sólidos del interior (interiores.py): cajas, y la espuma con sus calados. Lo que
+    está dentro de una tapa (espuma de la tapa, un equipo que entra en ella) se mueve con ella."""
+    capa = ComponentLayer.INTERNAL_DIVIDERS
+    arriba = k.girar((0.0, 0.0, 1.0))   # hacia la tapa 1, en el mundo
+
+    def mover(c):
+        t = interior.en_tapa(c) * interior.signo_tapa * lift
+        if not t:
+            return c
+        return type(c)(c.x0 + arriba[0] * t, c.y0 + arriba[1] * t, c.z0 + arriba[2] * t,
+                       c.x1 + arriba[0] * t, c.y1 + arriba[1] * t, c.z1 + arriba[2] * t)
+    for so in interior.solidos:
+        if so.tipo in ("espuma", "bandeja"):
+            continue   # la espuma se dibuja con sus calados; las bandejas ya están
+        c = mover(so.caja)
+        color = _COLOR_INTERIOR.get(so.tipo, "equipo")
+        if so.tipo == "rack" and so.nombre.endswith("(frente)"):
+            color = "rack_frente"
+        k.caja((c.x0, c.y0, c.z0), (1, 0, 0), (0, 1, 0), (0, 0, 1), c.med(0), c.med(1), c.med(2), color, capa,
+               so.nombre, mundo=True)
+    for bl in interior.espumas:
+        _espuma_3d(k, bl, capa, mover(bl.caja))
+
+
+def _espuma_3d(k: _Constructor, bl, capa: int, c=None) -> None:
+    """Bloque de espuma como relieve: cada celda de la grilla que forman los calados tiene su
+    propia altura (el fondo del calado o la cara abierta del bloque)."""
+    c, a = c or bl.caja, bl.eje
+    ua, va = {0: (1, 2), 1: (0, 2), 2: (0, 1)}[a]
+    Wu, Wv, L = c.med(ua), c.med(va), c.med(a)
+    sg = 1.0 if bl.abre_arriba else -1.0
+
+    def P(u: float, v: float, d: float) -> Point3D:
+        q = [0.0, 0.0, 0.0]
+        q[ua], q[va] = c.lo(ua) + u, c.lo(va) + v
+        q[a] = c.lo(a) + d if bl.abre_arriba else c.hi(a) - d
+        return Point3D(q[0], q[1], q[2])
+
+    def eje(i: int, signo: float) -> Vec:
+        n = [0.0, 0.0, 0.0]
+        n[i] = signo
+        return (n[0], n[1], n[2])
+
+    def cara(verts, normal):
+        k.caras.append(PolygonFace3D(vertices=tuple(verts), normal=normal, color_group="espuma",
+                                     label=bl.nombre, layer_order=capa))
+
+    us = sorted({0.0, Wu} | {round(b[x], 3) for b in bl.bolsillos for x in ("u0", "u1")})
+    vs = sorted({0.0, Wv} | {round(b[x], 3) for b in bl.bolsillos for x in ("v0", "v1")})
+    nu, nv = len(us) - 1, len(vs) - 1
+    alto = [[L] * nv for _ in range(nu)]
+    for i in range(nu):
+        for j in range(nv):
+            um, vm = (us[i] + us[i + 1]) / 2, (vs[j] + vs[j + 1]) / 2
+            for b in bl.bolsillos:
+                if b["u0"] < um < b["u1"] and b["v0"] < vm < b["v1"]:
+                    alto[i][j] = min(alto[i][j], b["fondo"])
+    cara([P(0, 0, 0), P(Wu, 0, 0), P(Wu, Wv, 0), P(0, Wv, 0)], eje(a, -sg))
+    for i in range(nu):
+        for j in range(nv):
+            h = alto[i][j]
+            if h > 0.01:
+                cara([P(us[i], vs[j], h), P(us[i + 1], vs[j], h), P(us[i + 1], vs[j + 1], h), P(us[i], vs[j + 1], h)],
+                     eje(a, sg))
+    H = lambda i, j: alto[i][j] if 0 <= i < nu and 0 <= j < nv else 0.0
+    for i in range(nu + 1):          # paredes perpendiculares a u
+        for j in range(nv):
+            h0, h1 = H(i - 1, j), H(i, j)
+            if abs(h0 - h1) > 0.01:
+                lo_, hi_ = min(h0, h1), max(h0, h1)
+                cara([P(us[i], vs[j], lo_), P(us[i], vs[j + 1], lo_), P(us[i], vs[j + 1], hi_), P(us[i], vs[j], hi_)],
+                     eje(ua, 1.0 if h0 > h1 else -1.0))
+    for j in range(nv + 1):          # paredes perpendiculares a v
+        for i in range(nu):
+            h0, h1 = H(i, j - 1), H(i, j)
+            if abs(h0 - h1) > 0.01:
+                lo_, hi_ = min(h0, h1), max(h0, h1)
+                cara([P(us[i], vs[j], lo_), P(us[i + 1], vs[j], lo_), P(us[i + 1], vs[j], hi_), P(us[i], vs[j], hi_)],
+                     eje(va, 1.0 if h0 > h1 else -1.0))
 
 
 def _rect_redondeado(x0: float, y0: float, x1: float, y1: float, r: float, por_esquina: int = 8):
