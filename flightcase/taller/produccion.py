@@ -167,6 +167,23 @@ def _vistas_extra(d: Dict[str, Any], carpeta: str) -> list:
     return vistas
 
 
+def _vistas_interior(res: ResultadoTaller, carpeta: str, piezas) -> list:
+    """Hojas del interior (espuma por capas, rack, cajones) con una vista 3D con las tapas abiertas."""
+    if res.valores.get("interiores") is None:
+        return []
+    from .geometria import Opciones3D, malla_3d
+    from .planos import interior as pl_int
+    from .render import renderizar
+    v = res.valores
+    png = os.path.join(carpeta, "interior.png")
+    op = Opciones3D(abrir_tapa=round(0.8 * max(v["ext_ancho"], v["ext_prof"], v["ext_alto"])))
+    try:
+        ok = renderizar(malla_3d(res, op), png, "0,0,0,62,0,28,0", "1600,1200")
+    except Exception:
+        ok = False
+    return pl_int.vistas_planos(res, carpeta, piezas, png if ok else None)
+
+
 def _renderizador(res: ResultadoTaller):
     """Función render(salida_png, defs, camara, tam) que espera instructivo.py, hecha con
     la vista 3D propia en lugar de OpenSCAD."""
@@ -302,9 +319,14 @@ def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool =
             if instructivo:
                 from .planos import instructivo as ins
                 pasos = ins.armar_pasos(d, piezas)
+                from .planos import interior as pl_int
+                p_int = pl_int.pasos_instructivo(res, piezas)
+                if p_int:   # antes del paso final (el case terminado), si lo hay
+                    fin = next((i for i, p in enumerate(pasos) if p.get("vista") == "final"), len(pasos))
+                    pasos[fin:fin] = p_int
                 laminas = ins.renderizar_laminas(render, d, piezas, os.path.join(carpeta, "montaje"), pasos)
                 paq.archivos += sorted(set(laminas.values()))
-        vistas = _vistas_extra(d, carpeta)
+        vistas = _vistas_extra(d, carpeta) + _vistas_interior(res, carpeta, piezas)
         ruta = os.path.join(carpeta, "planos.pdf")
         gen.generar_pdf(ruta, d, piezas, placas, barras, render_png, None, laminas.get("explotado"), vistas)
         paq.archivos += [v[1] for v in vistas] + [ruta]

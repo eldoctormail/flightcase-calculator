@@ -140,6 +140,7 @@ class ResultadoInteriores:
     util: Optional[Caja] = None       # espacio útil total (cuerpo y tapas)
     cuerpo: Optional[Caja] = None     # espacio útil del cuerpo
     rack: Optional[Dict[str, Any]] = None
+    cajones: List[Dict[str, Any]] = field(default_factory=list)   # para los planos
     eje_tapas: int = 2                # eje del mundo sobre el que abren las tapas
     signo_tapa: int = 1               # hacia dónde queda la tapa 1 sobre ese eje
 
@@ -435,6 +436,9 @@ def calcular(P: Dict[str, Any], ctx: Dict[str, Any], cat: CatalogoTaller) -> Res
                                                      (zc0 + (h_caja - alto_c) / 2, zc0 + (h_caja + alto_c) / 2)]),
                                         grupo, fijo=True))
             envolventes.append((nombre, z0, z0 + alto))
+            R.cajones.append(dict(nombre=nombre, z=z, alto=alto, ancho=W, largo=largo, caja_ancho=caja_ancho,
+                                  h_caja=h_caja, esp=e, holgura=h, retiro=retiro, corredera=ce_,
+                                  ancho_util=cuerpo.med(0), alto_util=total.med(2)))
             piezas = [
                 (s(nombre, " frente"), W - 2 * h, alto - h, 1),
                 (s(nombre, " lateral"), largo, h_caja - e, 2),
@@ -569,6 +573,7 @@ def _rack(R: ResultadoInteriores, P: Dict[str, Any], ctx: Dict[str, Any], cat: C
                          s("Placa o listón ", e_s, " mm")])
     # equipos
     ocupado: List[Tuple[int, int, str]] = []
+    lista_eq: List[Dict[str, Any]] = []
     siguiente = 1
     peso = 0.0
     fondo_max = 0.0
@@ -594,6 +599,7 @@ def _rack(R: ResultadoInteriores, P: Dict[str, Any], ctx: Dict[str, Any], cat: C
             if min(o1, u_hasta) >= max(o0, u_desde):
                 A.append(s(nombre, " y ", on, " ocupan las mismas unidades del rack."))
         ocupado.append((u_desde, u_hasta, nombre))
+        lista_eq.append(dict(nombre=nombre, u=u, desde=u_desde, hasta=u_hasta, fondo=fondo, peso=p_kg, sale=sal))
         if retiro + fondo + cables > d_max + 0.01:
             A.append(s(nombre, " no entra de fondo: necesita ", round(retiro + fondo + cables, 1),
                        " mm (retiro + fondo + ", cables, " de cables) y hay ", round(d_max, 1), " mm."))
@@ -674,7 +680,9 @@ def _rack(R: ResultadoInteriores, P: Dict[str, Any], ctx: Dict[str, Any], cat: C
                            s("riel de ", riel_esp, " mm"), ref_t if cat.existe(ref_t) else ""])
         R.herrajes.append(["Tornillo M6x16 con arandela plástica", tornillos, "4 por equipo de 1-2 U, 8 desde 3 U", ""])
     R.rack = dict(u=rack_u, largo=L, desde=a0, retiro=retiro, suplemento=supl, ancho=W, fondo_util=d_max,
-                  fondo_cuerpo=d_cuerpo, libres=len(libres))
+                  fondo_cuerpo=d_cuerpo, libres=len(libres), equipos=lista_eq, huecos=huecos,
+                  largo_util=a_largo, ala=ala, traseros=traseros, dist_traseros=dist_tr if traseros else 0,
+                  frontal=fr, cables=cables, caratulas=caratulas)
     R.resumen.append(s("Rack 19\": ", rack_u, " U (", round(L, 1), " mm, U1 ", txt_eje, "), rieles a ", retiro,
                        " mm del cierre", s(", suplemento de ", round(supl, 1), " mm por lado") if supl >= 1 else "",
                        "; fondo para equipos: ", round(d_cuerpo - retiro, 1), " mm en el cuerpo",
