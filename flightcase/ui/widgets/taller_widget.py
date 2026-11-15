@@ -405,7 +405,8 @@ class TallerWidget(QWidget):
         self.cmb_estilo.setToolTip("Aplica una forma de armado (tapas, accesos, bisagras, ruedas…) "
                                    "sin tocar las medidas ni el interior.")
         self.cmb_estilo.activated.connect(self._estilo_elegido)
-        fila_estilo.addWidget(self.cmb_estilo, 1)
+        self.cmb_estilo.setMaximumWidth(460)
+        fila_estilo.addWidget(self.cmb_estilo)
         self.btn_guardar_estilo = QPushButton("Guardar como estilo…")
         self.btn_guardar_estilo.setToolTip("Guarda cómo está armado este case (sin medidas ni interior) "
                                            "para usarlo en otros proyectos.")
@@ -414,10 +415,11 @@ class TallerWidget(QWidget):
         self.btn_borrar_estilo = QPushButton("Borrar estilo")
         self.btn_borrar_estilo.clicked.connect(lambda: self.borrar_estilo())
         fila_estilo.addWidget(self.btn_borrar_estilo)
+        fila_estilo.addStretch(1)
         raiz.addLayout(fila_estilo)
         self.lbl_estilo = QLabel()
         self.lbl_estilo.setWordWrap(True)
-        self.lbl_estilo.setStyleSheet("color:#666")
+        self.lbl_estilo.setStyleSheet("font-style:italic")
         raiz.addWidget(self.lbl_estilo)
         self._cargar_estilos()
 
@@ -495,6 +497,7 @@ class TallerWidget(QWidget):
         divisor.addWidget(derecha)
         divisor.setStretchFactor(0, 40)
         divisor.setStretchFactor(1, 60)
+        divisor.setSizes([480, 900])   # que entren los nombres de los herrajes elegidos
         raiz.addWidget(divisor, 1)
 
     # ------------------------------------------------------------- estilos
@@ -670,7 +673,7 @@ class TallerWidget(QWidget):
         for r, fila in enumerate(filas):
             for c, texto in enumerate(fila):
                 item = QTableWidgetItem(texto)
-                if c and texto.replace(".", "", 1).replace("-", "", 1).isdigit():
+                if c and texto.removeprefix("-").replace(".", "", 1).isdigit():   # números, no refs (08-41076)
                     item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 tabla.setItem(r, c, item)
 
