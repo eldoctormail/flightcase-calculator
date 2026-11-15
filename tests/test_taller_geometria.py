@@ -65,4 +65,4 @@ def test_orientaciones_acostadas_giran_el_case(orientacion):
     v = res.valores
     # el eje de las tapas (alto local) pasa a X en horizontal y a Y en frontal
     largo = b.x - a.x if orientacion == "horizontal" else b.y - a.y
-    assert largo == pytest.approx(v["ext_alto"], abs=10)
+    assert largo == pytest.approx(v["ext_alto"], abs=40)  # + esquineros y perfiles salientes

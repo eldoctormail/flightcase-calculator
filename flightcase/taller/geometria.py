@@ -13,6 +13,8 @@ Igual que el modelo de OpenSCAD, admite los parámetros de las láminas del inst
 
 from __future__ import annotations
 
+import math
+
 from dataclasses import dataclass, field
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -60,7 +62,8 @@ class Rotulo:
     """Etiqueta de un panel para dibujar sobre la lámina."""
     texto: str
     centro: Point3D
-    normal: Vec          # hacia afuera del case
+    normal: Vec          # hacia donde mira la cara del panel
+    tam: float = 30.0    # alto de letra en mm (como rotulo() de flightcase.scad)
 
 
 @dataclass
@@ -104,19 +107,22 @@ class _Constructor:
     def visible(self, paso: int) -> bool:
         return self.op.paso >= paso
 
-    def color(self, paso: int, color: str, tipo: str = "") -> str:
+    def color(self, paso: int, color: str) -> str:
+        """cc(): resalta lo que se agrega en el paso (salvo en láminas con otro resaltado)."""
         op = self.op
-        if op.resaltar_que:
-            if op.resaltar_que in ("perfiles", "aro") and tipo in ("aro", "perfil"):
-                return "resalte" if op.resaltar_que == "perfiles" or tipo == "aro" else color
-            if op.resaltar_que == "bandeja" and tipo == "bandeja":
-                return "resalte"
-            if op.resaltar_que == "junta" and tipo == "junta":
-                return "resalte"
-            return color
-        if op.paso < 99 and op.paso == paso and not op.resaltar_cubierta:
+        if op.paso < 99 and op.paso == paso and not op.resaltar_cubierta and not op.resaltar_que:
             return "resalte"
         return color
+
+    def color_perfil(self, paso: int, color: str) -> str:
+        """_col_perf(): en las láminas de perfiles o de aro, los aros van resaltados."""
+        return "resalte" if self.op.resaltar_que in ("perfiles", "aro") else self.color(paso, color)
+
+    def bloque(self, x0: float, x1: float, y0: float, y1: float, z0: float, z1: float, color: str,
+               capa: int, etiqueta: str = "") -> None:
+        """Caja alineada a los ejes locales del case."""
+        if x1 - x0 > 0.01 and y1 - y0 > 0.01 and z1 - z0 > 0.01:
+            self.caja((x0, y0, z0), (1, 0, 0), (0, 1, 0), (0, 0, 1), x1 - x0, y1 - y0, z1 - z0, color, capa, etiqueta)
 
     def _p(self, v: Vec, mundo: bool) -> Point3D:
         x, y, z = v if mundo else self.ubicar(v)
@@ -143,6 +149,24 @@ class _Constructor:
         for verts, normal, canto in caras:
             self.caras.append(PolygonFace3D(vertices=verts, normal=normal, color_group=color, label=etiqueta,
                                             is_endgrain=canto and color in ("base", "lid"), layer_order=capa))
+
+    def cilindro(self, centro: Vec, eje: Vec, a: Vec, b: Vec, r: float, largo: float, color: str,
+                 capa: int, etiqueta: str = "", lados: int = 20) -> None:
+        """Cilindro de radio r centrado en `centro`, con el eje (unitario) perpendicular a a y b."""
+        ang = [2 * math.pi * i / lados for i in range(lados)]
+        rad = [_sum(_mul(a, math.cos(t)), _mul(b, math.sin(t))) for t in ang]
+        abajo = [_sum(centro, _mul(eje, -largo / 2), _mul(d, r)) for d in rad]
+        arriba = [_sum(centro, _mul(eje, largo / 2), _mul(d, r)) for d in rad]
+        P = lambda q: self._p(q, False)
+        self.caras.append(PolygonFace3D(vertices=tuple(P(q) for q in reversed(abajo)), normal=self.girar(_mul(eje, -1)),
+                                        color_group=color, label=etiqueta, layer_order=capa))
+        self.caras.append(PolygonFace3D(vertices=tuple(P(q) for q in arriba), normal=self.girar(eje),
+                                        color_group=color, label=etiqueta, layer_order=capa))
+        for i in range(lados):
+            j = (i + 1) % lados
+            normal = self.girar(_mul(_sum(rad[i], rad[j]), 0.5))
+            self.caras.append(PolygonFace3D(vertices=(P(abajo[i]), P(abajo[j]), P(arriba[j]), P(arriba[i])),
+                                            normal=normal, color_group=color, label=etiqueta, layer_order=capa))
 
     def contorno(self, puntos: Iterable[Vec], color: str, etiqueta: str = "") -> None:
         pts = [self._p(p, False) for p in puntos]
@@ -171,20 +195,22 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
     hib = geo["hibrido"]
     s = geo["cierre_saliente"]
 
-    # Paneles, con sus calados, manijas y cierres sobre la cara exterior
+    cub_ids = {"cuerpo_trasera", "acceso_izq", "acceso_der"} if geo["cubierta"] else set()
+    ver_fija, ver_cub = op.vista_parte != "cubierta", op.vista_parte != "fija"
+    cl = op.cubierta_abierta
+
+    # Paneles, con sus calados, manijas y cierres sobre la cara exterior (colocar/herrajes_panel)
     for col in geo["colocaciones"]:
         p = paneles[col["id"]]
         grupo = col["grupo"]
         paso_p = P_CUERPO if grupo == "cuerpo" else P_TAPA
         if not k.visible(paso_p):
             continue
-        cub = "cubierta" in p.nombre.lower() or (p.id.startswith("acceso") and geo.get("cubierta"))
-        if (op.vista_parte == "fija" and cub) or (op.vista_parte == "cubierta" and grupo == "cuerpo" and not cub):
+        cub = col["id"] in cub_ids
+        if (cub and not ver_cub) or (grupo == "cuerpo" and not cub and col["id"] != "piso" and not ver_fija):
             continue
         u, vv, n = col["u"], col["v"], col["n"]
-        o = _sum(col["o"], (0, 0, desplaz.get(grupo, 0.0)), _mul(n, -ex))
-        if cub and op.cubierta_abierta:
-            o = _sum(o, (0, 0, op.cubierta_abierta))
+        o = _sum(col["o"], (0, 0, desplaz.get(grupo, 0.0)), _mul(n, -ex), (0, cl if cub else 0, 0))
         color = "resalte" if (cub and op.resaltar_cubierta) else k.color(paso_p, _GRUPO_COLOR.get(grupo, "base"))
         k.caja(o, u, vv, n, p.ancho, p.alto, t, color, _GRUPO_CAPA.get(grupo, 30), p.nombre)
         fuera = _mul(n, -1)
@@ -192,7 +218,10 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
             man = [c for c in calados.get(p.id, []) if c.tipo == "manija"]
             ly = (man[0].cy - man[0].alto / 2) / 2 if man else p.alto / 2
             centro = _sum(o, _mul(u, p.ancho / 2), _mul(vv, ly), _mul(fuera, 0.5))
-            k.rotulos.append(Rotulo(op.etiquetas[col["id"]], k._p(centro, False), k.girar(fuera)))
+            tam = max(min(min(p.ancho, p.alto) * 0.3, 60), 12)
+            k.rotulos.append(Rotulo(op.etiquetas[col["id"]], k._p(centro, False), k.girar(fuera), tam))
+            adentro = _sum(o, _mul(u, p.ancho / 2), _mul(vv, ly), _mul(n, t + 0.5))   # también del lado de adentro
+            k.rotulos.append(Rotulo(op.etiquetas[col["id"]], k._p(adentro, False), k.girar(n), tam))
         for c in calados.get(p.id, []):
             if c.tipo == "rebaje":
                 continue
@@ -204,100 +233,173 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
                 k.caja(_sum(o, _mul(u, x0 - 10), _mul(vv, y0 - 10), _mul(fuera, 2)), u, vv, n,
                        c.ancho + 20, c.alto + 20, 2, k.color(P_MANIJAS, "herraje"), ComponentLayer.BASE_ALU, "Manija")
         for m in marcas.get(p.id, []):
-            if m.tipo in ("cierre", "bisagra", "cierre_acceso") and k.visible(P_CIERRES):
-                a = 60 if m.tipo == "bisagra" else 50
-                k.caja(_sum(o, _mul(u, m.x - a / 2), _mul(vv, m.y - 25), _mul(fuera, 6 + s)), u, vv, n,
-                       a, 50, 6, k.color(P_CIERRES, "herraje"), ComponentLayer.BASE_ALU,
-                       "Bisagra" if m.tipo == "bisagra" else "Cierre")
-            elif m.tipo == "manija_sup" and k.visible(P_MANIJAS):
+            if m.tipo == "manija_sup" and k.visible(P_MANIJAS):
                 k.caja(_sum(o, _mul(u, m.x - m.ancho / 2), _mul(vv, m.y - 12), _mul(fuera, 12)), u, vv, n,
                        m.ancho, 24, 12, k.color(P_MANIJAS, "herraje"), ComponentLayer.BASE_ALU, "Manija")
+            elif m.tipo == "cierre_acceso" and k.visible(P_CIERRES):
+                dx = 1 if m.texto == "+" else -1
+                lado = m.panel in ("cuerpo_izq", "cuerpo_der")
+                xs = (m.x - 35 * dx, m.x + 18 * dx) if lado else (m.x - 22 * dx, m.x + 14 * dx)
+                k.caja(_sum(o, _mul(u, min(xs)), _mul(vv, m.y - 25), _mul(fuera, 6 + s)), u, vv, n,
+                       abs(xs[1] - xs[0]), 50, 6, k.color(P_CIERRES, "herraje"), ComponentLayer.BASE_ALU, "Cierre")
+            elif m.tipo in ("cierre", "bisagra") and k.visible(P_CIERRES):
+                d = (1 if m.texto == "c1" else -1) if grupo == "cuerpo" else (-1 if grupo == "tapa" else 1)
+                a = 50 if m.tipo == "cierre" else 60
+                ys = ((m.y - 35 * d, m.y + (14 if m.tipo == "bisagra" else 18) * d) if grupo == "cuerpo"
+                      else (m.y - 22 * d, m.y + 14 * d))
+                k.caja(_sum(o, _mul(u, m.x - a / 2), _mul(vv, min(ys)), _mul(fuera, 6 + s)), u, vv, n,
+                       a, abs(ys[1] - ys[0]), 6, k.color(P_CIERRES, "herraje"), ComponentLayer.BASE_ALU,
+                       "Bisagra" if m.tipo == "bisagra" else "Cierre")
+            elif m.tipo == "rueda" and (geo["horizontal"] or geo["frontal"]) and not geo["base"] and k.visible(P_RUEDAS):
+                _rueda(k, geo, o, u, vv, fuera, m.x, m.y, m.texto == "freno", ex)
+            elif m.tipo == "pie" and (geo["horizontal"] or geo["frontal"]) and k.visible(P_RUEDAS):
+                k.caja(_sum(o, _mul(u, m.x - geo["pie_d"] / 2), _mul(vv, m.y - geo["pie_d"] / 2)), u, vv, fuera,
+                       geo["pie_d"], geo["pie_d"], geo["pie_h"] + ex * 2.2, k.color(P_RUEDAS, "herraje"),
+                       ComponentLayer.BASE_ALU, "Pie")
 
-    # Base de ruedas (bajo el panel de abajo)
+    # Base de ruedas bajo el panel de abajo, con sus ruedas
     base = geo["base"]
     if base and base["panel"] in paneles and k.visible(P_RUEDAS):
         col = next(c for c in geo["colocaciones"] if c["id"] == base["panel"])
-        o = _sum(col["o"], _mul(col["u"], base["x"]), _mul(col["v"], base["y"]),
-                 _mul(col["n"], -base["separacion"] - base["esp"] - ex * 0.8 - ex))
-        k.caja(o, col["u"], col["v"], col["n"], base["ancho"], base["alto"], base["esp"],
-               k.color(P_RUEDAS, "base"), ComponentLayer.BASE_FLOOR, "Base de ruedas")
+        u, vv, n = col["u"], col["v"], col["n"]
+        fuera = _mul(n, -1)
+        o_pan = _sum(col["o"], _mul(n, -ex))
+        o = _sum(o_pan, _mul(u, base["x"]), _mul(vv, base["y"]), _mul(fuera, base["separacion"] + base["esp"] + ex * 0.8))
+        k.caja(o, u, vv, n, base["ancho"], base["alto"], base["esp"], k.color(P_RUEDAS, "base"),
+               ComponentLayer.BASE_FLOOR, "Base de ruedas")
+        for i, (rx, ry) in enumerate(geo["ruedas_en_base"]):
+            _rueda(k, geo, o, u, vv, fuera, rx, ry, i < geo["rueda_frenos"], ex)
 
-    # Aros de cierre (por fuera de las caras): macho en el cuerpo, hembra en la tapa
+    # Aros de cierre: macho en el cuerpo, hembra en la tapa (aro_cierre); con cubierta
+    # removible el del cuerpo va partido a la altura de la junta
     zc1, zc2 = geo["z_cierre"], geo["z_cierre2"]
-    m_alto, h_alto = geo["cierre_m_alto"], geo["cierre_h_alto"]
-    aros = [(zc1 - m_alto + ex * 0.7, m_alto), (zc1 + lift - ex * 0.7, h_alto)]
-    if geo["dos_tapas"]:
-        aros += [(zc2 - ex * 0.7, m_alto), (zc2 - h_alto - lift + ex * 0.7, h_alto)]
+    m_alto, h_alto, pared = geo["cierre_m_alto"], geo["cierre_h_alto"], geo["pared"]
+    yj = Y - geo["j_cub"]
+
+    def aro(z0: float, alto: float, color: str, partir: bool = False) -> None:
+        def marco(ylo: float, yhi: float, dy: float) -> None:
+            for x0, x1, y0, y1 in ((-s, X + s, -s, pared), (-s, X + s, Y - pared, Y + s),
+                                   (-s, pared, pared, Y - pared), (X - pared, X + s, pared, Y - pared)):
+                k.bloque(x0, x1, max(y0, ylo) + dy, min(y1, yhi) + dy, z0, z0 + alto, color,
+                         ComponentLayer.BASE_ALU, "Perfil de cierre")
+        if partir and geo["cubierta"]:
+            if ver_fija:
+                marco(-1e9, yj, 0.0)
+            if ver_cub:
+                marco(yj, 1e9, cl)
+        else:
+            marco(-1e9, 1e9, 0.0)
+
     if k.visible(P_AROS):
-        col_aro = k.color(P_AROS, "profile", "aro")
-        for z0, alto in aros:
-            for o, u, n, largo in (((0, -s, z0), (1, 0, 0), (0, 1, 0), X),
-                                   ((X, Y + s, z0), (-1, 0, 0), (0, -1, 0), X),
-                                   ((-s, Y, z0), (0, -1, 0), (1, 0, 0), Y),
-                                   ((X + s, 0, z0), (0, 1, 0), (-1, 0, 0), Y)):
-                k.caja(o, u, (0, 0, 1), n, largo, alto, s, col_aro, ComponentLayer.BASE_ALU, "Perfil de cierre")
+        sin_tapas = op.resaltar_cubierta or op.vista_parte or op.resaltar_que
+        aro(zc1 - m_alto + ex * 0.7, m_alto, k.color_perfil(P_AROS, "profile"), True)
+        if not sin_tapas:
+            aro(zc1 + lift - ex * 0.7, h_alto, k.color_perfil(P_AROS, "profile_h"))
+        if geo["dos_tapas"]:
+            aro(zc2 - ex * 0.7, m_alto, k.color_perfil(P_AROS, "profile"), True)
+            if not sin_tapas:
+                aro(zc2 - h_alto - lift + ex * 0.7, h_alto, k.color_perfil(P_AROS, "profile_h"))
 
-    # Ángulos de las aristas (con perfil híbrido van con los paneles)
-    ala, e = geo["ala_arista"], 1.5
+    # Ángulos de las aristas y esquineros (aristas_y_esquineros)
     paso_ar_c, paso_ar_t = (P_CUERPO, P_TAPA) if hib else (P_ARISTAS, P_ARISTAS)
-    juntas = [zc1 - m_alto, zc1 + h_alto]
-    if geo["dos_tapas"]:
-        juntas = [zc2 - h_alto, zc2 + m_alto] + juntas
-    cortes = [0.0] + juntas + [Z]
-    tramos = [(a, b) for a, b in zip(cortes[::2], cortes[1::2]) if b - a > 1]
+    e_ar, ala = geo["arista_esp"], geo["ala"]
+    ed = geo["esq_descuento"]
 
-    def dz_de(z: float) -> Tuple[float, int]:
-        """Desplazamiento y paso de lo que está a la altura z (cuerpo o una tapa)."""
-        if z > zc1:
-            return desplaz["tapa"], paso_ar_t
-        if geo["dos_tapas"] and z < zc2:
-            return desplaz["tapa2"], paso_ar_t
-        return 0.0, paso_ar_c
+    def arista(o: Vec, a: Vec, b: Vec, c: Vec, L: float, paso: int, dy: float = 0.0) -> None:
+        if not k.visible(paso) or L < 30:
+            return
+        o = _sum(o, _mul(_sum(a, b), ex * 1.7), (0, dy, 0))
+        col = k.color(paso, "profile")
+        k.caja(_sum(o, _mul(b, -ala)), a, b, c, e_ar, ala + e_ar, L, col, ComponentLayer.BASE_ALU, "Ángulo de arista")
+        k.caja(_sum(o, _mul(a, -ala)), a, b, c, ala + e_ar, e_ar, L, col, ComponentLayer.BASE_ALU, "Ángulo de arista")
 
-    for (cx, cy, sx, sy) in ((0, 0, 1, 1), (X, 0, -1, 1), (X, Y, -1, -1), (0, Y, 1, -1)):
-        for z0, z1 in tramos:
-            dz, paso_a = dz_de((z0 + z1) / 2)
-            if not k.visible(paso_a):
+    def esquinero(o: Vec, a: Vec, b: Vec, c: Vec) -> None:
+        if not k.visible(P_ESQ):
+            return
+        p_, e = geo["esq_pata"], 1.5
+        o = _sum(o, _mul(_sum(a, b, c), ex * 2.4))
+        col = k.color(P_ESQ, "herraje")
+        k.caja(_sum(o, _mul(b, -p_), _mul(c, -p_)), a, b, c, e, p_, p_, col, ComponentLayer.BASE_ALU, "Esquinero")
+        k.caja(_sum(o, _mul(a, -p_), _mul(c, -p_)), a, b, c, p_, e, p_, col, ComponentLayer.BASE_ALU, "Esquinero")
+        k.caja(_sum(o, _mul(a, -p_), _mul(b, -p_)), a, b, c, p_, p_, e, col, ComponentLayer.BASE_ALU, "Esquinero")
+        k.caja(_sum(o, (-12, -12, -12)), (1, 0, 0), (0, 1, 0), (0, 0, 1), 24, 24, 24, col, ComponentLayer.BASE_ALU, "Esquinero")
+
+    if ver_fija or ver_cub:
+        for z, sz in ((0.0, -1), (Z, 1)):
+            dz = desplaz["tapa"] if z > 0 else (desplaz["tapa2"] if geo["dos_tapas"] else 0.0)
+            paso_e = paso_ar_t if (z > 0 or geo["dos_tapas"]) else paso_ar_c
+            if op.vista_parte and z > 0:
                 continue
-            c = k.color(paso_a, "profile", "perfil")
-            k.caja((cx, cy - sy * e, z0 + dz), (sx, 0, 0), (0, 0, 1), (0, sy, 0), ala, z1 - z0, e, c,
-                   ComponentLayer.BASE_ALU, "Ángulo de arista")
-            k.caja((cx - sx * e, cy, z0 + dz), (0, sy, 0), (0, 0, 1), (sx, 0, 0), ala, z1 - z0, e, c,
-                   ComponentLayer.BASE_ALU, "Ángulo de arista")
-    for z, sz in ((0.0, 1), (Z, -1)):   # aristas horizontales de abajo y de arriba
-        dz, paso_a = dz_de(Z if z == Z else 0.0)
-        if not k.visible(paso_a):
-            continue
-        c = k.color(paso_a, "profile", "perfil")
-        for o, u, n, largo in (((0, -e, z + dz), (1, 0, 0), (0, 1, 0), X), ((0, Y, z + dz), (1, 0, 0), (0, 1, 0), X),
-                               ((-e, 0, z + dz), (0, 1, 0), (1, 0, 0), Y), ((X, 0, z + dz), (0, 1, 0), (1, 0, 0), Y)):
-            k.caja(o, u, (0, 0, sz), n, largo, ala, e, c, ComponentLayer.BASE_ALU, "Ángulo de arista")
+            for y0, sy in ((0.0, -1), (Y, 1)):
+                arista((ed, y0, z + dz), (0, sy, 0), (0, 0, sz), (1, 0, 0), geo["L_x"], paso_e)
+            for x0, sx in ((0.0, -1), (X, 1)):
+                arista((x0, ed, z + dz), (sx, 0, 0), (0, 0, sz), (0, 1, 0), geo["L_y"], paso_e)
+            for x0, sx in ((0.0, -1), (X, 1)):
+                for y0, sy in ((0.0, -1), (Y, 1)):
+                    esquinero((x0, y0, z + dz), (sx, 0, 0), (0, sy, 0), (0, 0, sz))
+        for x0, sx in ((0.0, -1), (X, 1)):
+            for y0, sy in ((0.0, -1), (Y, 1)):
+                z_c = zc2 + m_alto if geo["dos_tapas"] else ed
+                if ver_fija or (y0 > 0 and ver_cub):
+                    arista((x0, y0, z_c), (sx, 0, 0), (0, sy, 0), (0, 0, 1), geo["L_zc"], paso_ar_c, cl if y0 > 0 else 0.0)
+                if not op.vista_parte:
+                    arista((x0, y0, zc1 + h_alto + lift), (sx, 0, 0), (0, sy, 0), (0, 0, 1), geo["L_zt"], paso_ar_t)
+                    if geo["dos_tapas"]:
+                        arista((x0, y0, ed - lift), (sx, 0, 0), (0, sy, 0), (0, 0, 1), geo["L_zt2"], paso_ar_t)
 
-    # Esquineros en las esquinas de cada tramo (cuerpo y tapas)
-    if k.visible(P_ESQ):
-        lado = 34
-        for z0, z1 in (tramos or [(0.0, Z)]):
-            dz, _ = dz_de((z0 + z1) / 2)
-            for zc, sz in ((z0, 1), (z1, -1)):
-                for cx, cy, sx, sy in ((0, 0, 1, 1), (X, 0, -1, 1), (X, Y, -1, -1), (0, Y, 1, -1)):
-                    k.caja((cx - sx * 4, cy - sy * 4, zc + dz - sz * 4), (sx, 0, 0), (0, sy, 0), (0, 0, sz),
-                           lado, lado, lado, k.color(P_ESQ, "herraje"), ComponentLayer.BASE_ALU, "Esquinero")
+    # Juntas de las tapas de acceso laterales (juntas_acceso)
+    if geo["acceso"] and k.visible(P_CUERPO):
+        bm, bh = m_alto - geo["cierre_m_sup"], h_alto - geo["cierre_h_sup"]
+        z0 = zc2 + m_alto if geo["dos_tapas"] else ed
+        olc, a_acc, j_acc, w_low = geo["olc"], geo["a_acc"], geo["j_acc"], geo["w_low"]
+        for cara in ("izq", "der"):
+            y_m = Y - olc - a_acc - j_acc - bm if cara == "izq" else olc + w_low - bm
+            y_h = Y - olc - a_acc if cara == "izq" else olc + w_low + j_acc
+            x = -s - ex * 1.5 if cara == "izq" else X - t + ex * 1.5
+            for y0, largo, es_h in ((y_m, bm + j_acc / 2, False), (y_h - j_acc / 2, bh + j_acc / 2, True)):
+                if (ver_cub if es_h else ver_fija):
+                    col = "resalte" if op.resaltar_que in ("perfiles", "junta") else k.color(P_AROS, "profile")
+                    dy = cl if es_h else 0.0
+                    k.bloque(x, x + t + s, y0 + dy, y0 + largo + dy, z0, z0 + geo["L_zc"], col,
+                             ComponentLayer.BASE_ALU, "Junta de acceso")
 
-    # Ruedas (case parado sin base): bloques bajo el piso
+    # Ruedas y pies bajo el piso (case parado)
+    lift_pie = desplaz["tapa2"] if geo["dos_tapas"] else 0.0
     if k.visible(P_RUEDAS):
-        for cx, cy in geo["ruedas"]:
-            h = geo["rueda_alto"] or 100
-            k.caja((cx - 30, cy - 40, -h - ex * 2.2), (1, 0, 0), (0, 1, 0), (0, 0, 1), 60, 80, h,
-                   k.color(P_RUEDAS, "herraje"), ComponentLayer.BASE_ALU, "Rueda")
+        if not base:
+            for i, (cx, cy) in enumerate(geo["ruedas"]):
+                _rueda(k, geo, (0, 0, lift_pie), (1, 0, 0), (0, 1, 0), (0, 0, -1), cx, cy, i < geo["rueda_frenos"], ex)
+        if not (geo["horizontal"] or geo["frontal"]):
+            for cx, cy in geo["pies"]:
+                d = geo["pie_d"]
+                k.bloque(cx - d / 2, cx + d / 2, cy - d / 2, cy + d / 2, lift_pie - geo["pie_h"] - ex * 2.2, lift_pie,
+                         k.color(P_RUEDAS, "herraje"), ComponentLayer.BASE_ALU, "Pie")
 
     # Bandejas (ya en coordenadas del mundo)
-    if k.visible(P_CUERPO) and op.vista_parte != "cubierta" and op.resaltar_que != "perfiles":
+    if k.visible(P_CUERPO) and ver_fija and op.resaltar_que != "perfiles" and \
+            not (op.resaltar_que == "junta" and op.vista_parte == "fija"):
         for i, b in enumerate(geo["bandejas"]):
+            col = "resalte" if op.resaltar_que == "bandeja" else k.color(P_CUERPO, "wall")
             k.caja((b["cx"] - b["ancho"] / 2, b["cy"] - b["fondo"] / 2, b["z"] + ex * 0.6), (1, 0, 0), (0, 1, 0),
-                   (0, 0, 1), b["ancho"], b["fondo"], b["esp"], k.color(P_CUERPO, "wall", "bandeja"),
+                   (0, 0, 1), b["ancho"], b["fondo"], b["esp"], col,
                    ComponentLayer.INTERNAL_DIVIDERS, f"Bandeja {i + 1}", mundo=True)
 
     pts = [p for f in k.caras for p in f.vertices] or [Point3D(0, 0, 0)]
     caja = (Point3D(min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)),
             Point3D(max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
     return Malla3D(faces=k.caras, segments=k.segmentos, bounding_box=caja, rotulos=k.rotulos)
+
+
+def _rueda(k: _Constructor, geo: dict, o: Vec, u: Vec, v: Vec, fuera: Vec, cx: float, cy: float,
+           freno: bool, ex: float) -> None:
+    """Rueda (rueda_3d) simplificada: placa, horquilla y rueda, hacia `fuera` desde o + cx·u + cy·v."""
+    pl, d = geo["rueda_placa"], geo["rueda_diametro"]
+    alto = geo["rueda_alto"] or (d + 25)
+    base = _sum(o, _mul(u, cx), _mul(v, cy), _mul(fuera, ex * 2.2))
+    resalta = k.op.paso < 99 and k.op.paso == P_RUEDAS
+    k.caja(_sum(base, _mul(u, -pl[0] / 2), _mul(v, -pl[1] / 2)), u, v, fuera, pl[0], pl[1], 4,
+           "resalte" if resalta else "herraje", ComponentLayer.BASE_ALU, "Rueda")
+    k.caja(_sum(base, _mul(u, -d * 0.15), _mul(v, -d * 0.4), _mul(fuera, 4)), u, v, fuera, d * 0.3, d * 0.8,
+           max(alto - d - 4, 4), "resalte" if resalta else "herraje", ComponentLayer.BASE_ALU, "Rueda")
+    k.cilindro(_sum(base, _mul(fuera, alto - d / 2)), v, u, fuera, d / 2, d * 0.4,
+               "rueda_freno" if freno else "rueda", ComponentLayer.BASE_ALU, "Rueda")

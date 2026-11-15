@@ -19,6 +19,12 @@ COLORS = {
     "profile_fill": "#784d12",    # Warm bronze aluminum
     "wall_edge": "#ec4899",       # Pink/Magenta
     "wall_fill": "#3b1734",       # Deep magenta
+    "profile_h_edge": "#f59e0b",  # Aro hembra (tapas)
+    "profile_h_fill": "#5c3b0e",
+    "rueda_edge": "#94a3b8",
+    "rueda_fill": "#111827",
+    "rueda_freno_edge": "#f87171",
+    "rueda_freno_fill": "#7f1d1d",
     "herraje_edge": "#cbd5e1",    # Herrajes del taller (esquineros, cierres, manijas)
     "herraje_fill": "#475569",
     "resalte_edge": "#fde047",    # Lo que se agrega en un paso del instructivo

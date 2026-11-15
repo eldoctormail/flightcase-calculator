@@ -19,7 +19,10 @@ from .geometria import Malla3D
 COLORES: Dict[str, str] = {
     "base": "#d8c08e",      # cuerpo (neutro, como en las láminas de OpenSCAD)
     "lid": "#c4a46c",       # tapas
-    "profile": "#b8c0c8",   # aluminio
+    "profile": "#b0c4de",   # aluminio (aro macho, aristas)
+    "profile_h": "#708090", # aro hembra de las tapas
+    "rueda": "#222222",
+    "rueda_freno": "#7a1f1f",
     "herraje": "#5f6670",   # esquineros, cierres, manijas, ruedas
     "wall": "#9a7b4f",      # bandejas
     "resalte": "#ff9f1a",   # lo que se agrega en el paso
@@ -76,45 +79,61 @@ def renderizar(malla: Malla3D, ruta: str, camara: str = "0,0,0,62,0,32,0", tam: 
     img.fill(QColor(FONDO))
     pin = QPainter(img)
     pin.setRenderHint(QPainter.Antialiasing)
-    for _, pts, f in sorted(caras, key=lambda c: c[0]):
-        base = QColor(COLORES.get(f.color_group, COLORES["base"]))
-        luzf = 0.62 + 0.38 * max(0.0, sum(a * b for a, b in zip(f.normal, luz)))
-        col = QColor(int(base.red() * luzf), int(base.green() * luzf), int(base.blue() * luzf))
-        pin.setBrush(QBrush(col))
-        pin.setPen(QPen(col.darker(160), 1.0))
-        pin.drawPolygon(QPolygonF([pantalla(p[0], p[1]) for p in pts]))
-    # contornos de calados sobre las caras visibles (sólo los de caras que miran a la cámara)
-    pin.setPen(QPen(QColor("#3a3a3a"), 1.4))
+
+    # calados (agujeros) agrupados por panel: 4 segmentos seguidos con la misma etiqueta
+    calados_por_cara: Dict[int, list] = {}
+    grupos: Dict[str, list] = {}
     for s in malla.segments:
-        a, b = proy(s.p1), proy(s.p2)
-        pin.drawLine(pantalla(a[0], a[1]), pantalla(b[0], b[1])) if _segmento_visible(s, ojo, malla) else None
-    # rótulos P1, P2... en los paneles que miran a la cámara
-    fuente = QFont("Sans Serif", max(10, int(min(w, h) / 45)))
-    fuente.setBold(True)
-    pin.setFont(fuente)
+        grupos.setdefault(s.label, []).append(s)
+    for etiqueta, segs in grupos.items():
+        for i in range(0, len(segs) - 3, 4):
+            cuatro = segs[i:i + 4]
+            cara = _cara_de(cuatro[0], malla)
+            if cara is not None:
+                calados_por_cara.setdefault(id(cara), []).append(cuatro)
+
+    # rótulos: se ordenan junto con las caras, así los tapa lo que esté delante
+    elementos = [(prof, 0, pts, f) for prof, pts, f in caras]
     for r in malla.rotulos:
-        if sum(a * b for a, b in zip(r.normal, ojo)) <= 0.15:
-            continue
-        x, y, _ = proy(r.centro)
-        pt = pantalla(x, y)
-        ancho = pin.fontMetrics().horizontalAdvance(r.texto) + 16
-        alto = pin.fontMetrics().height() + 6
-        caja = QRectF(pt.x() - ancho / 2, pt.y() - alto / 2, ancho, alto)
-        pin.setPen(QPen(QColor("#222222"), 1.2))
-        pin.setBrush(QBrush(QColor("#ffffff")))
-        pin.drawRoundedRect(caja, 5, 5)
-        pin.drawText(caja, Qt.AlignCenter, r.texto)
+        if sum(a * b for a, b in zip(r.normal, ojo)) > 0.15:
+            x, y, z = proy(r.centro)
+            elementos.append((z + 0.01, 1, (x, y), r))
+
+    for prof, tipo, datos, obj in sorted(elementos, key=lambda e: e[0]):
+        if tipo == 0:
+            base = QColor(COLORES.get(obj.color_group, COLORES["base"]))
+            luzf = 0.62 + 0.38 * max(0.0, sum(a * b for a, b in zip(obj.normal, luz)))
+            col = QColor(int(base.red() * luzf), int(base.green() * luzf), int(base.blue() * luzf))
+            pin.setBrush(QBrush(col))
+            pin.setPen(QPen(col.darker(160), 1.0))
+            pin.drawPolygon(QPolygonF([pantalla(p[0], p[1]) for p in datos]))
+            for cuatro in calados_por_cara.get(id(obj), []):
+                pin.setPen(QPen(QColor("#2a2a2a"), 1.2))
+                pin.setBrush(QBrush(QColor(60, 52, 40)))
+                pin.drawPolygon(QPolygonF([pantalla(*proy(sg.p1)[:2]) for sg in cuatro]))
+        else:
+            pt = pantalla(*datos)
+            fuente = QFont("Sans Serif")
+            fuente.setBold(True)
+            fuente.setPixelSize(max(9, int(obj.tam * esc)))
+            pin.setFont(fuente)
+            ancho = pin.fontMetrics().horizontalAdvance(obj.texto) + fuente.pixelSize() * 0.8
+            alto = fuente.pixelSize() * 1.6
+            caja = QRectF(pt.x() - ancho / 2, pt.y() - alto / 2, ancho, alto)
+            pin.setPen(QPen(QColor("#222222"), 1.2))
+            pin.setBrush(QBrush(QColor("#ffffff")))
+            pin.drawRoundedRect(caja, alto * 0.2, alto * 0.2)
+            pin.drawText(caja, Qt.AlignCenter, obj.texto)
     pin.end()
     return img.save(ruta)
 
 
-def _segmento_visible(seg, ojo, malla) -> bool:
-    """Los calados se dibujan sólo si su panel mira a la cámara."""
+def _cara_de(seg, malla):
+    """Cara exterior del panel sobre la que está dibujado un calado (o None)."""
     for f in malla.faces:
-        if f.label and seg.label.startswith(f.label + ":") and not f.is_endgrain:
-            if sum(a * b for a, b in zip(f.normal, ojo)) > 0 and _en_plano(seg, f):
-                return True
-    return False
+        if f.label and seg.label.startswith(f.label + ":") and not f.is_endgrain and _en_plano(seg, f):
+            return f
+    return None
 
 
 def _en_plano(seg, f) -> bool:
