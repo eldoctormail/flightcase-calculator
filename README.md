@@ -13,6 +13,8 @@ Programa de escritorio (Python + PySide6 + OpenGL) para diseñar y fabricar flig
 - **Estilos de case** (rack, mixer, utilitario, tapa superior, cajonera, etc.) y estilos propios guardados.
 - **Interiores**: espuma en capas con calados rectangulares, redondos o con el contorno de un dibujo, huecos para los dedos, cajones, rack 19" y chequeos de choques.
 - **Herrajes a mano** en cada cara, en 2D, con imán, y placas de logo desde `.svg` / `.dxf`.
+- **Asistente de case nuevo** (`Ctrl+Shift+N` o el botón **Asistente…**): estilo, qué va adentro (vacío, espuma con equipos o rack), medidas sugeridas a partir de los equipos (o exteriores a mano), terminaciones y un resumen antes de abrirlo en el Taller.
+- **Biblioteca de equipos** (`Ctrl+B`, menú **Editar**): tus equipos con sus medidas, peso, U de rack y forma del calado, guardados una vez para cualquier case. Se buscan, se editan en la tabla y se pasan a una planilla CSV de Excel y desde ella. Las tablas de equipos de la espuma y del rack tienen **Desde la biblioteca…** y **Guardar en la biblioteca**.
 - **Vista 3D** con las tapas abiertas o cerradas.
 - **Paquete de producción** (`Ctrl+P`): DXF por pieza y por capa de espuma, lista de cortes y materiales en CSV, `planos.pdf`, instructivo de montaje y el case en STEP para CAD.
 
@@ -102,6 +104,7 @@ En GitHub corren solos en cada PR y en cada cambio a main (`.github/workflows/te
 ### Atajos del Taller
 
 - `Ctrl+N` nuevo case, `Ctrl+O` abrir `.scad`, `Ctrl+S` guardar (sin preguntar si ya tiene archivo), `Ctrl+Shift+S` guardar como
+- `Ctrl+Shift+N` case nuevo con el asistente, `Ctrl+B` biblioteca de equipos
 - `Ctrl+P` exportar el paquete del taller (planos, DXF, instructivo)
 - `Ctrl+Z` deshacer y `Ctrl+Y` (o `Ctrl+Shift+Z`) rehacer cualquier cambio del case: medidas, armado, estilo, herrajes a mano, interior. El menú **Editar** dice qué se va a deshacer; el historial guarda los últimos 200 pasos y empieza de cero al abrir otro proyecto
 - Al abrir la app se vuelve a cargar el último `.scad` que usaste, y la barra de estado muestra medidas, paneles, material y avisos del case

@@ -58,6 +58,8 @@ class FlightCaseMainWindow(QMainWindow):
         self.file_menu = barra.addMenu("&Archivo")
         m = self.file_menu
         self._accion(m, "&Nuevo case", "Ctrl+N", self._taller_nuevo, "Case nuevo con las reglas del taller")
+        self._accion(m, "Nuevo case con el a&sistente...", "Ctrl+Shift+N", self._asistente,
+                     "Case nuevo paso a paso: estilo, equipos, medidas y terminaciones")
         self._accion(m, "&Abrir case (.scad)...", "Ctrl+O", self._taller_abrir, "Abrir un proyecto del taller")
         self.recent_menu = m.addMenu("Abrir &reciente")
         m.addSeparator()
@@ -79,6 +81,9 @@ class FlightCaseMainWindow(QMainWindow):
         self.accion_rehacer = self._accion(self.edit_menu, "&Rehacer", None, self.taller_widget.rehacer)
         self.accion_rehacer.setShortcuts(QKeySequence.keyBindings(QKeySequence.StandardKey.Redo)
                                          + [QKeySequence("Ctrl+Y")])
+        self.edit_menu.addSeparator()
+        self._accion(self.edit_menu, "&Biblioteca de equipos...", "Ctrl+B", self.taller_widget.biblioteca,
+                     "Tus equipos con sus medidas, para usarlos en la espuma o el rack de cualquier case")
         self.taller_widget.historial_cambiado.connect(self._actualizar_historial)
         self._actualizar_historial()
 
@@ -140,6 +145,10 @@ class FlightCaseMainWindow(QMainWindow):
     def _taller_nuevo(self) -> None:
         self.taller_widget.nuevo()
         self._actualizar()
+
+    def _asistente(self) -> None:
+        if self.taller_widget.asistente():
+            self._actualizar()
 
     def _taller_abrir(self) -> None:
         self.abrir()

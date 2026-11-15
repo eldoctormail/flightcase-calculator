@@ -317,9 +317,62 @@ class _EditorTabla:
             b = QPushButton(texto)
             b.clicked.connect(slot)
             botones.addWidget(b)
+        if nombre in ("equipos", "rack_equipos"):   # biblioteca de equipos propios
+            b = QPushButton("Desde la biblioteca…")
+            b.setToolTip("Elegí equipos guardados en tu biblioteca y agregalos a esta tabla")
+            b.clicked.connect(self.desde_biblioteca)
+            botones.addWidget(b)
+            b = QPushButton("Guardar en la biblioteca")
+            b.setToolTip("Guarda las filas elegidas (o todas) en tu biblioteca de equipos, para usarlas en otros cases")
+            b.clicked.connect(lambda: self.guardar_en_biblioteca())
+            botones.addWidget(b)
         botones.addStretch(1)
         lay.addLayout(botones)
         self.widget = w
+
+    # ------------------------------------------------------- biblioteca
+    def agregar_filas(self, filas: List[List[Any]]) -> None:
+        self.tabla.blockSignals(True)
+        try:
+            for fila in filas:
+                self._poner_fila(self.tabla.rowCount(), fila)
+        finally:
+            self.tabla.blockSignals(False)
+        self._al_cambiar()
+
+    def desde_biblioteca(self) -> None:
+        from .biblioteca_widget import BibliotecaDialog
+        rack = self.nombre == "rack_equipos"
+        dlg = BibliotecaDialog(self.widget, agregar=lambda eqs: self.agregar_filas(
+            [e.fila_rack() if rack else e.fila_equipos() for e in eqs]),
+            texto_agregar="Agregar al rack" if rack else "Agregar a los equipos")
+        dlg.exec()
+
+    def guardar_en_biblioteca(self, filas_elegidas: Optional[List[int]] = None) -> int:
+        from ...taller import biblioteca as B
+        try:
+            filas = self.valor()
+        except ValueError:
+            QMessageBox.warning(self.widget, "Biblioteca de equipos", "Hay celdas obligatorias vacías en la tabla.")
+            return 0
+        elegidas = filas_elegidas if filas_elegidas is not None else sorted({i.row() for i in self.tabla.selectedIndexes()})
+        if elegidas:
+            filas = [f for i, f in enumerate(filas) if i in elegidas]
+        nuevos = []
+        for f in filas:
+            try:
+                nuevos.append(B.desde_fila_rack(f) if self.nombre == "rack_equipos" else B.desde_fila_equipos(f))
+            except (ValueError, TypeError):
+                continue
+        if not nuevos:
+            return 0
+        lista = B.cargar()
+        reemplazados = B.sumar(lista, nuevos)
+        B.guardar(lista)
+        extra = f"\n({len(reemplazados)} ya estaban y se actualizaron)" if reemplazados else ""
+        QMessageBox.information(self.widget, "Biblioteca de equipos",
+                                f"Se guardaron {len(nuevos)} equipos en la biblioteca.{extra}")
+        return len(nuevos)
 
     def _agregar(self) -> None:
         self.tabla.insertRow(self.tabla.rowCount())
@@ -337,17 +390,19 @@ class _EditorTabla:
         try:
             self.tabla.setRowCount(0)
             for fila in filas:
-                r = self.tabla.rowCount()
-                self.tabla.insertRow(r)
-                celdas = fila if isinstance(fila, list) else [fila]
-                for c, v in enumerate(celdas[:len(self.columnas)]):
-                    vacio = v == "c" or (v == -1 and self.columnas[c][2] == -1)   # relleno que se muestra vacío
-                    texto = "" if vacio else (fmt(v) if isinstance(v, (int, float)) else str(v))
-                    if self.columnas[c][1] == "ref":
-                        texto = etiqueta_ref(texto)
-                    self.tabla.setItem(r, c, QTableWidgetItem(texto))
+                self._poner_fila(self.tabla.rowCount(), fila)
         finally:
             self.tabla.blockSignals(False)
+
+    def _poner_fila(self, r: int, fila: Any) -> None:
+        self.tabla.insertRow(r)
+        celdas = fila if isinstance(fila, list) else [fila]
+        for c, v in enumerate(celdas[:len(self.columnas)]):
+            vacio = v == "c" or (v == -1 and self.columnas[c][2] == -1)   # relleno que se muestra vacío
+            texto = "" if vacio else (fmt(v) if isinstance(v, (int, float)) else str(v))
+            if self.columnas[c][1] == "ref":
+                texto = etiqueta_ref(texto)
+            self.tabla.setItem(r, c, QTableWidgetItem(texto))
 
     def valor(self) -> Any:
         out, error = [], False
@@ -443,7 +498,8 @@ class TallerWidget(QWidget):
         self.btn_rehacer.clicked.connect(self.rehacer)
         barra.addWidget(self.btn_deshacer)
         barra.addWidget(self.btn_rehacer)
-        for texto, slot in (("Nuevo", self.nuevo), ("Abrir .scad…", self.abrir),
+        for texto, slot in (("Nuevo", self.nuevo), ("Asistente…", lambda: self.asistente()),
+                            ("Abrir .scad…", self.abrir),
                             ("Guardar .scad…", self.guardar), ("Exportar paquete…", self.exportar),
                             ("Exportar STEP…", self.exportar_step)):
             b = QPushButton(texto)
@@ -957,6 +1013,19 @@ class TallerWidget(QWidget):
                 tabla.setItem(r, c, item)
 
     # ------------------------------------------------------------ archivos
+    def asistente(self) -> bool:
+        """Case nuevo paso a paso. Devuelve True si se terminó."""
+        from .asistente import AsistenteCase
+        dlg = AsistenteCase(self)
+        if dlg.exec() and dlg.params is not None:
+            self.set_params(dlg.params)
+            return True
+        return False
+
+    def biblioteca(self) -> None:
+        from .biblioteca_widget import BibliotecaDialog
+        BibliotecaDialog(self).exec()
+
     def nuevo(self) -> None:
         self.set_params({})
 
