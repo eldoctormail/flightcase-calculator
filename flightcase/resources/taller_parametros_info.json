@@ -290,7 +290,7 @@
   "parametros": [
    {
     "nombre": "equipos",
-    "ayuda": "Lo que va adentro del case: [[nombre, ancho, fondo, alto, peso kg, x, y, z], ...]. x desde el costado izquierdo, y desde el frente del cuerpo, z desde el piso interior (todo en mm, adentro del forro de espuma si hay). Sin x o y (o \"c\") el equipo va centrado. Se usa para los calados de la espuma y para controlar que todo entre sin chocar."
+    "ayuda": "Lo que va adentro del case: [[nombre, ancho, fondo, alto, peso kg, x, y, z], ...]. x desde el costado izquierdo, y desde el frente del cuerpo, z desde el piso interior (todo en mm, adentro del forro de espuma si hay). Sin x o y (o \"c\") el equipo va centrado. Se usa para los calados de la espuma y para controlar que todo entre sin chocar. Forma del calado en la espuma (columnas del final, opcionales): vacío o «rect» = rectángulo, «redondo» = redondo u ovalado (para micrófonos, tachos, focos), o la ruta de un dibujo .dxf o .svg con el contorno del equipo, que se encaja en su ancho y fondo. Radio = esquinas redondeadas del calado (vacío = espuma_radio). Dedos = huecos para meter los dedos y sacar el equipo: 0, 1 (del lado de adelante) o 2 (en los dos lados largos)."
    },
    {
     "nombre": "espumas",
@@ -311,6 +311,18 @@
    {
     "nombre": "espuma_fondo_min",
     "ayuda": "espuma mínima bajo cada equipo (mm)"
+   },
+   {
+    "nombre": "espuma_radio",
+    "ayuda": "radio de las esquinas de los calados (normalmente el de la fresa). 0 = esquinas vivas"
+   },
+   {
+    "nombre": "espuma_dedo_ancho",
+    "ayuda": "ancho de los huecos para los dedos"
+   },
+   {
+    "nombre": "espuma_dedo_largo",
+    "ayuda": "cuánto entra el hueco para los dedos en la espuma, desde el borde del calado"
    },
    {
     "nombre": "espuma_densidad",

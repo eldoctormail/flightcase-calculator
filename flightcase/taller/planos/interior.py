@@ -84,8 +84,14 @@ def dibujar_espuma(bl, ruta: str) -> str:
         for cal in c.calados:
             x0, y0 = cal["cx"] - cal["w"] / 2, cal["cy"] - cal["h"] / 2
             pas = cal["tipo"] == "calado"
-            ax.add_patch(patches.Rectangle((x0, y0), cal["w"], cal["h"], fc="white" if pas else "#f2f2f2",
-                                           ec=MARCA if pas else COTA, lw=1.0, hatch=None if pas else "///"))
+            estilo = dict(fc="white" if pas else "#f2f2f2", ec=MARCA if pas else COTA, lw=1.0,
+                          hatch=None if pas else "///")
+            if cal.get("puntos"):   # calado con forma: cada contorno, los de adentro en gris (islas)
+                for k_, pts in enumerate(cal["puntos"]):
+                    ax.add_patch(patches.Polygon(pts, closed=True, **(estilo if k_ == 0 else
+                                                                         dict(estilo, fc="#d9d9d9"))))
+            else:
+                ax.add_patch(patches.Rectangle((x0, y0), cal["w"], cal["h"], **estilo))
             txt = f"{cal['equipo']}\n{fmt(cal['w'])} × {fmt(cal['h'])}"
             if not pas:
                 txt += f"\nrebaje {fmt(cal['prof'])}"

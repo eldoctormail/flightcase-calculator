@@ -617,15 +617,28 @@ def _espuma_3d(k: _Constructor, bl, capa: int, c=None, color: str = "espuma") ->
         k.caras.append(PolygonFace3D(vertices=tuple(verts), normal=normal, color_group=color,
                                      label=bl.nombre, layer_order=capa))
 
-    us = sorted({0.0, Wu} | {round(b[x], 3) for b in bl.bolsillos for x in ("u0", "u1")})
-    vs = sorted({0.0, Wv} | {round(b[x], 3) for b in bl.bolsillos for x in ("v0", "v1")})
+    # Los calados con forma van en escalones: la grilla sale de los vértices del contorno
+    # simplificado (en 3D alcanza con eso; el DXF lleva el contorno exacto).
+    from .formas_espuma import dentro, simplificar
+    formas = {id(b): [simplificar(p, 2.0) for p in b["contorno"]] for b in bl.bolsillos if b.get("contorno")}
+    us_, vs_ = {0.0, Wu}, {0.0, Wv}
+    for b in bl.bolsillos:
+        if id(b) in formas:
+            us_ |= {round(x, 0) for p in formas[id(b)] for x, _ in p}
+            vs_ |= {round(y, 0) for p in formas[id(b)] for _, y in p}
+        else:
+            us_ |= {round(b["u0"], 3), round(b["u1"], 3)}
+            vs_ |= {round(b["v0"], 3), round(b["v1"], 3)}
+    us = sorted(x for x in us_ if 0.0 <= x <= Wu)
+    vs = sorted(y for y in vs_ if 0.0 <= y <= Wv)
     nu, nv = len(us) - 1, len(vs) - 1
     alto = [[L] * nv for _ in range(nu)]
     for i in range(nu):
         for j in range(nv):
             um, vm = (us[i] + us[i + 1]) / 2, (vs[j] + vs[j + 1]) / 2
             for b in bl.bolsillos:
-                if b["u0"] < um < b["u1"] and b["v0"] < vm < b["v1"]:
+                f = formas.get(id(b))
+                if (dentro(f, um, vm) if f else (b["u0"] < um < b["u1"] and b["v0"] < vm < b["v1"])):
                     alto[i][j] = min(alto[i][j], b["fondo"])
     # Para que el bloque sea un sólido cerrado (STEP), el fondo va partido en las celdas
     # de la grilla y cada pared lleva vértices en todas las alturas que se juntan en sus

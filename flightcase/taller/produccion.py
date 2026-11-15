@@ -99,6 +99,13 @@ def _dxf_arco(capa: str, c, r: float, a0: float, a1: float) -> str:
             f" 50\n{_n(a0)}\n 51\n{_n(a1)}\n")
 
 
+def _dxf_polilinea(capa: str, pts) -> str:
+    """Polilínea cerrada (POLYLINE de R12, que lee cualquier CAM): un calado de espuma con forma."""
+    vert = "".join(f"  0\nVERTEX\n  8\n{capa}\n 10\n{_n(x)}\n 20\n{_n(y)}\n 30\n0\n" for x, y in pts)
+    return (f"  0\nPOLYLINE\n  8\n{capa}\n 66\n1\n 10\n0\n 20\n0\n 30\n0\n 70\n1\n" + vert +
+            f"  0\nSEQEND\n  8\n{capa}\n")
+
+
 def _rect_redondeado(capa: str, cx: float, cy: float, w: float, h: float, r: float) -> List[str]:
     """Rectángulo centrado con esquinas redondeadas (mismo recorte de radio que rect_redondeado)."""
     rr = min(r, w / 2 - 0.01, h / 2 - 0.01)
@@ -127,6 +134,9 @@ def panel_dxf(ancho: float, alto: float, calados: List[Dict[str, Any]] = (), tra
     ent += [_dxf_linea("0", esquinas[i], esquinas[(i + 1) % 4]) for i in range(4)]
     for c in calados:
         capa = "REBAJE" if c["tipo"] == "rebaje" else "0"
+        if c.get("puntos"):   # calado de espuma con forma (redondo, dedos, contorno)
+            ent += [_dxf_polilinea(capa, pts) for pts in c["puntos"]]
+            continue
         r = 0.0 if c["tipo"] == "rebaje" else c.get("r", 0.0)
         ent += _rect_redondeado(capa, c["cx"], c["cy"], c["w"], c["h"], r)
     capas = [("0", 7), ("REBAJE", 1)]
