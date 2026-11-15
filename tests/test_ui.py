@@ -147,3 +147,42 @@ def test_medidas_interiores_y_exteriores_enganchadas(qapp):
     w.ext_spins[1].setValue(600)                                 # exterior -> interior
     assert w.resultado.valores["ext_prof"] == pytest.approx(600, abs=0.1)
     assert w.editores["int_prof"].valor() == w.params["int_prof"] < 600
+
+
+def test_deshacer_y_rehacer(qapp, tmp_path):
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from flightcase.ui import FlightCaseMainWindow
+    w = FlightCaseMainWindow(restore_settings=False)
+    t = w.taller_widget
+    assert not w.accion_deshacer.isEnabled() and not t.btn_deshacer.isEnabled()
+    t.editores["int_ancho"].widget.setValue(700)
+    t.recalcular()
+    t.editores["rack_u"].widget.setValue(4)
+    t.recalcular()
+    t.herrajes.cambiado.emit([["08-41076", "frente", 100, 100, 0, False, 0, 0, "", "placa"]])
+    assert w.accion_deshacer.text() == "&Deshacer: Herrajes a mano"
+    t.deshacer()
+    assert t.params["herrajes_manuales"] == [] and t.params["rack_u"] == 4
+    assert w.accion_rehacer.text() == "&Rehacer: Herrajes a mano"
+    w.accion_deshacer.trigger()
+    assert t.params["rack_u"] == 0 and t.editores["rack_u"].valor() == 0
+    t.deshacer()
+    assert t.params["int_ancho"] == 600 and not w.accion_deshacer.isEnabled()
+    t.rehacer()
+    t.rehacer()
+    assert (t.params["int_ancho"], t.params["rack_u"]) == (700, 4)
+    t.editores["int_prof"].widget.setValue(333)    # un cambio nuevo borra lo que se podía rehacer
+    t.recalcular()
+    assert not w.accion_rehacer.isEnabled()
+    # Ctrl+Z con el cursor en un campo: deshace el case (y lo escrito cuenta como cambio)
+    w.show()
+    campo = t.editores["int_alto_tapa"].widget
+    campo.setFocus()
+    campo.lineEdit().selectAll()
+    QTest.keyClicks(campo.lineEdit(), "120")
+    QTest.keyClick(campo.lineEdit(), Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+    assert t.params["int_alto_tapa"] == 80 and t.params["int_prof"] == 333
+    t.set_params({})                               # otro proyecto: historial nuevo
+    assert not w.accion_deshacer.isEnabled() and not w.accion_rehacer.isEnabled()
+    w.close()

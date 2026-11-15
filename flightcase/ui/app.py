@@ -7,7 +7,7 @@ import sys
 from typing import List, Optional
 
 from PySide6.QtCore import QEvent, QObject, QSettings, Qt
-from PySide6.QtGui import QAction, QCloseEvent, QIcon, QSurfaceFormat
+from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence, QSurfaceFormat
 from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMenu, QMessageBox, QStatusBar, QWidget
 
 from ..paths import bundled_resource
@@ -37,6 +37,7 @@ class FlightCaseMainWindow(QMainWindow):
         self.setStatusBar(self.status_bar)
         self.taller_widget.resultado_cambiado.connect(self._estado_taller)
         self._init_menus()
+        QApplication.instance().installEventFilter(self)
         if restore_settings:
             self._restore_settings(load_last_project)
         self._actualizar()
@@ -71,6 +72,39 @@ class FlightCaseMainWindow(QMainWindow):
         m.addSeparator()
         self._accion(m, "&Salir", "Ctrl+Q", self.close)
         self._update_recent_files_menu()
+
+        self.edit_menu = barra.addMenu("&Editar")
+        self.accion_deshacer = self._accion(self.edit_menu, "&Deshacer", None, self.taller_widget.deshacer)
+        self.accion_deshacer.setShortcuts(QKeySequence.keyBindings(QKeySequence.StandardKey.Undo))
+        self.accion_rehacer = self._accion(self.edit_menu, "&Rehacer", None, self.taller_widget.rehacer)
+        self.accion_rehacer.setShortcuts(QKeySequence.keyBindings(QKeySequence.StandardKey.Redo)
+                                         + [QKeySequence("Ctrl+Y")])
+        self.taller_widget.historial_cambiado.connect(self._actualizar_historial)
+        self._actualizar_historial()
+
+    def _actualizar_historial(self) -> None:
+        t = self.taller_widget
+        for accion, texto, base in ((self.accion_deshacer, t.texto_deshacer(), "&Deshacer"),
+                                    (self.accion_rehacer, t.texto_rehacer(), "&Rehacer")):
+            accion.setText(f"{base}: {texto}" if texto else base)
+        self.accion_deshacer.setEnabled(bool(t._deshacer))
+        self.accion_rehacer.setEnabled(bool(t._rehacer))
+
+    def eventFilter(self, obj, event) -> bool:
+        """Ctrl+Z / Ctrl+Y deshacen el case aunque el cursor esté en un campo numérico
+        (si no, el campo se queda con el atajo para deshacer su propio texto)."""
+        if event.type() == QEvent.Type.ShortcutOverride and isinstance(obj, QWidget) \
+                and self.taller_widget.isAncestorOf(obj):
+            from PySide6.QtWidgets import QAbstractSpinBox
+            w = obj
+            while w is not None and not isinstance(w, QAbstractSpinBox):
+                w = w.parentWidget()
+            if w is not None and (event.matches(QKeySequence.StandardKey.Undo)
+                                  or event.matches(QKeySequence.StandardKey.Redo)
+                                  or QKeySequence(event.keyCombination()) == QKeySequence("Ctrl+Y")):
+                event.ignore()
+                return True
+        return super().eventFilter(obj, event)
 
     # ------------------------------------------------------------- recientes
     def _get_recent_files(self) -> List[str]:
@@ -188,6 +222,7 @@ class FlightCaseMainWindow(QMainWindow):
                 pass
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        QApplication.instance().removeEventFilter(self)
         self._save_settings()
         super().closeEvent(event)
 
