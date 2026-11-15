@@ -44,6 +44,7 @@ class Opciones3D:
     etiquetas: Dict[str, str] = field(default_factory=dict)   # id de panel -> "P3"
     interior: bool = True           # equipos, espuma, cajones y rack (sólo con paso = 99)
     resaltar_interior: str = ""     # tipos del interior en naranja, separados por coma ("espuma,equipo")
+    resaltar_manuales: bool = False  # herrajes puestos a mano en naranja
 
     @classmethod
     def desde_defs(cls, defs: dict) -> "Opciones3D":
@@ -57,7 +58,8 @@ class Opciones3D:
                    resaltar_cubierta=bool(defs.get("resaltar_cubierta", False)),
                    vista_parte=str(defs.get("vista_parte", "")),
                    cubierta_abierta=float(defs.get("cubierta_abierta", 0)), etiquetas=dict(et),
-                   resaltar_interior=str(defs.get("resaltar_interior", "")))
+                   resaltar_interior=str(defs.get("resaltar_interior", "")),
+                   resaltar_manuales=bool(defs.get("resaltar_manuales", False)))
 
 
 @dataclass
@@ -254,6 +256,18 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
         marcas.setdefault(m.panel, []).append(m)
     hib = geo["hibrido"]
     s = geo["cierre_saliente"]
+    manuales = v.get("manuales")
+    man_panel: Dict[str, list] = {}
+    man_ids = set()
+    if manuales is not None:
+        for c in manuales.colocados:
+            if c.panel:
+                man_panel.setdefault(c.panel, []).append(c)
+        man_ids = {id(x) for x in manuales.calados + manuales.marcas}
+    res_man = op.resaltar_manuales
+
+    def col_m(obj, paso: int, color: str) -> str:
+        return "resalte" if (res_man and id(obj) in man_ids) else k.color(paso, color)
 
     cub_ids = {"cuerpo_trasera", "acceso_izq", "acceso_der"} if geo["cubierta"] else set()
     ver_fija, ver_cub = op.vista_parte != "cubierta", op.vista_parte != "fija"
@@ -293,10 +307,10 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
                        "profile", f"{p.nombre}: {c.tipo}")
             k.calados.append((p.nombre, [k._p(_sum(o, _mul(u, a), _mul(vv, b)), False)
                                          for a, b in _rect_redondeado(x0, y0, x1, y1, c.radio)]))
-            if c.tipo == "encastre" and k.visible(P_RUEDAS):
+            if c.tipo.startswith("encastre") and k.visible(P_RUEDAS):
                 # plato de apilado: reborde por fuera y cubeta metida en la tapa (encastre de flightcase.scad)
                 ala, prof = geo.get("encastre_ala", 10), geo.get("encastre_prof", 30)
-                col_p = k.color(P_RUEDAS, "plato")
+                col_p = col_m(c, P_RUEDAS, "plato")
                 for a0, b0, aw, bh in ((x0 - ala, y0 - ala, c.ancho + 2 * ala, ala), (x0 - ala, y1, c.ancho + 2 * ala, ala),
                                        (x0 - ala, y0, ala, c.alto), (x1, y0, ala, c.alto)):
                     k.caja(_sum(o, _mul(u, a0), _mul(vv, b0), _mul(fuera, 1.5)), u, vv, n, aw, bh, 1.5, col_p,
@@ -308,8 +322,8 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
                                        (x0, y0, e_, c.alto), (x1 - e_, y0, e_, c.alto)):
                     k.caja(_sum(o, _mul(u, a0), _mul(vv, b0)), u, vv, n, aw, bh, prof, col_p,
                            ComponentLayer.BASE_ALU, "Plato")
-            if c.tipo == "manija" and k.visible(P_MANIJAS):
-                _manija_embutida(k, o, u, vv, n, x0, y0, x1, y1, k.color(P_MANIJAS, "herraje"))
+            if c.tipo in ("manija", "manija a mano") and k.visible(P_MANIJAS):
+                _manija_embutida(k, o, u, vv, n, x0, y0, x1, y1, col_m(c, P_MANIJAS, "herraje"))
         for m in marcas.get(p.id, []):
             if m.tipo == "manija_sup" and k.visible(P_MANIJAS):
                 _manija_superficie(k, o, u, vv, n, m.x, m.y, m.ancho, k.color(P_MANIJAS, "herraje"))
@@ -327,7 +341,7 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
                 a = 50 if m.tipo == "cierre" else 60
                 ys = ((m.y - 35 * d, m.y + (14 if m.tipo == "bisagra" else 18) * d) if grupo == "cuerpo"
                       else (m.y - 22 * d, m.y + 14 * d))
-                col_c = k.color(P_CIERRES, "cierre")
+                col_c = col_m(m, P_CIERRES, "cierre")
                 if m.tipo == "bisagra":
                     _bisagra(k, o, u, vv, n, m.x, ys, d, s, col_c)
                 elif grupo == "cuerpo":
@@ -340,6 +354,9 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
                 k.caja(_sum(o, _mul(u, m.x - geo["pie_d"] / 2), _mul(vv, m.y - geo["pie_d"] / 2)), u, vv, fuera,
                        geo["pie_d"], geo["pie_d"], geo["pie_h"] + ex * 2.2, k.color(P_RUEDAS, "herraje"),
                        ComponentLayer.BASE_ALU, "Pie")
+        if k.visible(P_MANIJAS):
+            for hm_ in man_panel.get(p.id, []):
+                _herraje_manual(k, geo, o, u, vv, n, hm_, "resalte" if res_man else None, ex)
 
     # Base de ruedas bajo el panel de abajo, con sus ruedas
     base = geo["base"]
@@ -671,7 +688,11 @@ def _bisagra(k: _Constructor, o: Vec, u: Vec, v: Vec, n: Vec, x: float, ys, d: f
 
 def _manija_embutida(k: _Constructor, o: Vec, u: Vec, v: Vec, n: Vec, x0: float, y0: float, x1: float, y1: float,
                      col: str) -> None:
-    """Manija embutida: reborde alrededor del calado, cubeta hacia adentro y el asa."""
+    """Manija embutida: reborde alrededor del calado, cubeta hacia adentro y el asa (a lo largo
+    del lado más largo del calado)."""
+    if y1 - y0 > x1 - x0:
+        _manija_embutida(k, o, v, u, n, y0, x0, y1, x1, col)
+        return
     fuera = _mul(n, -1)
     P = lambda i, j, h: _sum(o, _mul(u, i), _mul(v, j), _mul(fuera, h))
     ala, e, prof = 10.0, 1.5, 38.0
@@ -699,3 +720,50 @@ def _manija_superficie(k: _Constructor, o: Vec, u: Vec, v: Vec, n: Vec, x: float
         k.caja(P(xs_, y - 15, 3), u, v, n, 22, 30, 3, col, ComponentLayer.BASE_ALU, "Manija")
         k.caja(P(xs_ + 4, y - 7, 14), u, v, n, 14, 14, 11, col, ComponentLayer.BASE_ALU, "Manija")
     k.cilindro(P(x, y, 10), u, v, fuera, 7, ancho - 30, "rueda", ComponentLayer.BASE_ALU, "Manija", lados=14)
+
+
+def _herraje_manual(k: _Constructor, geo: dict, o: Vec, u: Vec, v: Vec, n: Vec, h, resalte: Optional[str],
+                    ex: float) -> None:
+    """Herraje puesto a mano que no sale de un calado ni de una marca de cierre: piezas de
+    superficie, pies, ruedas, asas de superficie y placas de logo."""
+    fuera = _mul(n, -1)
+    P = lambda i, j, z: _sum(o, _mul(u, i), _mul(v, j), _mul(fuera, z))
+    x0, y0 = h.px - h.pw / 2, h.py - h.ph / 2
+    col = resalte or "herraje"
+    capa = ComponentLayer.BASE_ALU
+    if h.forma == "rueda":
+        d = h.datos
+        g2 = dict(geo, rueda_placa=list(d.get("placa") or [h.pw, h.ph]),
+                  rueda_diametro=float(d.get("diametro", 100)), rueda_alto=float(d.get("alto", 0)))
+        if h.giro_panel % 180:
+            _rueda(k, g2, o, v, u, fuera, h.py, h.px, bool(d.get("freno")), ex)
+        else:
+            _rueda(k, g2, o, u, v, fuera, h.px, h.py, bool(d.get("freno")), ex)
+    elif h.forma == "pie":
+        alto = float(h.datos.get("alto", 15))
+        k.cilindro(P(h.px, h.py, alto / 2), fuera, u, v, h.pw / 2, alto, col, capa, h.nombre, lados=16)
+    elif h.forma == "manija_sup":
+        if h.pw >= h.ph:
+            _manija_superficie(k, o, u, v, n, h.px, h.py, h.pw, col)
+        else:
+            _manija_superficie(k, o, v, u, n, h.py, h.px, h.ph, col)
+    elif h.forma == "logo":
+        grabado = h.fila.modo == "grabado"
+        z = 0.2
+        if not grabado:
+            k.caja(P(x0, y0, 0), u, v, fuera, h.pw, h.ph, 1.5, resalte or "cierre", capa, h.nombre)
+            z = 1.6
+        trazo = max(min(h.pw, h.ph) / 120, 0.6)
+        color_t = resalte or ("plato" if grabado else "herraje")
+        for linea in h.lineas_panel:
+            for (a, b), (c, d) in zip(linea, linea[1:]):
+                L = math.hypot(c - a, d - b)
+                if L < 1e-6:
+                    continue
+                na, nb = -(d - b) / L * trazo / 2, (c - a) / L * trazo / 2
+                cara = [P(a + na, b + nb, z), P(c + na, d + nb, z), P(c - na, d - nb, z), P(a - na, b - nb, z)]
+                k.caras.append(PolygonFace3D(vertices=tuple(k._p(q, False) for q in cara), normal=k.girar(fuera),
+                                             color_group=color_t, label=h.nombre, layer_order=capa))
+    else:
+        alto = 8.0 if h.categoria != "tope" else 12.0
+        k.caja(P(x0, y0, 0), u, v, fuera, h.pw, h.ph, alto, col, capa, h.nombre)

@@ -174,5 +174,6 @@
  "explotar": 0,
  "paso": 99,
  "etiquetas": [],
- "color_resalte": "Orange"
+ "color_resalte": "Orange",
+ "herrajes_manuales": []
 }
