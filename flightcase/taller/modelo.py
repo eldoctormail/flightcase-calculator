@@ -950,6 +950,13 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         base=dict(panel=_panel_base, x=_bo[0], y=_bo[1], ancho=_bx, alto=_by, esp=_bt, separacion=_bgap)
         if _base else None,
         ruedas=[list(c) for c in ruedas_centros], rueda_alto=E_rueda_alto if ruedas == 4 else 0,
+        esq_descuento=E_esq_descuento, esq_pata=E_esq_pata, L_x=_L_x, L_y=_L_y, L_zc=_L_zc, L_zt=_L_zt,
+        L_zt2=_L_zt2, arista_esp=hibrido_pared if _hib else E_angulo_esp, ala=15 if _hib else E_angulo_ala,
+        cubierta=_cub, acceso=_acc, j_cub=_j_cub, pared=pared, olc=olc, a_acc=_a_acc, j_acc=_j_acc,
+        w_low=_w_low, cierre_m_sup=cierre_m_sup, cierre_h_sup=cierre_h_sup, ext_alto_cuerpo=ext_alto_cuerpo,
+        ruedas_en_base=[list(c) for c in ruedas_en_base], rueda_placa=list(E_rueda_placa),
+        rueda_diametro=E_rueda_diametro, rueda_frenos=rueda_frenos,
+        pies=[list(c) for c in pies_centros], pie_d=_pie_d, pie_h=_pie_h, encastre_ala=E_encastre_ala, encastre_prof=E_encastre_profundidad,
         bandejas=[dict(cx=(ext_alto - _bc) if _hz else ext_ancho / 2, cy=_bc if _fr else ext_prof / 2,
                        z=pared + b[2] - _band_esp(b), ancho=b[0], fondo=b[1], esp=_band_esp(b))
                   for b in bandejas],

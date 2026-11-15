@@ -862,7 +862,7 @@ def generar_instructivo(ruta, d, piezas, laminas, render_final, pasos):
         y -= 0.026
     fig.text(0.03, 0.02, "Las láminas usan un color neutro para distinguir los paneles. "
                          "En naranja, lo que se agrega en cada paso.", fontsize=8, color="#777")
-    pdf.savefig(fig)
+    pdf.savefig(fig, dpi=220)  # imágenes nítidas (por defecto se bajan a 100 dpi)
     plt.close(fig)
 
     # ---- Pasos ----
@@ -887,7 +887,7 @@ def generar_instructivo(ruta, d, piezas, laminas, render_final, pasos):
         for parrafo in p["texto"]:
             lineas = textwrap.wrap(parrafo, ancho)
             if y - paso_l * len(lineas) < 0.06:
-                pdf.savefig(fig)
+                pdf.savefig(fig, dpi=220)  # imágenes nítidas (por defecto se bajan a 100 dpi)
                 plt.close(fig)
                 fig = plt.figure(figsize=A4)
                 encabezado(fig, f"Paso {i}. {p['titulo']} (continuación)")
@@ -934,6 +934,6 @@ def generar_instructivo(ruta, d, piezas, laminas, render_final, pasos):
                     cel.set_facecolor("#eeeeee")
                 if c == 0:
                     cel.set_text_props(weight="bold")
-        pdf.savefig(fig)
+        pdf.savefig(fig, dpi=220)  # imágenes nítidas (por defecto se bajan a 100 dpi)
         plt.close(fig)
     pdf.close()

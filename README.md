@@ -130,6 +130,7 @@ En GitHub corren solos en cada PR y en cada cambio a main (`.github/workflows/te
 - `dxf/*.dxf`: un DXF por pieza distinta, con calados (capa 0) y rebajes (capa `REBAJE`)
 - `lista_cortes.csv` y `materiales.csv` (separador `;`, se abren directo en Excel)
 - `planos.pdf`: piezas acotadas, aprovechamiento de placas, cortes de perfiles y materiales
+- `instructivo_montaje.pdf`: perspectiva explotada y pasos de armado con sus láminas 3D (`montaje/*.png`, dibujadas por la app; el aluminio y los herrajes van simplificados)
 
 Los tests comparan el resultado con OpenSCAD: los datos de 18 proyectos y variantes (`tests/golden/taller`) y las listas y DXF de 3 proyectos (`tests/golden/taller_paquete`). Para regenerarlos: `python tools/generar_golden.py ruta/a/flightcase-generador`.
 
