@@ -146,6 +146,11 @@ class _Numero(QDoubleSpinBox):
         return f"{valor:.{self.decimals()}f}".rstrip("0").rstrip(".") if self.decimals() else f"{valor:.0f}"
 
 
+def _con_codigo(ayuda: str, nombre: str) -> str:
+    """La ayuda con el nombre del parámetro en el .scad, para quien edite el archivo a mano."""
+    return f"{ayuda}\n\nEn el .scad: {nombre}" if ayuda else f"En el .scad: {nombre}"
+
+
 def _ayuda(texto: str) -> str:
     return f"<p style='white-space:pre-wrap'>{texto}</p>" if texto else ""
 
@@ -463,22 +468,23 @@ class TallerWidget(QWidget):
             pagina = QWidget()
             form = QFormLayout(pagina)
             form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+            form.setRowWrapPolicy(QFormLayout.WrapLongRows)   # nombre largo: el campo pasa abajo
             if n_sec == 0:
-                self._agregar_exterior(form)
-            for p in sec["parametros"]:
+                self._seccion_medidas(form, sec)
+            for p in ([] if n_sec == 0 else sec["parametros"]):
                 nombre = p["nombre"]
                 if nombre not in self.defectos:
                     continue
-                etiqueta = QLabel(nombre)
-                etiqueta.setToolTip(_ayuda(p["ayuda"]))
+                etiqueta = QLabel(p.get("etiqueta") or nombre)
+                etiqueta.setToolTip(_ayuda(_con_codigo(p["ayuda"], nombre)))
                 if nombre in TABLAS:
                     ed = _EditorTabla(nombre, self.defectos[nombre], self._programar)
-                    ed.widget.setToolTip(_ayuda(p["ayuda"]))
+                    ed.widget.setToolTip(_ayuda(_con_codigo(p["ayuda"], nombre)))
                     form.addRow(etiqueta)
                     form.addRow(ed.widget)
                 else:
                     ed = _Editor(nombre, self.defectos[nombre], self._programar)
-                    ed.widget.setToolTip(_ayuda(p["ayuda"]))
+                    ed.widget.setToolTip(_ayuda(_con_codigo(p["ayuda"], nombre)))
                     form.addRow(etiqueta, ed.widget)
                 self.editores[nombre] = ed
             scroll = QScrollArea()
@@ -622,30 +628,97 @@ class TallerWidget(QWidget):
         return t
 
     # -------------------------------------------------------------- estado
-    def _agregar_exterior(self, form: QFormLayout) -> None:
-        """Medidas exteriores arriba de las interiores: cambiar una recalcula las interiores."""
+    @staticmethod
+    def _con_mm(w: QWidget) -> QWidget:
+        """El control con "mm" a la derecha."""
+        caja = QWidget()
+        fila = QHBoxLayout(caja)
+        fila.setContentsMargins(0, 0, 0, 0)
+        fila.setSpacing(6)
+        fila.addWidget(w, 1)
+        fila.addWidget(QLabel("mm"))
+        return caja
+
+    def _seccion_medidas(self, form: QFormLayout, sec: Dict[str, Any]) -> None:
+        """Medidas exteriores e interiores, enganchadas: al cambiar unas se recalculan las otras."""
+        ayudas = {p["nombre"]: p["ayuda"] for p in sec["parametros"]}
+        ayuda_ext = ("Medida exterior del case, sin ruedas. Al cambiarla se recalculan las interiores con las "
+                     "paredes, el aluminio y la espuma de este armado. El alto de tapa no cambia.")
         titulo = QLabel("<b>Exteriores</b> (sin ruedas)")
-        titulo.setToolTip("Cargá la medida exterior que necesitás y la app calcula las interiores con las paredes, "
-                          "el aluminio y la espuma de este armado. Las tapas conservan su alto.")
+        titulo.setToolTip(ayuda_ext)
         form.addRow(titulo)
         self.ext_spins = []
-        for nombre in ("ancho", "fondo", "alto"):
-            sp = QDoubleSpinBox()
+        for nombre in ("Ancho exterior", "Largo exterior", "Alto exterior"):
+            sp = _Numero()
             sp.setRange(50, 5000)
             sp.setDecimals(1)
-            sp.setSuffix(" mm")
             sp.setKeyboardTracking(False)
-            sp.setToolTip(titulo.toolTip())
-            sp.editingFinished.connect(self._exterior_editado)
-            etiqueta = QLabel(f"exterior {nombre}")
-            etiqueta.setToolTip(titulo.toolTip())
-            form.addRow(etiqueta, sp)
+            sp.setToolTip(ayuda_ext)
+            sp.valueChanged.connect(self._exterior_editado)
+            etiqueta = QLabel(nombre)
+            etiqueta.setToolTip(ayuda_ext)
+            form.addRow(etiqueta, self._con_mm(sp))
             self.ext_spins.append(sp)
+
+        form.addRow(QLabel("<b>Interiores</b>"))
+        filas = (("int_ancho", "Ancho interior"), ("int_prof", "Largo interior"), ("alto_total", "Alto interior"),
+                 ("int_alto_tapa", "Alto de tapa"), ("int_alto_cuerpo", ""))
+        for nombre, texto in filas:
+            if nombre == "alto_total":
+                sp = _Numero()
+                sp.setRange(1, 10000)
+                sp.setDecimals(2)
+                sp.setKeyboardTracking(False)
+                sp.setToolTip(_ayuda("Alto interior total: del piso al techo interior (cuerpo + tapa"
+                                     " + segunda tapa si la hay). Al cambiarlo, la tapa queda igual y el"
+                                     " cuerpo toma la diferencia."))
+                sp.valueChanged.connect(self._alto_interior_editado)
+                self.sp_alto_interior = sp
+                form.addRow(QLabel(texto), self._con_mm(sp))
+                continue
+            ed = _Editor(nombre, self.defectos[nombre], self._programar)
+            ed.widget.setToolTip(_ayuda(_con_codigo(ayudas.get(nombre, ""), nombre)))
+            self.editores[nombre] = ed
+            if nombre == "int_alto_cuerpo":       # se maneja con el alto interior total
+                form.addRow(ed.widget)
+                ed.widget.setVisible(False)
+                continue
+            if nombre == "int_alto_tapa":
+                ed.widget.valueChanged.connect(self._alto_tapa_editado)
+            etiqueta = QLabel(texto)
+            etiqueta.setToolTip(_ayuda(_con_codigo(ayudas.get(nombre, ""), nombre)))
+            form.addRow(etiqueta, self._con_mm(ed.widget))
         self.lbl_exterior_nota = QLabel()
         self.lbl_exterior_nota.setStyleSheet("color:#bbbbbb")
         self.lbl_exterior_nota.setWordWrap(True)
         form.addRow(self.lbl_exterior_nota)
-        form.addRow(QLabel("<b>Interiores</b>"))
+        self._alto_total = None
+
+    def _alto_tapas(self) -> float:
+        """Alto interior de la tapa, más el de la segunda tapa si el case tiene dos."""
+        tapa = float(self.editores["int_alto_tapa"].valor())
+        if int(self.params.get("tapas", 1)) == 2:
+            t2 = float(self.params.get("int_alto_tapa2", -1))
+            tapa += tapa if t2 < 0 else t2
+        return tapa
+
+    def _poner_cuerpo(self, cuerpo: float) -> bool:
+        if cuerpo <= 0:
+            self.lbl_avisos.setText("El alto interior tiene que ser mayor que el alto de tapa.")
+            self._mostrar_exterior()
+            return False
+        self.editores["int_alto_cuerpo"].poner(round(cuerpo, 2))
+        self._programar()
+        return True
+
+    def _alto_interior_editado(self, total: float) -> None:
+        if self._poner_cuerpo(total - self._alto_tapas()):
+            self._alto_total = total
+
+    def _alto_tapa_editado(self, *_args) -> None:
+        """Al cambiar la tapa, el alto interior total queda igual (y el exterior también)."""
+        if self._alto_total is not None:
+            self._poner_cuerpo(self._alto_total - self._alto_tapas())
 
     def _mostrar_exterior(self) -> None:
         if self.resultado is None:
@@ -656,11 +729,15 @@ class TallerWidget(QWidget):
                 sp.blockSignals(True)
                 sp.setValue(v[clave])
                 sp.blockSignals(False)
-        self.lbl_exterior_nota.setText(
-            f"interior {fmt(self.params['int_ancho'])} × {fmt(self.params['int_prof'])} × "
-            f"{fmt(self.params['int_alto_cuerpo'])} mm (cuerpo)")
+        cuerpo = float(self.params["int_alto_cuerpo"])
+        self._alto_total = cuerpo + self._alto_tapas()
+        if not self.sp_alto_interior.hasFocus():
+            self.sp_alto_interior.blockSignals(True)
+            self.sp_alto_interior.setValue(self._alto_total)
+            self.sp_alto_interior.blockSignals(False)
+        self.lbl_exterior_nota.setText(f"Alto interior del cuerpo (del piso al cierre): {fmt(cuerpo)} mm")
 
-    def _exterior_editado(self) -> None:
+    def _exterior_editado(self, *_args) -> None:
         if self.resultado is None:
             return
         quiero = [sp.value() for sp in self.ext_spins]

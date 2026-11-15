@@ -112,3 +112,12 @@ def test_la_ventana_es_solo_el_taller(qapp, tmp_path):
     assert "int_ancho = 777" in ruta.read_text(encoding="utf-8")
     assert "mio.scad" in w.windowTitle() and w._get_recent_files()[0] == str(ruta)
     w.close()
+
+
+def test_parametros_con_nombre_en_castellano(widget):
+    from PySide6.QtWidgets import QFormLayout, QLabel
+    from flightcase.ui.widgets.taller_widget import secciones_parametros
+    assert all(p.get("etiqueta") for s in secciones_parametros() for p in s["parametros"])
+    textos = [l.text() for l in widget.toolbox.findChildren(QLabel)]
+    assert "Unidades de rack (U)" in textos and "Espesor de la placa" in textos
+    assert not any(t.startswith(("int_", "rack_", "ref_", "cierre_")) for t in textos)

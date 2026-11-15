@@ -8,7 +8,7 @@ Programa de escritorio (Python + PySide6 + OpenGL) para diseñar y fabricar flig
 
 ## Funciones
 
-- **Medidas exteriores o interiores** (primera sección del Taller): cargá el ancho, fondo y alto exterior y la app calcula las medidas interiores con las paredes, el aluminio y la espuma del armado elegido (las tapas conservan su alto), o trabajá directo con las interiores.
+- **Medidas exteriores e interiores enganchadas** (sección Medidas): ancho, largo y alto exterior; ancho, largo y alto interior y alto de tapa. Al cambiar unas se recalculan las otras con las paredes, el aluminio y la espuma del armado elegido; el alto de tapa se mantiene y el cuerpo toma la diferencia.
 - **Editor del case**: todos los parámetros del generador, agrupados como en `flightcase.scad`, con su explicación al pasar el mouse. Paneles, perfiles, herrajes y avisos se recalculan al instante.
 - **Estilos de case** (rack, mixer, utilitario, tapa superior, cajonera, etc.) y estilos propios guardados.
 - **Interiores**: espuma en capas con calados rectangulares, redondos o con el contorno de un dibujo, huecos para los dedos, cajones, rack 19" y chequeos de choques.

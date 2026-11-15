@@ -47,5 +47,12 @@ def convertir(texto):
 
 if __name__ == "__main__":
     datos = convertir(Path(sys.argv[1]).read_text(encoding="utf-8"))
+    # los nombres en castellano ("etiqueta") se cargan a mano: se conservan al regenerar
+    previas = ({p["nombre"]: p["etiqueta"] for s in json.loads(SALIDA.read_text(encoding="utf-8"))
+                for p in s["parametros"] if p.get("etiqueta")} if SALIDA.is_file() else {})
+    for s in datos:
+        for p in s["parametros"]:
+            if p["nombre"] in previas:
+                p["etiqueta"] = previas[p["nombre"]]
     SALIDA.write_text(json.dumps(datos, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"{sum(len(s['parametros']) for s in datos)} parámetros en {len(datos)} secciones -> {SALIDA}")
