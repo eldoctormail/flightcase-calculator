@@ -404,7 +404,8 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
         if not k.visible(P_ESQ):
             return
         p_, e = geo["esq_pata"], 1.5
-        o = _sum(o, _mul(_sum(a, b, c), ex * 2.4))
+        # va por encima de los ángulos: corrido hacia afuera el espesor del perfil en las tres caras
+        o = _sum(o, _mul(_sum(a, b, c), ex * 2.4 + e_ar))
         col = k.color(P_ESQ, "herraje")
         k.caja(_sum(o, _mul(b, -p_), _mul(c, -p_)), a, b, c, e, p_, p_, col, ComponentLayer.BASE_ALU, "Esquinero")
         k.caja(_sum(o, _mul(a, -p_), _mul(c, -p_)), a, b, c, p_, e, p_, col, ComponentLayer.BASE_ALU, "Esquinero")
