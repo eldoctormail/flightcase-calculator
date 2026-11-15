@@ -1,20 +1,11 @@
-"""Tests de rutas de datos editables (app instalada con recursos de solo lectura)."""
+"""Rutas de recursos incluidos y de datos del usuario (app instalada con recursos de solo lectura)."""
 
 from flightcase import paths
-from flightcase.production.catalog import HardwareItem, load_hardware, save_hardware
-from flightcase.domain.materials import WoodMaterial, load_wood_materials, save_wood_materials
 
 
-def test_user_copy_overrides_bundled_resources(tmp_path, monkeypatch):
+def test_datos_del_usuario_aparte_de_los_recursos(tmp_path, monkeypatch):
     monkeypatch.setenv("FLIGHTCASE_DATA_DIR", str(tmp_path))
-    bundled = paths.bundled_resource("hardware.json")
-    before = bundled.read_text(encoding="utf-8")
-
-    assert paths.editable_resource("hardware.json") == bundled
-    save_hardware([HardwareItem("x", "Herraje X", unit_price=1.0)])
-    assert (tmp_path / "hardware.json").is_file()
-    assert [h.id for h in load_hardware()] == ["x"]
-    assert bundled.read_text(encoding="utf-8") == before  # el recurso incluido no se toca
-
-    save_wood_materials([WoodMaterial("Madera X", 12.0, 600.0, 30.0)])
-    assert [m.name for m in load_wood_materials()] == ["Madera X"]
+    assert paths.user_data_dir() == tmp_path
+    assert paths.user_resource("taller_estilos_propios.json").parent == tmp_path
+    for nombre in ("catalogo_fr.json", "taller_parametros.json", "taller_estilos.json", "icono.png"):
+        assert paths.bundled_resource(nombre).is_file()

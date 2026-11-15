@@ -18,8 +18,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
-from ..domain.services import WireframeMesh3D
-from ..domain.value_objects import ComponentLayer, PolygonFace3D, Point3D, Segment3D
+from .malla import ComponentLayer, PolygonFace3D, Point3D, Segment3D, WireframeMesh3D
 from .modelo import ResultadoTaller
 
 Vec = Tuple[float, float, float]

@@ -1,4 +1,4 @@
-"""UI styling, color palettes, and themes for Flightcase Calculator."""
+"""UI styling, color palettes, and themes for LBD Flightcase Maker."""
 
 from pathlib import Path
 

@@ -448,7 +448,7 @@ def texto_step(lista: Sequence[Cuerpo], titulo: str = "Flightcase", archivo: str
     cabecera = (
         "ISO-10303-21;\nHEADER;\n"
         f"FILE_DESCRIPTION(({_txt('Flightcase ' + titulo)}),'2;1');\n"
-        f"FILE_NAME({_txt(archivo)},'{ahora}',(''),(''),'Flightcase Calculator','Flightcase Calculator','');\n"
+        f"FILE_NAME({_txt(archivo)},'{ahora}',(''),(''),'LBD Flightcase Maker','LBD Flightcase Maker','');\n"
         "FILE_SCHEMA(('AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }'));\nENDSEC;\nDATA;\n"
     )
     return cabecera + w.texto() + "\nENDSEC;\nEND-ISO-10303-21;\n"

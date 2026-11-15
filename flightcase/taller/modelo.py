@@ -1001,3 +1001,25 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
                  "barra_largo": barra_largo, "sierra_kerf": sierra_kerf, "cantidad_cases": cantidad_cases,
                  "remache_ref": E_remache_ref, "geo": geo, "interiores": interior, "manuales": manuales},
     )
+
+
+def interior_para_exterior(params: Optional[Dict[str, Any]], ancho: float, prof: float, alto: float,
+                           catalogo: Optional[CatalogoTaller] = None) -> Dict[str, float]:
+    """Medidas interiores (int_ancho, int_prof, int_alto_cuerpo) para que el case quede con
+    estas medidas exteriores, sin ruedas. Las tapas conservan su alto y el cuerpo toma el resto.
+
+    Las paredes, la espuma y el aluminio dependen de la construcción elegida, así que se
+    calcula con el modelo y se corrige la diferencia (es lineal: alcanza con una o dos vueltas)."""
+    P = dict(params or {})
+    cat = catalogo or CatalogoTaller()
+    for _ in range(4):
+        v = calcular(P, cat).valores
+        d = (ancho - v["ext_ancho"], prof - v["ext_prof"], alto - v["ext_alto"])
+        if max(abs(x) for x in d) < 0.05:
+            break
+        base = parametros_por_defecto()
+        for clave, dif in zip(("int_ancho", "int_prof", "int_alto_cuerpo"), d):
+            P[clave] = round(float(P.get(clave, base[clave])) + dif, 1)
+    if min(P.get("int_ancho", 1), P.get("int_prof", 1), P.get("int_alto_cuerpo", 1)) <= 0:
+        raise ValueError("Las medidas exteriores no alcanzan para las paredes y las tapas de este case.")
+    return {k: P[k] for k in ("int_ancho", "int_prof", "int_alto_cuerpo") if k in P}

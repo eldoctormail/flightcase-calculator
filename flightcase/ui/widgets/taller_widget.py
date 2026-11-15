@@ -428,6 +428,26 @@ class TallerWidget(QWidget):
             barra.addWidget(b)
         raiz.addLayout(barra)
 
+        fila_medidas = QHBoxLayout()
+        fila_medidas.addWidget(QLabel("Medidas exteriores (sin ruedas):"))
+        self.ext_spins = []
+        for eje in ("Ancho", "Fondo", "Alto"):
+            sp = QDoubleSpinBox()
+            sp.setRange(50, 5000)
+            sp.setDecimals(1)
+            sp.setSuffix(" mm")
+            sp.setKeyboardTracking(False)
+            sp.setToolTip(f"{eje} exterior del case. Al cambiarlo se recalculan las medidas interiores "
+                          "con las paredes, el aluminio y la espuma de este armado. Las tapas conservan su alto.")
+            sp.setPrefix(f"{eje} ")
+            sp.editingFinished.connect(self._exterior_editado)
+            fila_medidas.addWidget(sp)
+            self.ext_spins.append(sp)
+        self.lbl_exterior_nota = QLabel()
+        self.lbl_exterior_nota.setStyleSheet("color:#bbbbbb")
+        fila_medidas.addWidget(self.lbl_exterior_nota, 1)
+        raiz.addLayout(fila_medidas)
+
         fila_estilo = QHBoxLayout()
         fila_estilo.addWidget(QLabel("Estilo de case:"))
         self.cmb_estilo = QComboBox()
@@ -493,11 +513,14 @@ class TallerWidget(QWidget):
         pagina_3d = QWidget()
         l3d = QVBoxLayout(pagina_3d)
         l3d.setContentsMargins(0, 0, 0, 0)
-        self.chk_interior = QCheckBox("Ver el interior (tapas abiertas)")
-        self.chk_interior.toggled.connect(self._actualizar_3d)
-        l3d.addWidget(self.chk_interior)
+        from .barra_3d import BarraVista3D
         self.vista_3d = Schema3DCanvas(self)
         self.vista_3d.setMinimumHeight(260)
+        self.barra_3d = BarraVista3D(self.vista_3d, self)
+        self.chk_interior = QCheckBox("Ver el interior (tapas abiertas)")
+        self.chk_interior.toggled.connect(self._actualizar_3d)
+        self.barra_3d.layout().addWidget(self.chk_interior)
+        l3d.addWidget(self.barra_3d)
         l3d.addWidget(self.vista_3d, 1)
         self.tabs.addTab(pagina_3d, "Vista 3D")
         from .herrajes_2d_widget import HerrajesManualesWidget
@@ -607,6 +630,44 @@ class TallerWidget(QWidget):
         return t
 
     # -------------------------------------------------------------- estado
+    def _mostrar_exterior(self) -> None:
+        if self.resultado is None:
+            return
+        v = self.resultado.valores
+        for sp, clave in zip(self.ext_spins, ("ext_ancho", "ext_prof", "ext_alto")):
+            if not sp.hasFocus():
+                sp.blockSignals(True)
+                sp.setValue(v[clave])
+                sp.blockSignals(False)
+        self.lbl_exterior_nota.setText(
+            f"interior {fmt(self.params['int_ancho'])} × {fmt(self.params['int_prof'])} × "
+            f"{fmt(self.params['int_alto_cuerpo'])} mm (cuerpo)")
+
+    def _exterior_editado(self) -> None:
+        if self.resultado is None:
+            return
+        quiero = [sp.value() for sp in self.ext_spins]
+        v = self.resultado.valores
+        if all(abs(a - v[k]) < 0.05 for a, k in zip(quiero, ("ext_ancho", "ext_prof", "ext_alto"))):
+            return
+        self.poner_exterior(*quiero)
+
+    def poner_exterior(self, ancho: float, prof: float, alto: float) -> None:
+        """Ajusta las medidas interiores para que el case tenga estas medidas exteriores."""
+        from ...taller.modelo import interior_para_exterior
+        self._leer_editores()
+        try:
+            interior = interior_para_exterior(self.params, ancho, prof, alto)
+        except ValueError as e:
+            self.lbl_avisos.setText(str(e))
+            self._mostrar_exterior()
+            return
+        for clave, valor in interior.items():
+            self.params[clave] = valor
+            if clave in self.editores:
+                self.editores[clave].poner(valor)
+        self.recalcular()
+
     def _cargar_en_editores(self) -> None:
         for nombre, ed in self.editores.items():
             ed.poner(self.params.get(nombre, self.defectos[nombre]))
@@ -649,6 +710,7 @@ class TallerWidget(QWidget):
             return
         self.resultado = res
         self._mostrar(res)
+        self._mostrar_exterior()
         self.resultado_cambiado.emit(res)
 
     def _mostrar(self, res: ResultadoTaller) -> None:

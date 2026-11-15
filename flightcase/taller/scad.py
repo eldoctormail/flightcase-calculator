@@ -129,7 +129,7 @@ def escribir_proyecto(params: Dict[str, Any], por_defecto: Optional[Dict[str, An
     lineas = []
     if titulo:
         lineas.append(f"// {titulo}")
-    lineas += ["// Proyecto guardado desde Flightcase Calculator.", "",
+    lineas += ["// Proyecto guardado desde LBD Flightcase Maker.", "",
                "include <flightcase_gen/flightcase.scad>", ""]
     cambios = {k: v for k, v in params.items()
                if not k.startswith("_") and (por_defecto is None or k not in por_defecto or por_defecto[k] != v)}
