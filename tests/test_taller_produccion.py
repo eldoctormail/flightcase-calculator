@@ -28,12 +28,15 @@ def test_paquete_igual_que_generar_py(caso, tmp_path):
     for nombre in ("lista_cortes.csv", "materiales.csv"):
         assert (tmp_path / nombre).read_bytes() == (esperado / nombre).read_bytes(), nombre
     largos = json.loads((esperado / "largos_dxf.json").read_text(encoding="utf-8"))
-    assert sorted(p.name for p in (tmp_path / "dxf").iterdir()) == sorted(largos)
+    assert sorted(p.name for p in (tmp_path / "dxf").glob("*.dxf")) == sorted(largos)
     for nombre, largo_os in largos.items():
         # OpenSCAD aproxima las esquinas redondeadas con polígonos de 32 lados
         largo = largo_contornos((tmp_path / "dxf" / nombre).read_text(encoding="utf-8"))
         assert largo == pytest.approx(largo_os, rel=2e-3), nombre
-    assert len(paq.archivos) == len(largos) + 3     # + lista_cortes, materiales y case_3d.step
+    n_placas = len(list((tmp_path / "dxf" / "placas").glob("*.dxf")))
+    assert n_placas == len(paq.placas) >= 1
+    # + un DXF por placa, lista_cortes, placas.csv, materiales y case_3d.step
+    assert len(paq.archivos) == len(largos) + n_placas + 4
 
 
 def test_dxf_panel_con_calados_y_rebaje():

@@ -725,7 +725,7 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
         ax.set_ylim(-160, A + 40)
         fig.text(0.04, 0.06, f"Kerf {info['placa'][2]} mm entre piezas, margen "
                              f"{info['placa'][3]} mm al borde. 'Girada' = pieza rotada 90°; "
-                             f"usá --sin-rotar si importa la veta.", fontsize=8, color="#333")
+                             f"si importa la veta, apagá «Girar piezas» en la pestaña Placas.", fontsize=8, color="#333")
         pdf.savefig(fig, dpi=220)  # imágenes nítidas (por defecto se bajan a 100 dpi)
         plt.close(fig)
         pag += 1

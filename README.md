@@ -16,6 +16,7 @@ Programa de escritorio (Python + PySide6 + OpenGL) para diseñar y fabricar flig
 - **Asistente de case nuevo** (`Ctrl+Shift+N` o el botón **Asistente…**): estilo, qué va adentro (vacío, espuma con equipos o rack), medidas sugeridas a partir de los equipos (o exteriores a mano), terminaciones y un resumen antes de abrirlo en el Taller.
 - **Biblioteca de equipos** (`Ctrl+B`, menú **Editar**): tus equipos con sus medidas, peso, U de rack y forma del calado, guardados una vez para cualquier case. Se buscan, se editan en la tabla y se pasan a una planilla CSV de Excel y desde ella. Las tablas de equipos de la espuma y del rack tienen **Desde la biblioteca…** y **Guardar en la biblioteca**.
 - **Vista 3D** con las tapas abiertas o cerradas.
+- **Optimización de cortes** (pestaña **Placas**): las piezas acomodadas en placas enteras, cuántas comprar, aprovechamiento, retazo útil y un DXF por placa para la CNC.
 - **Paquete de producción** (`Ctrl+P`): DXF por pieza y por capa de espuma, lista de cortes y materiales en CSV, `planos.pdf`, instructivo de montaje y el case en STEP para CAD.
 
 ---
@@ -96,10 +97,17 @@ En GitHub corren solos en cada PR y en cada cambio a main (`.github/workflows/te
 `flightcase/taller/` tiene en Python las reglas de construcción del generador de OpenSCAD del taller (placa de 10 mm, ángulo 32x32, perfil híbrido, refuerzos, tapas, cubiertas, bandejas, base de ruedas, catálogo FR Sistemas / Adam Hall), más los interiores (espuma, cajones, rack 19"). En la ventana del Taller se editan todos los parámetros del generador (agrupados como en `flightcase.scad`, con su explicación al pasar el mouse) y se ven al instante los paneles, perfiles, herrajes y avisos; desde ahí se abre y se guarda el `.scad` y se exporta el paquete. También, con **Archivo → Paquete del taller desde un .scad sin abrirlo** (`Ctrl+T`) se toma un proyecto `.scad` (por ejemplo `mi_case.scad`) y se genera, sin tener OpenSCAD instalado:
 
 - `dxf/*.dxf`: un DXF por pieza distinta, con calados (capa 0) y rebajes (capa `REBAJE`)
-- `lista_cortes.csv` y `materiales.csv` (separador `;`, se abren directo en Excel)
+- `dxf/placas/*.dxf`: un DXF por placa entera con las piezas ya acomodadas (ver **Placas** abajo)
+- `lista_cortes.csv`, `placas.csv` y `materiales.csv` (separador `;`, se abren directo en Excel)
 - `planos.pdf`: piezas acotadas, aprovechamiento de placas, cortes de perfiles y materiales
 - `instructivo_montaje.pdf`: perspectiva explotada y pasos de armado con sus láminas 3D (`montaje/*.png`, dibujadas por la app; el aluminio y los herrajes van simplificados)
 - `case_3d.step`: el case armado en 3D para abrir en Fusion, SolidWorks o FreeCAD (ver abajo)
+
+### Placas: optimización de cortes
+
+La pestaña **Placas** del Taller acomoda todas las piezas del pedido (todos los cases de **Cantidad de cases**, separadas por material) en placas enteras con el kerf y el margen de **Corte y compra**. Prueba varias formas de acomodarlas y se queda con la que usa menos placas y deja el retazo más grande. Arriba dice cuántas placas comprar, el aprovechamiento y el retazo libre más grande (marcado en verde en el dibujo). **Girar piezas** deja rotarlas 90° para aprovechar mejor; apagalo si la placa tiene veta o dibujo.
+
+**Guardar DXF de las placas…** escribe un DXF por placa con cada pieza en su lugar, lista para la router CNC: borde de la placa en la capa `PLACA`, contornos y calados pasantes en `0`, rebajes en `REBAJE`, marcas de herrajes en `MARCA`, logos en `GRABADO` y el número de pieza en `TEXTO` (para apagar en el CAM). También va `placas.csv` con las piezas de cada placa. Lo mismo sale en el paquete de producción.
 
 ### Atajos del Taller
 
