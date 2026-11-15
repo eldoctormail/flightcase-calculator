@@ -19,6 +19,10 @@ COLORS = {
     "profile_fill": "#784d12",    # Warm bronze aluminum
     "wall_edge": "#ec4899",       # Pink/Magenta
     "wall_fill": "#3b1734",       # Deep magenta
+    "herraje_edge": "#cbd5e1",    # Herrajes del taller (esquineros, cierres, manijas)
+    "herraje_fill": "#475569",
+    "resalte_edge": "#fde047",    # Lo que se agrega en un paso del instructivo
+    "resalte_fill": "#d97706",
     "endgrain_edge": "#60a5fa",   # Blue/slate edge highlight
     "endgrain_fill": "#334155",   # Wood panel thickness cross-section
     "highlight_edge": "#fde047",  # Bright glowing electric yellow/gold

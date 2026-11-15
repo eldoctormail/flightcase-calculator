@@ -167,9 +167,24 @@ def _vistas_extra(d: Dict[str, Any], carpeta: str) -> list:
     return vistas
 
 
+def _renderizador(res: ResultadoTaller):
+    """Función render(salida_png, defs, camara, tam) que espera instructivo.py, hecha con
+    la vista 3D propia en lugar de OpenSCAD."""
+    from .geometria import Opciones3D, malla_3d
+    from .render import renderizar
+
+    def render(salida_png: str, defs: dict, camara: str, tam: str) -> bool:
+        try:
+            return renderizar(malla_3d(res, Opciones3D.desde_defs(defs)), salida_png, camara, tam)
+        except Exception:
+            return False
+    return render
+
+
 def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool = True,
-             render_png: Optional[str] = None) -> PaqueteTaller:
-    """Escribe dxf/*.dxf, lista_cortes.csv, materiales.csv y planos.pdf en `carpeta`."""
+             render_png: Optional[str] = None, instructivo: bool = True) -> PaqueteTaller:
+    """Escribe dxf/*.dxf, lista_cortes.csv, materiales.csv, planos.pdf e
+    instructivo_montaje.pdf en `carpeta`."""
     os.makedirs(os.path.join(carpeta, "dxf"), exist_ok=True)
     d = datos(res)
     paq = PaqueteTaller(carpeta=carpeta, avisos=list(d["avisos"]))
@@ -241,8 +256,29 @@ def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool =
     paq.archivos.append(ruta)
 
     if pdf:
+        laminas, pasos = {}, []
+        if instructivo or render_png is None:
+            from .geometria import Opciones3D, malla_3d
+            from .render import renderizar
+            render = _renderizador(res)
+            if render_png is None:
+                render_png = os.path.join(carpeta, "render.png")
+                if renderizar(malla_3d(res), render_png, "0,0,0,74,0,35,0", "1600,1200"):
+                    paq.archivos.append(render_png)
+                else:
+                    render_png = None
+            if instructivo:
+                from .planos import instructivo as ins
+                pasos = ins.armar_pasos(d, piezas)
+                laminas = ins.renderizar_laminas(render, d, piezas, os.path.join(carpeta, "montaje"), pasos)
+                paq.archivos += sorted(set(laminas.values()))
         vistas = _vistas_extra(d, carpeta)
         ruta = os.path.join(carpeta, "planos.pdf")
-        gen.generar_pdf(ruta, d, piezas, placas, barras, render_png, None, None, vistas)
+        gen.generar_pdf(ruta, d, piezas, placas, barras, render_png, None, laminas.get("explotado"), vistas)
         paq.archivos += [v[1] for v in vistas] + [ruta]
+        if pasos:
+            ruta = os.path.join(carpeta, "instructivo_montaje.pdf")
+            from .planos import instructivo as ins
+            ins.generar_instructivo(ruta, d, piezas, laminas, render_png, pasos)
+            paq.archivos.append(ruta)
     return paq
