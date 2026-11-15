@@ -729,6 +729,7 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
               math.ceil(_rem_total * 1.1), s("estimado: paso ", remache_paso, " mm, +10%"),
               E_remache_ref if E_remache_ref is not None else ""])
     herrajes = [Herraje(*h) for h in H]
+    _i_remache = len(herrajes) - 1
 
     # ---- avisos ----
     _man_top = _man_cy + _man_hl / 2
@@ -977,6 +978,20 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         interior=interior,
     )
 
+    # ---- herrajes puestos a mano (herrajes_manuales.py): no están en flightcase.scad ----
+    manuales = None
+    if P.get("herrajes_manuales"):
+        from . import herrajes_manuales as _hm
+        manuales = _hm.aplicar(P, geo, paneles, ext_ancho, ext_prof, ext_alto, calados, cat)
+        calados += manuales.calados
+        marcas += manuales.marcas
+        if manuales.remaches:
+            h_rem = herrajes[_i_remache]
+            h_rem.cantidad = math.ceil((_rem_total + manuales.remaches) * 1.1)
+            h_rem.detalle = s(h_rem.detalle, " (incluye herrajes a mano)")
+        _hm.unir_herrajes(herrajes, manuales.herrajes, Herraje)
+        A += manuales.avisos
+
     return ResultadoTaller(
         info=info, paneles=paneles, calados=calados, marcas=marcas, perfiles=perfiles, extras=extras_p,
         herrajes=herrajes, panelmat=panelmat, bandejas=bandejas_out, avisos=A,
@@ -984,5 +999,5 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
                  "placa_largo": E_placa_largo, "placa_ancho": E_placa_ancho, "placa_esp": E_placa_esp,
                  "placa_material": E_placa_material, "placa_kerf": placa_kerf, "placa_margen": placa_margen,
                  "barra_largo": barra_largo, "sierra_kerf": sierra_kerf, "cantidad_cases": cantidad_cases,
-                 "remache_ref": E_remache_ref, "geo": geo, "interiores": interior},
+                 "remache_ref": E_remache_ref, "geo": geo, "interiores": interior, "manuales": manuales},
     )

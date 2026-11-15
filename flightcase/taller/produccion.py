@@ -43,8 +43,43 @@ def lineas_datos(res: ResultadoTaller) -> List[str]:
 
 
 def datos(res: ResultadoTaller) -> Dict[str, Any]:
-    """Diccionario `d` con la forma que usan las funciones de generar.py."""
-    return gen.parsear_datos(lineas_datos(res))
+    """Diccionario `d` con la forma que usan las funciones de generar.py. Los herrajes puestos
+    a mano van además en d["manuales"] (por panel, en coordenadas del panel)."""
+    d = gen.parsear_datos(lineas_datos(res))
+    d["manuales"] = manuales_por_panel(res)
+    return d
+
+
+def manuales_por_panel(res: ResultadoTaller) -> Dict[str, List[Dict[str, Any]]]:
+    man = res.valores.get("manuales")
+    out: Dict[str, List[Dict[str, Any]]] = {}
+    if man is None:
+        return out
+    for c in man.colocados:
+        if not c.panel or c.forma == "junta":
+            continue
+        out.setdefault(c.panel, []).append(dict(
+            nombre=c.nombre, forma=c.forma, categoria=c.categoria, x=c.px, y=c.py, w=c.pw, h=c.ph,
+            lineas=c.lineas_panel, modo=c.fila.modo if c.forma == "logo" else ""))
+    return out
+
+
+def trazos_manuales(manuales: List[Dict[str, Any]]) -> List[tuple]:
+    """(capa, polilínea) para el DXF: contorno de cada herraje de superficie en MARCA y el dibujo
+    de los logos (en GRABADO si se graba)."""
+    out = []
+    for hm in manuales:
+        x0, y0, x1, y1 = hm["x"] - hm["w"] / 2, hm["y"] - hm["h"] / 2, hm["x"] + hm["w"] / 2, hm["y"] + hm["h"] / 2
+        grabado = hm.get("modo") == "grabado"
+        if hm["forma"] == "pie":
+            r = hm["w"] / 2
+            out.append(("MARCA", [(hm["x"] + r * math.cos(2 * math.pi * k / 36), hm["y"] + r * math.sin(2 * math.pi * k / 36))
+                                  for k in range(37)]))
+        elif hm["forma"] != "calado" and not grabado:
+            out.append(("MARCA", [(x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0)]))
+        for ln in hm.get("lineas", []):
+            out.append(("GRABADO" if grabado else "MARCA", list(ln)))
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -83,9 +118,10 @@ def _rect_redondeado(capa: str, cx: float, cy: float, w: float, h: float, r: flo
     ]
 
 
-def panel_dxf(ancho: float, alto: float, calados: List[Dict[str, Any]] = ()) -> str:
+def panel_dxf(ancho: float, alto: float, calados: List[Dict[str, Any]] = (), trazos: List[tuple] = ()) -> str:
     """DXF de un panel: contorno y calados pasantes en la capa 0 (como OpenSCAD) y
-    rebajes (no pasantes) en la capa REBAJE."""
+    rebajes (no pasantes) en la capa REBAJE. `trazos` (capa, polilínea) agrega las marcas
+    de los herrajes puestos a mano (capa MARCA) y los logos grabados (capa GRABADO)."""
     ent: List[str] = []
     esquinas = [(0, 0), (ancho, 0), (ancho, alto), (0, alto)]
     ent += [_dxf_linea("0", esquinas[i], esquinas[(i + 1) % 4]) for i in range(4)]
@@ -93,9 +129,13 @@ def panel_dxf(ancho: float, alto: float, calados: List[Dict[str, Any]] = ()) -> 
         capa = "REBAJE" if c["tipo"] == "rebaje" else "0"
         r = 0.0 if c["tipo"] == "rebaje" else c.get("r", 0.0)
         ent += _rect_redondeado(capa, c["cx"], c["cy"], c["w"], c["h"], r)
-    return ("  0\nSECTION\n  2\nTABLES\n  0\nTABLE\n  2\nLAYER\n 70\n2\n"
-            "  0\nLAYER\n  2\n0\n 70\n0\n 62\n7\n  6\nCONTINUOUS\n"
-            "  0\nLAYER\n  2\nREBAJE\n 70\n0\n 62\n1\n  6\nCONTINUOUS\n"
+    capas = [("0", 7), ("REBAJE", 1)]
+    for capa, pts in trazos:
+        ent += [_dxf_linea(capa, pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
+        if capa not in [c[0] for c in capas]:
+            capas.append((capa, 5 if capa == "MARCA" else 3))
+    tabla = "".join(f"  0\nLAYER\n  2\n{c}\n 70\n0\n 62\n{col}\n  6\nCONTINUOUS\n" for c, col in capas)
+    return (f"  0\nSECTION\n  2\nTABLES\n  0\nTABLE\n  2\nLAYER\n 70\n{len(capas)}\n" + tabla +
             "  0\nENDTAB\n  0\nENDSEC\n"
             "  0\nSECTION\n  2\nENTITIES\n" + "".join(ent) + "  0\nENDSEC\n  0\nEOF\n")
 
@@ -249,7 +289,8 @@ def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool =
     N = gen.cantidad_cases(d)
     for pz in piezas:
         pz["dxf"] = f"{pz['num']:02d}_{pz['ids'][0]}_x{pz['cant']}.dxf"
-        escribir(pz["dxf"], panel_dxf(pz["w"], pz["h"], pz["calados"]))
+        escribir(pz["dxf"], panel_dxf(pz["w"], pz["h"], pz["calados"],
+                                      trazos_manuales(d["manuales"].get(pz["ids"][0], []))))
     for i, e in enumerate(d["extras"]):
         num_p = len(piezas) + 1
         nombre = f"{num_p:02d}_extra{i + 1}_x{e['cant']}.dxf"
@@ -321,6 +362,8 @@ def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool =
                 pasos = ins.armar_pasos(d, piezas)
                 from .planos import interior as pl_int
                 p_int = pl_int.pasos_instructivo(res, piezas)
+                from . import herrajes_manuales as hman
+                p_int += hman.pasos_instructivo(res, piezas)
                 if p_int:   # antes del paso final (el case terminado), si lo hay
                     fin = next((i for i, p in enumerate(pasos) if p.get("vista") == "final"), len(pasos))
                     pasos[fin:fin] = p_int
