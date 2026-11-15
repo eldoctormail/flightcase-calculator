@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict, Iterator, Union
+from typing import Any, Dict, Iterator, Optional, Union
 
 _IDENT = re.compile(r"^\s*([A-Za-z_$][A-Za-z0-9_]*)\s*=\s*(.+?)\s*$", re.S)
 
@@ -105,3 +105,36 @@ def leer_asignaciones(texto: str) -> Dict[str, Any]:
 
 def leer_proyecto(ruta: Union[str, Path]) -> Dict[str, Any]:
     return leer_asignaciones(Path(ruta).read_text(encoding="utf-8"))
+
+
+def literal(valor: Any) -> str:
+    """Escribe un valor de Python como literal de OpenSCAD."""
+    if isinstance(valor, bool):
+        return "true" if valor else "false"
+    if isinstance(valor, (int, float)):
+        if isinstance(valor, float) and valor.is_integer():
+            valor = int(valor)
+        return repr(valor) if isinstance(valor, int) else f"{valor:.6g}"
+    if isinstance(valor, str):
+        return json.dumps(valor, ensure_ascii=False)
+    if isinstance(valor, (list, tuple)):
+        return "[" + ", ".join(literal(v) for v in valor) + "]"
+    raise TypeError(f"No se puede escribir {valor!r} en OpenSCAD")
+
+
+def escribir_proyecto(params: Dict[str, Any], por_defecto: Optional[Dict[str, Any]] = None,
+                      titulo: str = "") -> str:
+    """Texto de un proyecto .scad del generador del taller con los parámetros que
+    cambian respecto de los valores por defecto (todos si no se pasan)."""
+    lineas = []
+    if titulo:
+        lineas.append(f"// {titulo}")
+    lineas += ["// Proyecto guardado desde Flightcase Calculator.", "",
+               "include <flightcase_gen/flightcase.scad>", ""]
+    cambios = {k: v for k, v in params.items()
+               if por_defecto is None or k not in por_defecto or por_defecto[k] != v}
+    ancho = max((len(k) for k in cambios), default=0)
+    for k, v in cambios.items():
+        lineas.append(f"{k.ljust(ancho)} = {literal(v)};")
+    lineas += ["", "flightcase();", ""]
+    return "\n".join(lineas)

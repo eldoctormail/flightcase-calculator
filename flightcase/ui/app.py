@@ -44,6 +44,7 @@ from .widgets import (
     WoodTypesWidget,
     CostsWidget,
     CatalogWidget,
+    TallerWidget,
 )
 from ..application import CalculateQuoteUseCase, ExportProductionPackUseCase, ExportTallerPackFromScadUseCase
 from ..production.catalog import Catalog
@@ -113,6 +114,10 @@ class FlightCaseMainWindow(QMainWindow):
 
         self.center_tabs.addTab(self.schema_widget, "Vista 3D")
         self.center_tabs.addTab(self.svg_widget, "Paneles 2D (SVG)")
+        # Reglas del taller (generador de OpenSCAD): editor propio a pantalla completa
+        self.taller_widget = TallerWidget(self)
+        self.center_tabs.addTab(self.taller_widget, "Taller (reglas propias)")
+        self.center_tabs.currentChanged.connect(self._on_center_tab_changed)
         self.main_splitter.addWidget(self.center_tabs)
 
         # Set splitter proportions (40% left output tables, 60% center 3D schema)
@@ -198,6 +203,11 @@ class FlightCaseMainWindow(QMainWindow):
         export_pack_action.setShortcut("Ctrl+P")
         export_pack_action.triggered.connect(self._export_production_pack)
         self.file_menu.addAction(export_pack_action)
+
+        open_taller_action = QAction("Abrir proyecto del &taller (.scad)...", self)
+        open_taller_action.setShortcut("Ctrl+Shift+T")
+        open_taller_action.triggered.connect(self._open_taller_project)
+        self.file_menu.addAction(open_taller_action)
 
         taller_pack_action = QAction("Paquete del &taller desde proyecto OpenSCAD (.scad)...", self)
         taller_pack_action.setShortcut("Ctrl+T")
@@ -666,6 +676,16 @@ class FlightCaseMainWindow(QMainWindow):
             )
         except Exception as e:
             QMessageBox.critical(self, "Paquete de producción", f"No se pudo generar el paquete:\n{e}")
+
+    def _on_center_tab_changed(self, index: int) -> None:
+        """En la pestaña Taller se ocultan los paneles del modelo simple (no aplican)."""
+        en_taller = self.center_tabs.widget(index) is self.taller_widget
+        self.tabs.setVisible(not en_taller)
+        self.config_container.setVisible(not en_taller)
+
+    def _open_taller_project(self) -> None:
+        self.center_tabs.setCurrentWidget(self.taller_widget)
+        self.taller_widget.abrir()
 
     def _export_taller_pack(self) -> None:
         """Arma DXF, listas y planos.pdf de un proyecto .scad con las reglas del taller."""

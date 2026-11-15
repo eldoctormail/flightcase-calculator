@@ -273,7 +273,7 @@ def test_main_window_permanent_3d_view_and_highlighting(qapp):
     center_tabs = splitter.widget(1)
     assert isinstance(center_tabs, QTabWidget)
     assert center_tabs == window.center_tabs
-    assert center_tabs.count() == 2
+    assert center_tabs.count() == 3
     assert center_tabs.widget(0) == window.schema_widget
     assert center_tabs.widget(1) == window.svg_widget
     assert window.schema_widget.isVisibleTo(window)
@@ -1064,7 +1064,7 @@ def test_wood_panels_svg_widget_ui_and_export(qapp, tmp_path, monkeypatch):
     window = FlightCaseMainWindow(restore_settings=False, load_last_project=False)
     assert window.svg_widget is not None
     assert window.tabs.count() == 5
-    assert window.center_tabs.count() == 2
+    assert window.center_tabs.count() == 3
     assert window.center_tabs.widget(0) == window.schema_widget
     assert window.center_tabs.widget(1) == window.svg_widget
 
