@@ -286,6 +286,145 @@
   ]
  },
  {
+  "seccion": "Interior: equipos y espuma",
+  "parametros": [
+   {
+    "nombre": "equipos",
+    "ayuda": "Lo que va adentro del case: [[nombre, ancho, fondo, alto, peso kg, x, y, z], ...]. x desde el costado izquierdo, y desde el frente del cuerpo, z desde el piso interior (todo en mm, adentro del forro de espuma si hay). Sin x o y (o \"c\") el equipo va centrado. Se usa para los calados de la espuma y para controlar que todo entre sin chocar."
+   },
+   {
+    "nombre": "espumas",
+    "ayuda": "Bloques de espuma con calados para los equipos: [[ancho, fondo, alto, x, y, z], ...]. Una medida en 0 llega hasta el borde del cuerpo; sin x o y el bloque va centrado, y sin z apoya en el piso (en un case frontal, sin y va contra el fondo del cuerpo). Cada equipo que cae dentro del bloque lleva su calado (más la holgura) desde la cara abierta hasta el fondo del equipo. El bloque se corta en capas de espuma_plancha y cada capa sale en su DXF."
+   },
+   {
+    "nombre": "espuma_plancha",
+    "ayuda": "espesor de las planchas de espuma con que se arman los bloques (mm)"
+   },
+   {
+    "nombre": "espuma_holgura",
+    "ayuda": "juego del calado alrededor del equipo, por lado (mm)"
+   },
+   {
+    "nombre": "espuma_pared_min",
+    "ayuda": "espuma mínima entre calados y hasta el borde del bloque (mm)"
+   },
+   {
+    "nombre": "espuma_fondo_min",
+    "ayuda": "espuma mínima bajo cada equipo (mm)"
+   },
+   {
+    "nombre": "espuma_densidad",
+    "ayuda": "densidad de la espuma de los bloques (kg/m³), para el peso"
+   },
+   {
+    "nombre": "espuma_material",
+    "ayuda": "nombre de la espuma de los bloques en la lista de materiales"
+   },
+   {
+    "nombre": "espuma_plancha_medidas",
+    "ayuda": "medidas de la plancha que se compra [largo, ancho] (mm)"
+   },
+   {
+    "nombre": "ref_espuma_bloques",
+    "ayuda": "referencia del catálogo para la espuma de los bloques (ej. \"08-019330\" plastazote 30 mm): reemplaza material y espesor de plancha"
+   }
+  ]
+ },
+ {
+  "seccion": "Interior: cajones",
+  "parametros": [
+   {
+    "nombre": "cajones",
+    "ayuda": "Cajones con correderas telescópicas, para cases frontales: [[alto del frente, altura desde el piso, ancho, largo de corredera], ...]. Ancho 0 o vacío = todo el ancho interior; largo 0 o vacío = la corredera más larga que entra. Cada cajón agrega frente, 2 laterales, trasera y piso a la lista de cortes."
+   },
+   {
+    "nombre": "cajon_esp",
+    "ayuda": "espesor de la placa de los cajones (mm)"
+   },
+   {
+    "nombre": "cajon_material",
+    "ayuda": "material de los cajones (vacío = \"Placa <espesor> mm\")"
+   },
+   {
+    "nombre": "cajon_holgura",
+    "ayuda": "luz alrededor del frente del cajón (mm)"
+   },
+   {
+    "nombre": "cajon_desc_alto",
+    "ayuda": "cuánto más baja que el frente es la caja del cajón (mm)"
+   },
+   {
+    "nombre": "cajon_retiro",
+    "ayuda": "distancia del plano de cierre al frente del cajón (mm)"
+   },
+   {
+    "nombre": "corredera_esp",
+    "ayuda": "espacio que ocupa cada corredera a cada lado (mm, 12,7 la estándar)"
+   },
+   {
+    "nombre": "corredera_largos",
+    "ayuda": "largos de corredera que se consiguen (mm)"
+   },
+   {
+    "nombre": "ref_corredera",
+    "ayuda": "referencia del catálogo de la corredera (vacío = genérica)"
+   },
+   {
+    "nombre": "densidad_placa",
+    "ayuda": "densidad de la placa (kg/m³), para el peso de cajones"
+   }
+  ]
+ },
+ {
+  "seccion": "Interior: rack 19\"",
+  "parametros": [
+   {
+    "nombre": "rack_u",
+    "ayuda": "unidades de rack (1 U = 44,45 mm). 0 = sin rack. En un case frontal los rieles van verticales y los equipos entran de frente; en uno vertical van a lo largo y los equipos entran desde arriba."
+   },
+   {
+    "nombre": "rack_equipos",
+    "ayuda": "Equipos de 19\": [[nombre, U, fondo, peso kg, desde U, sobresale adelante], ...]. Sin \"desde U\" se apilan desde la U1 (abajo en un frontal, adelante en un vertical). Se controla que entren de fondo con lugar para los cables, que no se pisen y que lo que sobresale entre en la tapa. Las unidades libres se tapan con carátulas ciegas."
+   },
+   {
+    "nombre": "rack_desde",
+    "ayuda": "posición del comienzo de los rieles desde el piso (frontal) o el frente (vertical), en mm. -1 = centrados"
+   },
+   {
+    "nombre": "rack_retiro",
+    "ayuda": "distancia del plano de cierre a la cara de los rieles (mm): deja lugar para perillas y manijas"
+   },
+   {
+    "nombre": "rack_cables",
+    "ayuda": "lugar detrás de cada equipo para conectores y cables (mm)"
+   },
+   {
+    "nombre": "rack_traseros",
+    "ayuda": "rieles traseros para sostener equipos pesados o largos"
+   },
+   {
+    "nombre": "rack_dist_traseros",
+    "ayuda": "distancia entre la cara de los rieles delanteros y la de los traseros (mm, 0 = lo más atrás que entre)"
+   },
+   {
+    "nombre": "riel_ala",
+    "ayuda": "ancho del ala del riel donde apoyan las orejas (mm). Si el interior es más ancho que el riel, se calcula el suplemento para cada costado."
+   },
+   {
+    "nombre": "riel_fondo",
+    "ayuda": "ala del riel que va atornillada al costado (mm)"
+   },
+   {
+    "nombre": "riel_esp",
+    "ayuda": "espesor del riel (mm): elige la tuerca enjaulada"
+   },
+   {
+    "nombre": "ref_riel",
+    "ayuda": "referencia del perfil de rack del catálogo (barra de 45 U)"
+   }
+  ]
+ },
+ {
   "seccion": "Encastres de apilado (platos en el techo)",
   "parametros": [
    {

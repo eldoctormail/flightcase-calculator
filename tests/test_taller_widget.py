@@ -35,13 +35,13 @@ def test_cambiar_un_parametro_recalcula(widget):
 
 
 def test_lista_mal_escrita_no_rompe(widget):
-    widget.editores["bandejas"].widget.setText("[[400, 300")
+    widget.editores["piezas_extra"].widget.setText('[["Base", 400, 300')
     widget.recalcular()
     assert "lista" in widget.lbl_avisos.text()
-    widget.editores["bandejas"].widget.setText("[[400, 300, 120]]")
+    widget.editores["piezas_extra"].widget.setText('[["Base", 400, 300, 18]]')
     widget.recalcular()
-    assert widget.params["bandejas"] == [[400, 300, 120]]
-    assert widget.resultado.bandejas
+    assert widget.params["piezas_extra"] == [["Base", 400, 300, 18]]
+    assert widget.resultado.extras
 
 
 def test_guardar_y_abrir_scad(widget, tmp_path):

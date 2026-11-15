@@ -43,6 +43,14 @@ COLORS = {
     "plato_fill": "#3a3a3a",
     "herraje_edge": "#cbd5e1",    # Herrajes del taller (esquineros, cierres, manijas)
     "herraje_fill": "#475569",
+    "equipo_edge": "#a3a3a3",     # Equipos dentro del case
+    "equipo_fill": "#2b3a4a",
+    "rack_frente_edge": "#d4d4d4",  # Frente de los equipos de rack
+    "rack_frente_fill": "#404040",
+    "espuma_edge": "#4b5563",     # Espuma con calados
+    "espuma_fill": "#1f2937",
+    "cajon_edge": "#d6a35c",      # Cajones y suplementos de madera
+    "cajon_fill": "#6b4a26",
     "resalte_edge": "#fde047",    # Lo que se agrega en un paso del instructivo
     "resalte_fill": "#d97706",
     "endgrain_edge": "#60a5fa",   # Blue/slate edge highlight

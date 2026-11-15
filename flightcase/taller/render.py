@@ -34,6 +34,10 @@ COLORES: Dict[str, str] = {
     "base_ruedas": "#5a3d22",
     "plato": "#3a3a3a",
     "wall": "#deb887",        # bandejas (color de la placa)
+    "equipo": "#3d4b5c",      # equipos dentro del case
+    "rack_frente": "#2f2f2f",
+    "espuma": "#3a3a3a",      # espuma gris oscura
+    "cajon": "#c9a26b",
     "resalte": "#ffa500",     # Orange: lo que se agrega en el paso
     "rotulo": "#ffffff",
     "remache": "#b4b4b4",

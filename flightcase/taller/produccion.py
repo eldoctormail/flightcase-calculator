@@ -181,6 +181,36 @@ def _renderizador(res: ResultadoTaller):
     return render
 
 
+def _exportar_espuma(res: ResultadoTaller, carpeta: str, paq: "PaqueteTaller") -> None:
+    """Un DXF por capa de cada bloque de espuma (calados en la capa 0, rebajes en REBAJE) y
+    espuma.csv con el despiece."""
+    interior = res.valores.get("interiores")
+    if interior is None or not interior.espumas:
+        return
+    os.makedirs(os.path.join(carpeta, "dxf", "espuma"), exist_ok=True)
+    filas = []
+    for b, bl in enumerate(interior.espumas, 1):
+        for capa in bl.capas:
+            nombre = f"espuma{b}_capa{capa.indice}_{fmt(capa.esp)}mm.dxf"
+            ruta = os.path.join(carpeta, "dxf", "espuma", nombre)
+            with open(ruta, "w", encoding="utf-8", newline="\n") as f:
+                f.write(panel_dxf(capa.ancho, capa.alto, capa.calados))
+            paq.archivos.append(ruta)
+            pas = [c for c in capa.calados if c["tipo"] == "calado"]
+            reb = [c for c in capa.calados if c["tipo"] == "rebaje"]
+            filas.append([bl.nombre, capa.indice, gen.num(capa.ancho), gen.num(capa.alto), gen.num(capa.esp),
+                          ", ".join(f"{c['equipo']} {gen.num(c['w'])}x{gen.num(c['h'])}" for c in pas),
+                          ", ".join(f"{c['equipo']} {gen.num(c['w'])}x{gen.num(c['h'])} prof. {gen.num(c['prof'])}"
+                                    for c in reb),
+                          "espuma/" + nombre])
+    ruta = os.path.join(carpeta, "espuma.csv")
+    with open(ruta, "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.writer(f, delimiter=";")
+        w.writerow(["Bloque", "Capa", "Ancho", "Alto", "Espesor", "Calados pasantes", "Rebajes", "Archivo"])
+        w.writerows(filas)
+    paq.archivos.append(ruta)
+
+
 def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool = True,
              render_png: Optional[str] = None, instructivo: bool = True) -> PaqueteTaller:
     """Escribe dxf/*.dxf, lista_cortes.csv, materiales.csv, planos.pdf e
@@ -210,6 +240,8 @@ def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool =
         piezas.append(dict(num=num_p, ids=[f"extra{i + 1}"], cant=e["cant"], nombre=e["nombre"],
                            w=e["w"], h=e["h"], calados=[], marcas=[], dxf=nombre, extra=True,
                            material=e["material"], esp=e["esp"]))
+
+    _exportar_espuma(res, carpeta, paq)
 
     # Placas por material y barras de perfil
     material_principal = d["info"]["material"]
