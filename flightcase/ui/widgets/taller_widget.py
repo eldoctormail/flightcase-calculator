@@ -12,17 +12,20 @@ from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QComboBox,
+    QCompleter,
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
     QScrollArea,
     QSplitter,
+    QStyledItemDelegate,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -32,7 +35,8 @@ from PySide6.QtWidgets import (
 )
 
 from ...paths import bundled_resource
-from ...taller.modelo import ResultadoTaller, calcular, fmt, parametros_por_defecto
+from ...taller import estilos
+from ...taller.modelo import CatalogoTaller, ResultadoTaller, calcular, fmt, parametros_por_defecto
 from ...taller.scad import escribir_proyecto, leer_proyecto, literal, valor_literal
 
 # Opciones fijas de los parámetros de texto que las tienen
@@ -64,7 +68,68 @@ TABLAS: Dict[str, List[tuple]] = {
                 ("Largo corredera", "num", 0)],
     "rack_equipos": [("Nombre", "texto", ""), ("U", "num", None), ("Fondo", "num", None), ("Peso kg", "num", 0),
                      ("Desde U", "num", 0), ("Sobresale adelante", "num", 0)],
+    "extras": [("Artículo del catálogo", "ref", None), ("Cantidad", "num", 1)],
 }
+
+# Tablas cuyas filas se completan con los valores por defecto de las columnas vacías
+COMPLETAR = {"extras"}
+
+# Herrajes que se eligen del catálogo: categorías que se ofrecen en la lista (None = todas)
+REF_CATEGORIAS: Dict[str, Optional[tuple]] = {
+    "ref_placa": ("placa",), "ref_angulo": ("angulo",), "ref_hibrido": ("hibrido",),
+    "ref_cierre_macho": ("tapa_m", "hibrido"), "ref_cierre_hembra": ("tapa_h", "hibrido"),
+    "ref_esquinero": ("esquinero",), "ref_cierre": ("cierre",), "ref_manija": ("manija",),
+    "ref_rueda": ("rueda",), "ref_rueda_freno": ("rueda",), "ref_plato": ("plato",),
+    "ref_remache": ("remache",), "ref_pie": ("pie",), "ref_bisagra": ("bisagra",), "ref_tope": ("tope",),
+    "ref_espuma": ("espuma",), "ref_espuma_bloques": ("espuma",), "ref_escuadra": ("escuadra",),
+    "ref_riel": ("rack",), "ref_corredera": None,
+}
+SEPARADOR_REF = " — "
+_catalogo: Optional[CatalogoTaller] = None
+
+
+def catalogo() -> CatalogoTaller:
+    global _catalogo
+    if _catalogo is None:
+        _catalogo = CatalogoTaller()
+    return _catalogo
+
+
+def etiqueta_ref(ref: str) -> str:
+    """«ref — nombre» para mostrar un artículo; el ref solo si no está en el catálogo."""
+    cat = catalogo()
+    return f"{ref}{SEPARADOR_REF}{cat.nombre(ref)}" if cat.existe(ref) else ref
+
+
+def ref_de_texto(texto: str) -> str:
+    return texto.split(SEPARADOR_REF, 1)[0].strip()
+
+
+def _ayuda_articulo(fila: Dict[str, Any]) -> str:
+    datos = ", ".join(f"{k}: {fmt(v) if not isinstance(v, str) else v}" for k, v in fila.get("datos", {}).items())
+    nota = "" if fila.get("verificado", True) else "\nMedidas estimadas: verificalas con la pieza."
+    return f"{fila['nombre']} ({fila['categoria']})" + (f"\n{datos}" if datos else "") + nota
+
+
+def _llenar_combo_catalogo(w: QComboBox, categorias: Optional[tuple], vacio: bool) -> None:
+    """Carga los artículos del catálogo (de esas categorías) en un combo editable con búsqueda."""
+    w.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+    w.setMinimumContentsLength(18)
+    w.view().setMinimumWidth(420)
+    if vacio:
+        w.addItem("", "")
+    filas = catalogo().filas
+    orden = list(categorias) if categorias else sorted({f["categoria"] for f in filas})
+    for cat in orden:
+        for f in filas:
+            if f["categoria"] == cat:
+                w.addItem(f"{f['ref']}{SEPARADOR_REF}{f['nombre']}" + ("" if f.get("verificado", True) else " *"),
+                          f["ref"])
+                w.setItemData(w.count() - 1, _ayuda_articulo(f), Qt.ToolTipRole)
+    comp = QCompleter(w.model(), w)
+    comp.setFilterMode(Qt.MatchContains)
+    comp.setCaseSensitivity(Qt.CaseInsensitive)
+    w.setCompleter(comp)
 
 
 def secciones_parametros() -> List[Dict[str, Any]]:
@@ -97,6 +162,14 @@ class _Editor:
             w.setDecimals(0 if nombre in ENTEROS else 2)
             w.setKeyboardTracking(False)
             w.valueChanged.connect(al_cambiar)
+        elif isinstance(defecto, str) and nombre in REF_CATEGORIAS:
+            w = QComboBox()
+            w.setEditable(True)
+            w.setMaxVisibleItems(20)
+            _llenar_combo_catalogo(w, REF_CATEGORIAS[nombre], vacio=True)
+            w.lineEdit().setPlaceholderText("sin elegir (usa las medidas)")
+            w.currentTextChanged.connect(al_cambiar)
+            w.activated.connect(lambda *_: w.lineEdit().setCursorPosition(0))
         elif isinstance(defecto, str) and nombre in OPCIONES:
             w = QComboBox()
             w.setEditable(True)
@@ -117,6 +190,13 @@ class _Editor:
                 w.setChecked(bool(valor))
             elif isinstance(w, QDoubleSpinBox):
                 w.setValue(float(valor))
+            elif isinstance(w, QComboBox) and self.nombre in REF_CATEGORIAS:
+                i = w.findData(str(valor))
+                if i >= 0:
+                    w.setCurrentIndex(i)
+                else:
+                    w.setEditText(str(valor))
+                w.lineEdit().setCursorPosition(0)
             elif isinstance(w, QComboBox):
                 w.setCurrentText(str(valor))
             else:
@@ -132,6 +212,8 @@ class _Editor:
         if isinstance(w, QDoubleSpinBox):
             v = w.value()
             return int(round(v)) if self.nombre in ENTEROS or (isinstance(self.defecto, int) and v.is_integer()) else v
+        if isinstance(w, QComboBox) and self.nombre in REF_CATEGORIAS:
+            return ref_de_texto(w.currentText())
         if isinstance(w, QComboBox):
             return w.currentText()
         texto = w.text()
@@ -151,6 +233,28 @@ def _a_numero(texto: str) -> float:
     return int(v) if v.is_integer() else v
 
 
+class _DelegadoArticulo(QStyledItemDelegate):
+    """Celda que se edita eligiendo un artículo del catálogo (con búsqueda por texto)."""
+
+    def createEditor(self, parent, option, index):  # noqa: N802 (nombre de Qt)
+        w = QComboBox(parent)
+        w.setEditable(True)
+        w.setMaxVisibleItems(20)
+        _llenar_combo_catalogo(w, None, vacio=False)
+        return w
+
+    def setEditorData(self, editor, index):  # noqa: N802
+        ref = ref_de_texto(index.data() or "")
+        i = editor.findData(ref)
+        if i >= 0:
+            editor.setCurrentIndex(i)
+        else:
+            editor.setEditText(ref)
+
+    def setModelData(self, editor, model, index):  # noqa: N802
+        model.setData(index, etiqueta_ref(ref_de_texto(editor.currentText())))
+
+
 class _EditorTabla:
     """Editor de una lista de listas (bandejas, equipos, cajones...) como tabla con filas."""
 
@@ -167,6 +271,10 @@ class _EditorTabla:
         self.tabla.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.tabla.horizontalHeader().setStretchLastSection(True)
         self.tabla.setMinimumHeight(110)
+        for c, (_, tipo, _r) in enumerate(self.columnas):
+            if tipo == "ref":
+                self._delegado = _DelegadoArticulo(self.tabla)
+                self.tabla.setItemDelegateForColumn(c, self._delegado)
         self.tabla.cellChanged.connect(lambda *_: self._al_cambiar())
         lay.addWidget(self.tabla)
         botones = QHBoxLayout()
@@ -199,6 +307,8 @@ class _EditorTabla:
                 celdas = fila if isinstance(fila, list) else [fila]
                 for c, v in enumerate(celdas[:len(self.columnas)]):
                     texto = "" if v == "c" else (fmt(v) if isinstance(v, (int, float)) else str(v))
+                    if self.columnas[c][1] == "ref":
+                        texto = etiqueta_ref(texto)
                     self.tabla.setItem(r, c, QTableWidgetItem(texto))
         finally:
             self.tabla.blockSignals(False)
@@ -223,12 +333,16 @@ class _EditorTabla:
                             item.setBackground(QColor("#ffd6d6"))
                             error = True
                             celdas.append(None)
+                    elif tipo == "ref":
+                        celdas.append(ref_de_texto(texto))
                     else:
                         celdas.append(texto)
                 while celdas and celdas[-1] is None:
                     celdas.pop()
                 if not celdas:
                     continue
+                if self.nombre in COMPLETAR:   # filas que el modelo lee enteras
+                    celdas += [None] * (len(self.columnas) - len(celdas))
                 for c, v in enumerate(celdas):
                     if v is None:
                         relleno = self.columnas[c][2]
@@ -283,6 +397,29 @@ class TallerWidget(QWidget):
             b.clicked.connect(slot)
             barra.addWidget(b)
         raiz.addLayout(barra)
+
+        fila_estilo = QHBoxLayout()
+        fila_estilo.addWidget(QLabel("Estilo de case:"))
+        self.cmb_estilo = QComboBox()
+        self.cmb_estilo.setMinimumWidth(280)
+        self.cmb_estilo.setToolTip("Aplica una forma de armado (tapas, accesos, bisagras, ruedas…) "
+                                   "sin tocar las medidas ni el interior.")
+        self.cmb_estilo.activated.connect(self._estilo_elegido)
+        fila_estilo.addWidget(self.cmb_estilo, 1)
+        self.btn_guardar_estilo = QPushButton("Guardar como estilo…")
+        self.btn_guardar_estilo.setToolTip("Guarda cómo está armado este case (sin medidas ni interior) "
+                                           "para usarlo en otros proyectos.")
+        self.btn_guardar_estilo.clicked.connect(lambda: self.guardar_estilo())
+        fila_estilo.addWidget(self.btn_guardar_estilo)
+        self.btn_borrar_estilo = QPushButton("Borrar estilo")
+        self.btn_borrar_estilo.clicked.connect(lambda: self.borrar_estilo())
+        fila_estilo.addWidget(self.btn_borrar_estilo)
+        raiz.addLayout(fila_estilo)
+        self.lbl_estilo = QLabel()
+        self.lbl_estilo.setWordWrap(True)
+        self.lbl_estilo.setStyleSheet("color:#666")
+        raiz.addWidget(self.lbl_estilo)
+        self._cargar_estilos()
 
         divisor = QSplitter(Qt.Horizontal, self)
         self.toolbox = QToolBox()
@@ -360,6 +497,72 @@ class TallerWidget(QWidget):
         divisor.setStretchFactor(1, 60)
         raiz.addWidget(divisor, 1)
 
+    # ------------------------------------------------------------- estilos
+    def _cargar_estilos(self, elegir: str = "") -> None:
+        self.cmb_estilo.blockSignals(True)
+        self.cmb_estilo.clear()
+        self.cmb_estilo.addItem("Elegí un estilo para aplicarlo…", "")
+        lista = estilos.todos()
+        for e in lista:
+            self.cmb_estilo.addItem(("★ " if e.propio else "") + e.nombre, e.id)
+            self.cmb_estilo.setItemData(self.cmb_estilo.count() - 1, e.descripcion, Qt.ToolTipRole)
+        i = self.cmb_estilo.findData(elegir) if elegir else 0
+        self.cmb_estilo.setCurrentIndex(max(i, 0))
+        self.cmb_estilo.blockSignals(False)
+        self._estilos = {e.id: e for e in lista}
+        self._mostrar_estilo()
+
+    def _mostrar_estilo(self) -> None:
+        e = self._estilos.get(self.cmb_estilo.currentData() or "")
+        self.lbl_estilo.setText(e.descripcion if e else "")
+        self.btn_borrar_estilo.setEnabled(bool(e and e.propio))
+
+    def _estilo_elegido(self, _indice: int) -> None:
+        id_estilo = self.cmb_estilo.currentData()
+        if id_estilo:
+            self.aplicar_estilo(id_estilo)
+        self._mostrar_estilo()
+
+    def aplicar_estilo(self, id_estilo: str) -> None:
+        """Aplica un estilo sobre las medidas e interior actuales."""
+        e = self._estilos.get(id_estilo) or estilos.buscar(id_estilo)
+        if e is None:
+            return
+        self._leer_editores()
+        try:
+            self.params = estilos.aplicar(self.params, e, self.defectos)
+        except Exception as ex:   # base automática con medidas que el modelo no admite
+            self.lbl_avisos.setText(f"No se pudo aplicar el estilo «{e.nombre}»: {ex}")
+            return
+        i = self.cmb_estilo.findData(id_estilo)
+        if i >= 0:
+            self.cmb_estilo.setCurrentIndex(i)
+        self._cargar_en_editores()
+        self.recalcular()
+        self._mostrar_estilo()
+
+    def guardar_estilo(self, nombre: Optional[str] = None) -> Optional[str]:
+        if nombre is None:
+            nombre, ok = QInputDialog.getText(self, "Guardar como estilo",
+                                              "Nombre del estilo (guarda cómo está armado, sin medidas ni interior):")
+            if not ok:
+                return None
+        if not nombre.strip():
+            return None
+        self._leer_editores()
+        e = estilos.guardar_propio(nombre, self.params, self.defectos)
+        self._cargar_estilos(e.id)
+        return e.id
+
+    def borrar_estilo(self, confirmar: bool = True) -> None:
+        e = self._estilos.get(self.cmb_estilo.currentData() or "")
+        if not e or not e.propio:
+            return
+        if confirmar and QMessageBox.question(self, "Borrar estilo", f"¿Borrar el estilo «{e.nombre}»?") != QMessageBox.Yes:
+            return
+        estilos.borrar_propio(e.id)
+        self._cargar_estilos()
+
     @staticmethod
     def _tabla(columnas: List[str]) -> QTableWidget:
         t = QTableWidget(0, len(columnas))
@@ -397,6 +600,8 @@ class TallerWidget(QWidget):
         self.params["_carpeta"] = os.path.dirname(os.path.abspath(ruta)) if ruta else ""
         self.ruta = ruta
         self.lbl_archivo.setText(os.path.basename(ruta) if ruta else "Proyecto nuevo")
+        self.cmb_estilo.setCurrentIndex(0)
+        self._mostrar_estilo()
         self._cargar_en_editores()
         self.recalcular()
 

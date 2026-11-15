@@ -495,7 +495,7 @@
   "parametros": [
    {
     "nombre": "ref_placa",
-    "ayuda": "Poné la referencia del catálogo (ver flightcase_gen/catalogo_fr.scad) y sus medidas reemplazan a los parámetros de arriba. Vacío = usar los parámetros. ej. \"05-001\" tablero abedul 9,6 mm"
+    "ayuda": "Elegí el artículo de la lista (escribí parte del nombre o del número para buscar) y sus medidas reemplazan a los parámetros de arriba. Vacío = usar los parámetros. Los marcados con * tienen medidas estimadas: verificalas con la pieza. ej. \"05-001\" tablero abedul 9,6 mm"
    },
    {
     "nombre": "ref_angulo",
@@ -624,7 +624,7 @@
    },
    {
     "nombre": "extras",
-    "ayuda": "otros artículos para la lista: [[\"08-3476031\", 1], [\"08-5740A\", 4]]"
+    "ayuda": "Otros artículos del catálogo para la lista de compras (asas telescópicas, argollas, tornillos, carátulas de rack…): agregá una fila, elegí el artículo y poné la cantidad."
    }
   ]
  }
