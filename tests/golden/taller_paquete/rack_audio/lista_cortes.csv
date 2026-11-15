@@ -1,0 +1,21 @@
+﻿Tipo;Pieza;Descripción;Largo/Ancho;Alto;Espesor;Cant.;Corte;Archivo
+Panel;P1;Piso cuerpo;535;712;10;1;;01_cuerpo_frente_x1.dxf
+Panel;P2;Techo cuerpo (cubierta);535;712;10;1;;02_cuerpo_trasera_x1.dxf
+Panel;P3;Lateral izq. cuerpo (parte fija) / Lateral der. cuerpo (parte fija);749;712;10;2;;03_cuerpo_izq_x2.dxf
+Panel;P4;Lateral izq. de la cubierta / Lateral der. de la cubierta;343;712;10;2;;04_acceso_izq_x2.dxf
+Panel;P5;Cara tapa delantera / Cara tapa trasera;535;1120;10;2;;05_techo_x2.dxf
+Panel;P6;Piso tapa del. / Piso tapa tras.;515;101;10;2;;06_tapa_frente_x2.dxf
+Panel;P7;Techo tapa del. / Techo tapa tras.;515;101;10;2;;07_tapa_trasera_x2.dxf
+Panel;P8;Lateral izq. tapa del. / Lateral der. tapa del. / Lateral izq. tapa tras. / Lateral der. tapa tras.;1120;101;10;4;;08_tapa_izq_x4.dxf
+Panel;P9;Base de ruedas;530;750;18;1;;09_base_ruedas_x1.dxf
+Panel;P10;Bandeja interna;515;650;15;1;;10_bandeja0_x1.dxf
+Perfil;Ángulo 32x32x2;Aristas horizontales de las caras;485;;;4;recto;
+Perfil;Ángulo 32x32x2;Aristas verticales de las caras;1070;;;4;recto;
+Perfil;Ángulo 32x32x2;Aristas a lo profundo cuerpo;670;;;4;recto;
+Perfil;Ángulo 32x32x2;Aristas a lo profundo tapa del.;65;;;4;recto;
+Perfil;Ángulo 32x32x2;Aristas a lo profundo tapa tras.;65;;;4;recto;
+Perfil;Perfil híbrido;Lados horizontales (punta larga);538;;;8;45/45;
+Perfil;Perfil híbrido;Lados verticales, tramo de la cubierta;358,5;;;4;45/45L;
+Perfil;Perfil híbrido;Lados verticales, tramo fijo;764,5;;;4;45/45L;
+Perfil;Perfil híbrido;Lados verticales (punta larga);1123;;;4;45/45;
+Perfil;Perfil híbrido;Junta tapa de acceso lateral;720;;;4;45L/45L;

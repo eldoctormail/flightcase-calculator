@@ -123,6 +123,18 @@ En GitHub corren solos en cada PR y en cada cambio a main (`.github/workflows/te
 
 ---
 
+## Reglas del taller (proyectos OpenSCAD)
+
+`flightcase/taller/` tiene en Python las reglas de construcción del generador de OpenSCAD del taller (placa de 10 mm, ángulo 32x32, perfil híbrido, refuerzos, tapas, cubiertas, bandejas, base de ruedas, catálogo FR Sistemas / Adam Hall). Con **Archivo → Paquete del taller desde proyecto OpenSCAD (.scad)** se abre un proyecto `.scad` (por ejemplo `mi_case.scad`) y se genera, sin tener OpenSCAD instalado:
+
+- `dxf/*.dxf`: un DXF por pieza distinta, con calados (capa 0) y rebajes (capa `REBAJE`)
+- `lista_cortes.csv` y `materiales.csv` (separador `;`, se abren directo en Excel)
+- `planos.pdf`: piezas acotadas, aprovechamiento de placas, cortes de perfiles y materiales
+
+Los tests comparan el resultado con OpenSCAD: los datos de 18 proyectos y variantes (`tests/golden/taller`) y las listas y DXF de 3 proyectos (`tests/golden/taller_paquete`). Para regenerarlos: `python tools/generar_golden.py ruta/a/flightcase-generador`.
+
+---
+
 ## Traducción
 
 La interfaz, los mensajes, las exportaciones (CSV y SVG) y este README están en español. Los nombres de piezas, notas y etiquetas que genera el modelo se siguen calculando en inglés internamente (se usan para agrupar piezas, resaltar en 3D y guardar proyectos) y se traducen al mostrarlos o exportarlos mediante `flightcase/i18n.py`. Los proyectos `.fcproj` guardados con la versión en inglés se abren sin cambios.

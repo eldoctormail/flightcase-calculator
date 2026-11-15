@@ -335,3 +335,16 @@ class ExportProductionPackUseCase:
             quote=quote,
             svg=svg,
         )
+
+
+class ExportTallerPackFromScadUseCase:
+    """Lee un proyecto .scad del generador del taller y arma su paquete de producción
+    (DXF por pieza, lista_cortes.csv, materiales.csv y planos.pdf) sin usar OpenSCAD."""
+
+    @staticmethod
+    def execute(scad_path: str, folder: str, rotar: bool = True, pdf: bool = True):
+        from ..taller.modelo import calcular
+        from ..taller.produccion import exportar
+        from ..taller.scad import leer_proyecto
+
+        return exportar(calcular(leer_proyecto(scad_path)), folder, rotar=rotar, pdf=pdf)

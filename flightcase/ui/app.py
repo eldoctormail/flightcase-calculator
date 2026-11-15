@@ -45,7 +45,7 @@ from .widgets import (
     CostsWidget,
     CatalogWidget,
 )
-from ..application import CalculateQuoteUseCase, ExportProductionPackUseCase
+from ..application import CalculateQuoteUseCase, ExportProductionPackUseCase, ExportTallerPackFromScadUseCase
 from ..production.catalog import Catalog
 from ..production.pack import full_report_csv
 
@@ -198,6 +198,11 @@ class FlightCaseMainWindow(QMainWindow):
         export_pack_action.setShortcut("Ctrl+P")
         export_pack_action.triggered.connect(self._export_production_pack)
         self.file_menu.addAction(export_pack_action)
+
+        taller_pack_action = QAction("Paquete del &taller desde proyecto OpenSCAD (.scad)...", self)
+        taller_pack_action.setShortcut("Ctrl+T")
+        taller_pack_action.triggered.connect(self._export_taller_pack)
+        self.file_menu.addAction(taller_pack_action)
 
         self.file_menu.addSeparator()
 
@@ -661,6 +666,31 @@ class FlightCaseMainWindow(QMainWindow):
             )
         except Exception as e:
             QMessageBox.critical(self, "Paquete de producción", f"No se pudo generar el paquete:\n{e}")
+
+    def _export_taller_pack(self) -> None:
+        """Arma DXF, listas y planos.pdf de un proyecto .scad con las reglas del taller."""
+        scad, _ = QFileDialog.getOpenFileName(
+            self, "Proyecto del taller (OpenSCAD)", "", "Proyecto OpenSCAD (*.scad)")
+        if not scad:
+            return
+        folder = QFileDialog.getExistingDirectory(self, "Carpeta para el paquete del taller")
+        if not folder:
+            return
+        base = os.path.splitext(os.path.basename(scad))[0]
+        target = os.path.join(folder, f"salida_{base}")
+        try:
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            try:
+                paq = ExportTallerPackFromScadUseCase.execute(scad, target)
+            finally:
+                QApplication.restoreOverrideCursor()
+            avisos = ("\n\nAvisos:\n" + "\n".join(f"• {a}" for a in paq.avisos)) if paq.avisos else ""
+            QMessageBox.information(
+                self, "Paquete del taller",
+                f"Se generaron {len(paq.archivos)} archivos en:\n{target}{avisos}",
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Paquete del taller", f"No se pudo generar el paquete:\n{e}")
 
 
 def run_app() -> int:

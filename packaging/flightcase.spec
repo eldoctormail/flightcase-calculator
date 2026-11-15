@@ -14,7 +14,8 @@ a = Analysis(
     pathex=[ROOT],
     datas=[(os.path.join(ROOT, "flightcase", "resources"), os.path.join("flightcase", "resources"))],
     # PyOpenGL carga sus módulos de plataforma de forma dinámica
-    hiddenimports=collect_submodules("OpenGL.platform") + collect_submodules("OpenGL.arrays"),
+    hiddenimports=collect_submodules("OpenGL.platform") + collect_submodules("OpenGL.arrays")
+    + ["matplotlib.backends.backend_agg", "matplotlib.backends.backend_pdf"],
     excludes=["tkinter", "pytest"],
     noarchive=False,
 )

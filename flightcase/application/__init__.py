@@ -16,6 +16,7 @@ from .use_cases import (
     LoadProjectUseCase,
     CalculateQuoteUseCase,
     ExportProductionPackUseCase,
+    ExportTallerPackFromScadUseCase,
 )
 
 __all__ = [
@@ -32,4 +33,5 @@ __all__ = [
     "LoadProjectUseCase",
     "CalculateQuoteUseCase",
     "ExportProductionPackUseCase",
+    "ExportTallerPackFromScadUseCase",
 ]
