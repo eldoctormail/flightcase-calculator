@@ -908,6 +908,53 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
             panelmat.append([f"bandeja{i}", _band_mat(b), _band_esp(b)])
         bandejas_out.append([f"bandeja{i}", b[2], bandeja_soportes])
 
+    # Ubicación 3D de cada panel (como colocar()/paredes() de flightcase.scad, case cerrado):
+    # o = esquina local (0,0), u = dirección del ancho, v = del alto, n = normal hacia adentro.
+    z0_tapa = z_cierre + cierre_h_sup
+    z0_tapa2 = _d + _ce
+    X, Y = ext_ancho, ext_prof
+    colocaciones = []
+
+    def _col(pid, o, u, v, n, grupo):
+        if any(p.id == pid for p in paneles):
+            colocaciones.append(dict(id=pid, o=o, u=u, v=v, n=n, grupo=grupo))
+
+    def _paredes(pre, z0, grupo):
+        of_ = ofc if pre == "cuerpo" else off_frente
+        ol_ = olc if pre == "cuerpo" else off_lateral
+        _col(f"{pre}_frente", (of_, _hp, z0), (1, 0, 0), (0, 0, 1), (0, 1, 0), grupo)
+        _col(f"{pre}_trasera", (X - of_, Y - _hp, z0), (-1, 0, 0), (0, 0, 1), (0, -1, 0), grupo)
+        if pre == "cuerpo" and _acc:
+            _col("acceso_izq", (_hp, Y - ol_, z0), (0, -1, 0), (0, 0, 1), (1, 0, 0), grupo)
+            _col("cuerpo_izq", (_hp, Y - ol_ - _a_acc - _j_acc, z0), (0, -1, 0), (0, 0, 1), (1, 0, 0), grupo)
+            _col("cuerpo_der", (X - _hp, ol_, z0), (0, 1, 0), (0, 0, 1), (-1, 0, 0), grupo)
+            _col("acceso_der", (X - _hp, ol_ + _w_low + _j_acc, z0), (0, 1, 0), (0, 0, 1), (-1, 0, 0), grupo)
+        else:
+            _col(f"{pre}_izq", (_hp, Y - ol_, z0), (0, -1, 0), (0, 0, 1), (1, 0, 0), grupo)
+            _col(f"{pre}_der", (X - _hp, ol_, z0), (0, 1, 0), (0, 0, 1), (-1, 0, 0), grupo)
+
+    _ox, _oy = (ext_ancho - w_piso) / 2, (ext_prof - d_piso) / 2
+    if not _2t:
+        _col("piso", (_ox, _oy, _hp), (1, 0, 0), (0, 1, 0), (0, 0, 1), "cuerpo")
+    _paredes("cuerpo", z0_cuerpo, "cuerpo")
+    _col("techo", (_ox, _oy, ext_alto - _hp), (1, 0, 0), (0, 1, 0), (0, 0, -1), "tapa")
+    _paredes("tapa", z0_tapa, "tapa")
+    if _2t:
+        _col("base2", (_ox, _oy, _hp), (1, 0, 0), (0, 1, 0), (0, 0, 1), "tapa2")
+        _paredes("tapa2", z0_tapa2, "tapa2")
+    _bc = (z_cierre2 + z_cierre) / 2
+    geo = dict(
+        colocaciones=colocaciones, espesor=_t, horizontal=_hz, frontal=_fr, dos_tapas=_2t,
+        z_cierre=z_cierre, z_cierre2=z_cierre2, cierre_m_alto=cierre_m_alto, cierre_h_alto=cierre_h_alto,
+        cierre_saliente=cierre_saliente, ala_arista=_ala_arista, hibrido=_hib,
+        base=dict(panel=_panel_base, x=_bo[0], y=_bo[1], ancho=_bx, alto=_by, esp=_bt, separacion=_bgap)
+        if _base else None,
+        ruedas=[list(c) for c in ruedas_centros], rueda_alto=E_rueda_alto if ruedas == 4 else 0,
+        bandejas=[dict(cx=(ext_alto - _bc) if _hz else ext_ancho / 2, cy=_bc if _fr else ext_prof / 2,
+                       z=pared + b[2] - _band_esp(b), ancho=b[0], fondo=b[1], esp=_band_esp(b))
+                  for b in bandejas],
+    )
+
     return ResultadoTaller(
         info=info, paneles=paneles, calados=calados, marcas=marcas, perfiles=perfiles, extras=extras_p,
         herrajes=herrajes, panelmat=panelmat, bandejas=bandejas_out, avisos=A,
@@ -915,5 +962,5 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
                  "placa_largo": E_placa_largo, "placa_ancho": E_placa_ancho, "placa_esp": E_placa_esp,
                  "placa_material": E_placa_material, "placa_kerf": placa_kerf, "placa_margen": placa_margen,
                  "barra_largo": barra_largo, "sierra_kerf": sierra_kerf, "cantidad_cases": cantidad_cases,
-                 "remache_ref": E_remache_ref},
+                 "remache_ref": E_remache_ref, "geo": geo},
     )

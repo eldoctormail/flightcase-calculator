@@ -193,6 +193,10 @@ class TallerWidget(QWidget):
         self.lbl_resumen.setTextFormat(Qt.RichText)
         dl.addWidget(self.lbl_resumen)
         self.tabs = QTabWidget()
+        from .schema_3d_widget import Schema3DCanvas
+        self.vista_3d = Schema3DCanvas(self)
+        self.vista_3d.setMinimumHeight(260)
+        self.tabs.addTab(self.vista_3d, "Vista 3D")
         self.tabla_paneles = self._tabla(["Pieza", "Ancho", "Alto", "Calados"])
         self.tabla_perfiles = self._tabla(["Perfil", "Descripción", "Largo", "Cant.", "Corte"])
         self.tabla_herrajes = self._tabla(["Herraje", "Cant.", "Detalle", "Ref."])
@@ -274,6 +278,11 @@ class TallerWidget(QWidget):
                                            for p in res.perfiles])
         self._llenar(self.tabla_herrajes, [[h.nombre, str(h.cantidad), h.detalle, h.ref] for h in res.herrajes])
         self.lbl_avisos.setText("\n".join(f"⚠ {a}" for a in res.avisos))
+        try:
+            from ...taller.geometria import malla_3d
+            self.vista_3d.set_mesh(malla_3d(res))
+        except Exception as e:   # la vista 3D nunca debe impedir ver el resultado
+            self.lbl_avisos.setText(self.lbl_avisos.text() + f"\n(No se pudo armar la vista 3D: {e})")
 
     @staticmethod
     def _llenar(tabla: QTableWidget, filas: List[List[str]]) -> None:

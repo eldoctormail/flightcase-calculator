@@ -86,3 +86,10 @@ def test_pestana_taller_en_la_ventana(qapp):
     w.center_tabs.setCurrentIndex(0)
     assert w.tabs.isVisible() and w.config_container.isVisible()
     w.close()
+
+
+def test_vista_3d_se_actualiza(widget):
+    widget.editores["int_ancho"].widget.setValue(900)
+    widget.recalcular()
+    a, b = widget.vista_3d.mesh.bounding_box
+    assert b.x - a.x >= widget.resultado.valores["ext_ancho"]
