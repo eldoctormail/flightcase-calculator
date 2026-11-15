@@ -317,9 +317,62 @@ class _EditorTabla:
             b = QPushButton(texto)
             b.clicked.connect(slot)
             botones.addWidget(b)
+        if nombre in ("equipos", "rack_equipos"):   # biblioteca de equipos propios
+            b = QPushButton("Desde la biblioteca…")
+            b.setToolTip("Elegí equipos guardados en tu biblioteca y agregalos a esta tabla")
+            b.clicked.connect(self.desde_biblioteca)
+            botones.addWidget(b)
+            b = QPushButton("Guardar en la biblioteca")
+            b.setToolTip("Guarda las filas elegidas (o todas) en tu biblioteca de equipos, para usarlas en otros cases")
+            b.clicked.connect(lambda: self.guardar_en_biblioteca())
+            botones.addWidget(b)
         botones.addStretch(1)
         lay.addLayout(botones)
         self.widget = w
+
+    # ------------------------------------------------------- biblioteca
+    def agregar_filas(self, filas: List[List[Any]]) -> None:
+        self.tabla.blockSignals(True)
+        try:
+            for fila in filas:
+                self._poner_fila(self.tabla.rowCount(), fila)
+        finally:
+            self.tabla.blockSignals(False)
+        self._al_cambiar()
+
+    def desde_biblioteca(self) -> None:
+        from .biblioteca_widget import BibliotecaDialog
+        rack = self.nombre == "rack_equipos"
+        dlg = BibliotecaDialog(self.widget, agregar=lambda eqs: self.agregar_filas(
+            [e.fila_rack() if rack else e.fila_equipos() for e in eqs]),
+            texto_agregar="Agregar al rack" if rack else "Agregar a los equipos")
+        dlg.exec()
+
+    def guardar_en_biblioteca(self, filas_elegidas: Optional[List[int]] = None) -> int:
+        from ...taller import biblioteca as B
+        try:
+            filas = self.valor()
+        except ValueError:
+            QMessageBox.warning(self.widget, "Biblioteca de equipos", "Hay celdas obligatorias vacías en la tabla.")
+            return 0
+        elegidas = filas_elegidas if filas_elegidas is not None else sorted({i.row() for i in self.tabla.selectedIndexes()})
+        if elegidas:
+            filas = [f for i, f in enumerate(filas) if i in elegidas]
+        nuevos = []
+        for f in filas:
+            try:
+                nuevos.append(B.desde_fila_rack(f) if self.nombre == "rack_equipos" else B.desde_fila_equipos(f))
+            except (ValueError, TypeError):
+                continue
+        if not nuevos:
+            return 0
+        lista = B.cargar()
+        reemplazados = B.sumar(lista, nuevos)
+        B.guardar(lista)
+        extra = f"\n({len(reemplazados)} ya estaban y se actualizaron)" if reemplazados else ""
+        QMessageBox.information(self.widget, "Biblioteca de equipos",
+                                f"Se guardaron {len(nuevos)} equipos en la biblioteca.{extra}")
+        return len(nuevos)
 
     def _agregar(self) -> None:
         self.tabla.insertRow(self.tabla.rowCount())
@@ -337,17 +390,19 @@ class _EditorTabla:
         try:
             self.tabla.setRowCount(0)
             for fila in filas:
-                r = self.tabla.rowCount()
-                self.tabla.insertRow(r)
-                celdas = fila if isinstance(fila, list) else [fila]
-                for c, v in enumerate(celdas[:len(self.columnas)]):
-                    vacio = v == "c" or (v == -1 and self.columnas[c][2] == -1)   # relleno que se muestra vacío
-                    texto = "" if vacio else (fmt(v) if isinstance(v, (int, float)) else str(v))
-                    if self.columnas[c][1] == "ref":
-                        texto = etiqueta_ref(texto)
-                    self.tabla.setItem(r, c, QTableWidgetItem(texto))
+                self._poner_fila(self.tabla.rowCount(), fila)
         finally:
             self.tabla.blockSignals(False)
+
+    def _poner_fila(self, r: int, fila: Any) -> None:
+        self.tabla.insertRow(r)
+        celdas = fila if isinstance(fila, list) else [fila]
+        for c, v in enumerate(celdas[:len(self.columnas)]):
+            vacio = v == "c" or (v == -1 and self.columnas[c][2] == -1)   # relleno que se muestra vacío
+            texto = "" if vacio else (fmt(v) if isinstance(v, (int, float)) else str(v))
+            if self.columnas[c][1] == "ref":
+                texto = etiqueta_ref(texto)
+            self.tabla.setItem(r, c, QTableWidgetItem(texto))
 
     def valor(self) -> Any:
         out, error = [], False
@@ -402,6 +457,9 @@ class TallerWidget(QWidget):
     """Editor de un case con las reglas del taller (las del generador de OpenSCAD)."""
 
     resultado_cambiado = Signal(object)
+    historial_cambiado = Signal()          # cambió lo que se puede deshacer o rehacer
+
+    MAX_HISTORIAL = 200
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -415,6 +473,12 @@ class TallerWidget(QWidget):
         self._timer.setSingleShot(True)
         self._timer.setInterval(250)
         self._timer.timeout.connect(self.recalcular)
+        self._deshacer: List[str] = []       # fotos del case (JSON) antes de cada cambio
+        self._rehacer: List[str] = []
+        self._foto_actual: Optional[str] = None
+        self._etiquetas = {p["nombre"]: p.get("etiqueta") or p["nombre"]
+                           for sec in secciones_parametros() for p in sec["parametros"]}
+        self._etiquetas.update(int_alto_cuerpo="Alto interior", herrajes_manuales="Herrajes a mano")
         self._init_ui()
         self._cargar_en_editores()
         self.recalcular()
@@ -428,7 +492,14 @@ class TallerWidget(QWidget):
         self.lbl_archivo = QLabel("Proyecto nuevo")
         self.lbl_archivo.setStyleSheet("font-weight:600")
         barra.addWidget(self.lbl_archivo, 1)
-        for texto, slot in (("Nuevo", self.nuevo), ("Abrir .scad…", self.abrir),
+        self.btn_deshacer = QPushButton("↶ Deshacer")
+        self.btn_deshacer.clicked.connect(self.deshacer)
+        self.btn_rehacer = QPushButton("↷ Rehacer")
+        self.btn_rehacer.clicked.connect(self.rehacer)
+        barra.addWidget(self.btn_deshacer)
+        barra.addWidget(self.btn_rehacer)
+        for texto, slot in (("Nuevo", self.nuevo), ("Asistente…", lambda: self.asistente()),
+                            ("Abrir .scad…", self.abrir),
                             ("Guardar .scad…", self.guardar), ("Exportar paquete…", self.exportar),
                             ("Exportar STEP…", self.exportar_step)):
             b = QPushButton(texto)
@@ -791,12 +862,90 @@ class TallerWidget(QWidget):
         self.cmb_estilo.setCurrentIndex(0)
         self._mostrar_estilo()
         self._cargar_en_editores()
+        self._deshacer.clear()               # otro proyecto: el historial empieza de cero
+        self._rehacer.clear()
+        self._foto_actual = None
         self.recalcular()
+
+    # ------------------------------------------------------------ historial
+    def _foto(self) -> str:
+        datos = {k: v for k, v in self.params.items() if not k.startswith("_")}
+        return json.dumps(datos, sort_keys=True, ensure_ascii=False, default=str)
+
+    def _registrar_cambio(self) -> None:
+        foto = self._foto()
+        if self._foto_actual is not None and foto != self._foto_actual:
+            self._deshacer.append(self._foto_actual)
+            del self._deshacer[:-self.MAX_HISTORIAL]
+            self._rehacer.clear()
+        if foto != self._foto_actual:
+            self._foto_actual = foto
+            self._avisar_historial()
+
+    def _describir(self, a: Optional[str], b: Optional[str]) -> str:
+        """Qué cambió entre dos fotos, con los nombres en castellano."""
+        if not a or not b:
+            return ""
+        pa, pb = json.loads(a), json.loads(b)
+        claves = sorted(k for k in set(pa) | set(pb) if pa.get(k) != pb.get(k))
+        if not claves:
+            return ""
+        nombres = [self._etiquetas.get(k, k) for k in claves]
+        return nombres[0] if len(nombres) == 1 else f"{nombres[0]} y {len(nombres) - 1} más"
+
+    def texto_deshacer(self) -> str:
+        return self._describir(self._deshacer[-1], self._foto_actual) if self._deshacer else ""
+
+    def texto_rehacer(self) -> str:
+        return self._describir(self._foto_actual, self._rehacer[-1]) if self._rehacer else ""
+
+    def _avisar_historial(self) -> None:
+        for boton, pila, texto, accion in ((self.btn_deshacer, self._deshacer, self.texto_deshacer(), "Deshacer"),
+                                           (self.btn_rehacer, self._rehacer, self.texto_rehacer(), "Rehacer")):
+            boton.setEnabled(bool(pila))
+            boton.setToolTip(f"{accion}: {texto}" if texto else accion)
+        self.historial_cambiado.emit()
+
+    def _confirmar_edicion(self) -> None:
+        """Si hay un número a medio escribir, que cuente como cambio antes de deshacer."""
+        foco = QApplication.focusWidget()
+        while foco is not None and not isinstance(foco, QDoubleSpinBox):
+            foco = foco.parentWidget()
+        if isinstance(foco, QDoubleSpinBox) and self.isAncestorOf(foco):
+            foco.interpretText()
+        if self._timer.isActive():
+            self._timer.stop()
+            self.recalcular()
+
+    def deshacer(self) -> None:
+        self._confirmar_edicion()
+        if not self._deshacer:
+            return
+        self._rehacer.append(self._foto_actual)
+        self._restaurar(self._deshacer.pop())
+
+    def rehacer(self) -> None:
+        self._confirmar_edicion()
+        if not self._rehacer:
+            return
+        self._deshacer.append(self._foto_actual)
+        self._restaurar(self._rehacer.pop())
+
+    def _restaurar(self, foto: str) -> None:
+        carpeta = self.params.get("_carpeta", "")
+        self.params = dict(self.defectos)
+        self.params.update(json.loads(foto))
+        self.params["_carpeta"] = carpeta
+        self._foto_actual = foto
+        self._cargar_en_editores()
+        self.recalcular()
+        self._avisar_historial()
 
     def recalcular(self) -> None:
         if not self._leer_editores():
             self.lbl_avisos.setText("Hay un dato mal cargado (en rojo): una lista mal escrita, un número que no se entiende o una celda obligatoria vacía.")
             return
+        self._registrar_cambio()
         try:
             res = calcular(self.params)
         except Exception as e:   # parámetros fuera de rango que el modelo no admite
@@ -864,6 +1013,19 @@ class TallerWidget(QWidget):
                 tabla.setItem(r, c, item)
 
     # ------------------------------------------------------------ archivos
+    def asistente(self) -> bool:
+        """Case nuevo paso a paso. Devuelve True si se terminó."""
+        from .asistente import AsistenteCase
+        dlg = AsistenteCase(self)
+        if dlg.exec() and dlg.params is not None:
+            self.set_params(dlg.params)
+            return True
+        return False
+
+    def biblioteca(self) -> None:
+        from .biblioteca_widget import BibliotecaDialog
+        BibliotecaDialog(self).exec()
+
     def nuevo(self) -> None:
         self.set_params({})
 
