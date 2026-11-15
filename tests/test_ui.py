@@ -274,8 +274,10 @@ def test_main_window_permanent_3d_view_and_highlighting(qapp):
     assert isinstance(center_tabs, QTabWidget)
     assert center_tabs == window.center_tabs
     assert center_tabs.count() == 3
-    assert center_tabs.widget(0) == window.schema_widget
-    assert center_tabs.widget(1) == window.svg_widget
+    assert center_tabs.widget(0) == window.taller_widget   # el Taller es la parte principal
+    assert center_tabs.widget(1) == window.schema_widget
+    assert center_tabs.widget(2) == window.svg_widget
+    center_tabs.setCurrentWidget(window.schema_widget)
     assert window.schema_widget.isVisibleTo(window)
 
     # Right panel must be permanent configuration panel (with dimensions and walls) directly in central layout
@@ -1065,8 +1067,8 @@ def test_wood_panels_svg_widget_ui_and_export(qapp, tmp_path, monkeypatch):
     assert window.svg_widget is not None
     assert window.tabs.count() == 5
     assert window.center_tabs.count() == 3
-    assert window.center_tabs.widget(0) == window.schema_widget
-    assert window.center_tabs.widget(1) == window.svg_widget
+    assert window.center_tabs.widget(1) == window.schema_widget
+    assert window.center_tabs.widget(2) == window.svg_widget
 
     # Recalculate populates SVG data
     assert "<svg" in window.svg_widget.get_svg_data()

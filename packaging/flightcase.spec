@@ -8,6 +8,7 @@ from PyInstaller.utils.hooks import collect_submodules
 ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))
 APP_NAME = "Flightcase Calculator"
 VERSION = os.environ.get("APP_VERSION", "0.1.0")
+ICONO = os.path.join(ROOT, "packaging", "icono")   # se regeneran con tools/generar_icono.py
 
 a = Analysis(
     [os.path.join(ROOT, "main.py")],
@@ -29,6 +30,7 @@ exe = EXE(
     name=APP_NAME,
     console=False,
     upx=False,
+    icon=os.path.join(ICONO, "icono.ico"),
 )
 coll = COLLECT(exe, a.binaries, a.datas, name=APP_NAME, upx=False)
 
@@ -36,6 +38,7 @@ if sys.platform == "darwin":
     app = BUNDLE(
         coll,
         name=f"{APP_NAME}.app",
+        icon=os.path.join(ICONO, "icono.icns"),
         bundle_identifier="com.eldoctormail.flightcasecalculator",
         version=VERSION,
         info_plist={
