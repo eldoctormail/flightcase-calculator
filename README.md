@@ -114,6 +114,7 @@ La pestaña **Placas** del Taller acomoda todas las piezas del pedido (todos los
 - `Ctrl+N` nuevo case, `Ctrl+O` abrir `.scad`, `Ctrl+S` guardar (sin preguntar si ya tiene archivo), `Ctrl+Shift+S` guardar como
 - `Ctrl+Shift+N` case nuevo con el asistente, `Ctrl+B` biblioteca de equipos
 - `Ctrl+P` exportar el paquete del taller (planos, DXF, instructivo)
+- `Ctrl+Shift+P` (o el botón **Planos PDF…**) guarda sólo `planos.pdf`, igual que el que armaba el generador de OpenSCAD: resumen con el render en el color de la placa, perspectiva explotada, perfil de cierre, detalle de la junta, cubierta removible, cada pieza acotada, placas, perfiles y materiales
 - `Ctrl+Z` deshacer y `Ctrl+Y` (o `Ctrl+Shift+Z`) rehacer cualquier cambio del case: medidas, armado, estilo, herrajes a mano, interior. El menú **Editar** dice qué se va a deshacer; el historial guarda los últimos 200 pasos y empieza de cero al abrir otro proyecto
 - Al abrir la app se vuelve a cargar el último `.scad` que usaste, y la barra de estado muestra medidas, paneles, material y avisos del case
 

@@ -500,7 +500,8 @@ class TallerWidget(QWidget):
         barra.addWidget(self.btn_rehacer)
         for texto, slot in (("Nuevo", self.nuevo), ("Asistente…", lambda: self.asistente()),
                             ("Abrir .scad…", self.abrir),
-                            ("Guardar .scad…", self.guardar), ("Exportar paquete…", self.exportar),
+                            ("Guardar .scad…", self.guardar), ("Planos PDF…", lambda: self.exportar_planos()),
+                            ("Exportar paquete…", self.exportar),
                             ("Exportar STEP…", self.exportar_step)):
             b = QPushButton(texto)
             b.clicked.connect(slot)
@@ -1119,6 +1120,36 @@ class TallerWidget(QWidget):
         QMessageBox.information(self, "Paquete del taller",
                                 f"Se generaron {len(paq.archivos)} archivos en:\n{carpeta}{avisos}")
         return paq
+
+    def exportar_planos(self, ruta: Optional[str] = None) -> Optional[str]:
+        """Sólo planos.pdf (resumen, vistas 3D, cada pieza acotada, placas, perfiles y materiales),
+        sin el resto del paquete."""
+        import shutil
+        import tempfile
+        from ...taller.produccion import exportar
+        from .placas_widget import girar_permitido
+        if self.resultado is None:
+            return None
+        nombre = os.path.splitext(os.path.basename(self.ruta))[0] if self.ruta else "case"
+        if not ruta:
+            ruta, _ = QFileDialog.getSaveFileName(self, "Exportar planos", f"Planos - {nombre}.pdf", "PDF (*.pdf)")
+            if not ruta:
+                return None
+            if not ruta.lower().endswith(".pdf"):
+                ruta += ".pdf"
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                exportar(self.resultado, os.path.join(tmp, f"salida_{nombre}"), rotar=girar_permitido(), step=False)
+                shutil.copyfile(os.path.join(tmp, f"salida_{nombre}", "planos.pdf"), ruta)
+        except Exception as e:
+            QApplication.restoreOverrideCursor()
+            QMessageBox.critical(self, "Exportar planos", f"No se pudieron generar los planos:\n{e}")
+            return None
+        QApplication.restoreOverrideCursor()
+        if self.isVisible():
+            QMessageBox.information(self, "Exportar planos", f"Se guardaron los planos en:\n{ruta}")
+        return ruta
 
     def exportar_step(self, ruta: Optional[str] = None):
         """Modelo 3D del case armado (.step) para abrir en Fusion, SolidWorks o FreeCAD."""
