@@ -128,3 +128,22 @@ def test_botones_de_la_vista_3d(qapp):
     c.resize(400, 300)
     c.zoom(2.0, QPointF(300, 150))       # el punto bajo el mouse queda quieto
     assert (c.pan_offset_x, c.pan_offset_y) == pytest.approx((-100, 0))
+
+
+def test_medidas_interiores_y_exteriores_enganchadas(qapp):
+    from flightcase.ui.widgets import TallerWidget
+    w = TallerWidget()
+    tapa = w.params["int_alto_tapa"]
+    w.editores["int_alto_tapa"].widget.setValue(tapa + 40)       # la tapa cambia, el alto total no
+    w.recalcular()
+    assert w.params["int_alto_cuerpo"] + w.params["int_alto_tapa"] == pytest.approx(w.sp_alto_interior.value())
+    w.sp_alto_interior.setValue(500)
+    w.recalcular()
+    assert w.params["int_alto_cuerpo"] == pytest.approx(500 - tapa - 40)
+    assert w.ext_spins[2].value() == pytest.approx(w.resultado.valores["ext_alto"])
+    w.editores["int_ancho"].widget.setValue(700)                 # interior -> exterior
+    w.recalcular()
+    assert w.ext_spins[0].value() == pytest.approx(w.resultado.valores["ext_ancho"]) and w.ext_spins[0].value() > 700
+    w.ext_spins[1].setValue(600)                                 # exterior -> interior
+    assert w.resultado.valores["ext_prof"] == pytest.approx(600, abs=0.1)
+    assert w.editores["int_prof"].valor() == w.params["int_prof"] < 600
