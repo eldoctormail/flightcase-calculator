@@ -64,11 +64,30 @@ class Rotulo:
     centro: Point3D
     normal: Vec          # hacia donde mira la cara del panel
     tam: float = 30.0    # alto de letra en mm (como rotulo() de flightcase.scad)
+    der: Vec = (1.0, 0.0, 0.0)     # dirección de lectura sobre la cara (mundo)
+    arriba: Vec = (0.0, 0.0, 1.0)  # hacia arriba del texto (mundo)
+
+
+def _ejes_rotulo(normal: Vec) -> Tuple[Vec, Vec]:
+    """(der, arriba) para que el rótulo se lea derecho mirando la cara desde `normal`:
+    arriba es la vertical del mundo proyectada en la cara (o el fondo, si la cara es horizontal)."""
+    for ref in ((0.0, 0.0, 1.0), (0.0, 1.0, 0.0)):
+        d = sum(a * b for a, b in zip(ref, normal))
+        up = tuple(r - d * nn for r, nn in zip(ref, normal))
+        l = math.sqrt(sum(c * c for c in up))
+        if l > 0.3:
+            up = tuple(c / l for c in up)
+            der = (up[1] * normal[2] - up[2] * normal[1], up[2] * normal[0] - up[0] * normal[2],
+                   up[0] * normal[1] - up[1] * normal[0])
+            return der, up  # type: ignore[return-value]
+    return (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)
 
 
 @dataclass
 class Malla3D(WireframeMesh3D):
     rotulos: List[Rotulo] = field(default_factory=list)
+    # calados pasantes: (nombre del panel, contorno en el mundo sobre la cara exterior)
+    calados: List[Tuple[str, List[Point3D]]] = field(default_factory=list)
 
 
 def _sum(*vs: Sequence[float]) -> Vec:
@@ -103,6 +122,7 @@ class _Constructor:
         self.caras: List[PolygonFace3D] = []
         self.segmentos: List[Segment3D] = []
         self.rotulos: List[Rotulo] = []
+        self.calados: List[Tuple[str, List[Point3D]]] = []
 
     def visible(self, paso: int) -> bool:
         return self.op.paso >= paso
@@ -149,6 +169,43 @@ class _Constructor:
         for verts, normal, canto in caras:
             self.caras.append(PolygonFace3D(vertices=verts, normal=normal, color_group=color, label=etiqueta,
                                             is_endgrain=canto and color in ("base", "lid"), layer_order=capa))
+
+    def hexaedro(self, v8: Sequence[Vec], color: str, capa: int, etiqueta: str = "") -> None:
+        """Hexaedro convexo: v8 = 4 vértices de abajo y 4 de arriba, en el mismo orden (coords locales)."""
+        P = [self._p(q, False) for q in v8]
+        cen = _mul(_sum(*v8), 1 / 8)
+        for idx in ((0, 1, 2, 3), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)):
+            a, b, c = (v8[i] for i in idx[:3])
+            e1, e2 = _sum(b, _mul(a, -1)), _sum(c, _mul(a, -1))
+            nrm = (e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0])
+            l = math.sqrt(sum(x * x for x in nrm))
+            if l < 1e-9:
+                continue
+            nrm = _mul(nrm, 1 / l)
+            fc = _mul(_sum(*(v8[i] for i in idx)), 0.25)
+            if sum((fc[i] - cen[i]) * nrm[i] for i in range(3)) < 0:
+                nrm = _mul(nrm, -1)
+            self.caras.append(PolygonFace3D(vertices=tuple(P[i] for i in idx), normal=self.girar(nrm),
+                                            color_group=color, label=etiqueta, layer_order=capa))
+
+    def esfera(self, centro: Vec, r: float, color: str, capa: int, etiqueta: str = "",
+               lados: int = 16, pisos: int = 8) -> None:
+        """Esfera en coordenadas locales (como sphere() con $fn bajo)."""
+        def pt(i: int, j: int) -> Vec:
+            th, ph = 2 * math.pi * i / lados, math.pi * j / pisos
+            return (math.sin(ph) * math.cos(th), math.sin(ph) * math.sin(th), math.cos(ph))
+        for j in range(pisos):
+            for i in range(lados):
+                dirs = [pt(i, j), pt(i + 1, j), pt(i + 1, j + 1), pt(i, j + 1)]
+                verts = [self._p(_sum(centro, _mul(d, r)), False) for d in dirs]
+                if j == 0:
+                    verts = [verts[0], verts[2], verts[3]]
+                elif j == pisos - 1:
+                    verts = verts[:3]
+                nrm = _mul(_sum(*dirs), 0.25)
+                l = math.sqrt(sum(x * x for x in nrm)) or 1.0
+                self.caras.append(PolygonFace3D(vertices=tuple(verts), normal=self.girar(_mul(nrm, 1 / l)),
+                                                color_group=color, label=etiqueta, layer_order=capa))
 
     def cilindro(self, centro: Vec, eje: Vec, a: Vec, b: Vec, r: float, largo: float, color: str,
                  capa: int, etiqueta: str = "", lados: int = 20) -> None:
@@ -219,9 +276,11 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
             ly = (man[0].cy - man[0].alto / 2) / 2 if man else p.alto / 2
             centro = _sum(o, _mul(u, p.ancho / 2), _mul(vv, ly), _mul(fuera, 0.5))
             tam = max(min(min(p.ancho, p.alto) * 0.3, 60), 12)
-            k.rotulos.append(Rotulo(op.etiquetas[col["id"]], k._p(centro, False), k.girar(fuera), tam))
+            nf = k.girar(fuera)
+            k.rotulos.append(Rotulo(op.etiquetas[col["id"]], k._p(centro, False), nf, tam, *_ejes_rotulo(nf)))
             adentro = _sum(o, _mul(u, p.ancho / 2), _mul(vv, ly), _mul(n, t + 0.5))   # también del lado de adentro
-            k.rotulos.append(Rotulo(op.etiquetas[col["id"]], k._p(adentro, False), k.girar(n), tam))
+            ni = k.girar(n)
+            k.rotulos.append(Rotulo(op.etiquetas[col["id"]], k._p(adentro, False), ni, tam, *_ejes_rotulo(ni)))
         for c in calados.get(p.id, []):
             if c.tipo == "rebaje":
                 continue
@@ -229,16 +288,23 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
             cara = _mul(fuera, 0.2)
             k.contorno([_sum(o, cara, _mul(u, a), _mul(vv, b)) for a, b in ((x0, y0), (x1, y0), (x1, y1), (x0, y1))],
                        "profile", f"{p.nombre}: {c.tipo}")
+            k.calados.append((p.nombre, [k._p(_sum(o, _mul(u, a), _mul(vv, b)), False)
+                                         for a, b in _rect_redondeado(x0, y0, x1, y1, c.radio)]))
             if c.tipo == "encastre" and k.visible(P_RUEDAS):
                 # plato de apilado: reborde por fuera y cubeta metida en la tapa (encastre de flightcase.scad)
                 ala, prof = geo.get("encastre_ala", 10), geo.get("encastre_prof", 30)
-                col_p = k.color(P_RUEDAS, "herraje")
+                col_p = k.color(P_RUEDAS, "plato")
                 for a0, b0, aw, bh in ((x0 - ala, y0 - ala, c.ancho + 2 * ala, ala), (x0 - ala, y1, c.ancho + 2 * ala, ala),
                                        (x0 - ala, y0, ala, c.alto), (x1, y0, ala, c.alto)):
                     k.caja(_sum(o, _mul(u, a0), _mul(vv, b0), _mul(fuera, 1.5)), u, vv, n, aw, bh, 1.5, col_p,
                            ComponentLayer.BASE_ALU, "Plato")
                 k.caja(_sum(o, _mul(u, x0 + 0.5), _mul(vv, y0 + 0.5), _mul(n, prof - 1.5)), u, vv, n,
                        c.ancho - 1, c.alto - 1, 1.5, col_p, ComponentLayer.BASE_ALU, "Plato")
+                e_ = 1.5   # paredes de la cubeta
+                for a0, b0, aw, bh in ((x0, y0, c.ancho, e_), (x0, y1 - e_, c.ancho, e_),
+                                       (x0, y0, e_, c.alto), (x1 - e_, y0, e_, c.alto)):
+                    k.caja(_sum(o, _mul(u, a0), _mul(vv, b0)), u, vv, n, aw, bh, prof, col_p,
+                           ComponentLayer.BASE_ALU, "Plato")
             if c.tipo == "manija" and k.visible(P_MANIJAS):
                 k.caja(_sum(o, _mul(u, x0 - 10), _mul(vv, y0 - 10), _mul(fuera, 2)), u, vv, n,
                        c.ancho + 20, c.alto + 20, 2, k.color(P_MANIJAS, "herraje"), ComponentLayer.BASE_ALU, "Manija")
@@ -251,14 +317,14 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
                 lado = m.panel in ("cuerpo_izq", "cuerpo_der")
                 xs = (m.x - 35 * dx, m.x + 18 * dx) if lado else (m.x - 22 * dx, m.x + 14 * dx)
                 k.caja(_sum(o, _mul(u, min(xs)), _mul(vv, m.y - 25), _mul(fuera, 6 + s)), u, vv, n,
-                       abs(xs[1] - xs[0]), 50, 6, k.color(P_CIERRES, "herraje"), ComponentLayer.BASE_ALU, "Cierre")
+                       abs(xs[1] - xs[0]), 50, 6, k.color(P_CIERRES, "cierre"), ComponentLayer.BASE_ALU, "Cierre")
             elif m.tipo in ("cierre", "bisagra") and k.visible(P_CIERRES):
                 d = (1 if m.texto == "c1" else -1) if grupo == "cuerpo" else (-1 if grupo == "tapa" else 1)
                 a = 50 if m.tipo == "cierre" else 60
                 ys = ((m.y - 35 * d, m.y + (14 if m.tipo == "bisagra" else 18) * d) if grupo == "cuerpo"
                       else (m.y - 22 * d, m.y + 14 * d))
                 k.caja(_sum(o, _mul(u, m.x - a / 2), _mul(vv, min(ys)), _mul(fuera, 6 + s)), u, vv, n,
-                       a, abs(ys[1] - ys[0]), 6, k.color(P_CIERRES, "herraje"), ComponentLayer.BASE_ALU,
+                       a, abs(ys[1] - ys[0]), 6, k.color(P_CIERRES, "cierre"), ComponentLayer.BASE_ALU,
                        "Bisagra" if m.tipo == "bisagra" else "Cierre")
             elif m.tipo == "rueda" and (geo["horizontal"] or geo["frontal"]) and not geo["base"] and k.visible(P_RUEDAS):
                 _rueda(k, geo, o, u, vv, fuera, m.x, m.y, m.texto == "freno", ex)
@@ -275,7 +341,7 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
         fuera = _mul(n, -1)
         o_pan = _sum(col["o"], _mul(n, -ex))
         o = _sum(o_pan, _mul(u, base["x"]), _mul(vv, base["y"]), _mul(fuera, base["separacion"] + base["esp"] + ex * 0.8))
-        k.caja(o, u, vv, n, base["ancho"], base["alto"], base["esp"], k.color(P_RUEDAS, "base"),
+        k.caja(o, u, vv, n, base["ancho"], base["alto"], base["esp"], k.color(P_RUEDAS, "base_ruedas"),
                ComponentLayer.BASE_FLOOR, "Base de ruedas")
         for i, (rx, ry) in enumerate(geo["ruedas_en_base"]):
             _rueda(k, geo, o, u, vv, fuera, rx, ry, i < geo["rueda_frenos"], ex)
@@ -319,7 +385,7 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
         if not k.visible(paso) or L < 30:
             return
         o = _sum(o, _mul(_sum(a, b), ex * 1.7), (0, dy, 0))
-        col = k.color(paso, "profile")
+        col = k.color(paso, "aluminio")
         k.caja(_sum(o, _mul(b, -ala)), a, b, c, e_ar, ala + e_ar, L, col, ComponentLayer.BASE_ALU, "Ángulo de arista")
         k.caja(_sum(o, _mul(a, -ala)), a, b, c, ala + e_ar, e_ar, L, col, ComponentLayer.BASE_ALU, "Ángulo de arista")
 
@@ -332,7 +398,7 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
         k.caja(_sum(o, _mul(b, -p_), _mul(c, -p_)), a, b, c, e, p_, p_, col, ComponentLayer.BASE_ALU, "Esquinero")
         k.caja(_sum(o, _mul(a, -p_), _mul(c, -p_)), a, b, c, p_, e, p_, col, ComponentLayer.BASE_ALU, "Esquinero")
         k.caja(_sum(o, _mul(a, -p_), _mul(b, -p_)), a, b, c, p_, p_, e, col, ComponentLayer.BASE_ALU, "Esquinero")
-        k.caja(_sum(o, (-12, -12, -12)), (1, 0, 0), (0, 1, 0), (0, 0, 1), 24, 24, 24, col, ComponentLayer.BASE_ALU, "Esquinero")
+        k.esfera(o, 12, col, ComponentLayer.BASE_ALU, "Esquinero")
 
     if ver_fija or ver_cub:
         for z, sz in ((0.0, -1), (Z, 1)):
@@ -382,8 +448,8 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
         if not (geo["horizontal"] or geo["frontal"]):
             for cx, cy in geo["pies"]:
                 d = geo["pie_d"]
-                k.bloque(cx - d / 2, cx + d / 2, cy - d / 2, cy + d / 2, lift_pie - geo["pie_h"] - ex * 2.2, lift_pie,
-                         k.color(P_RUEDAS, "herraje"), ComponentLayer.BASE_ALU, "Pie")
+                k.cilindro((cx, cy, lift_pie - ex * 2.2 - geo["pie_h"] / 2), (0, 0, 1), (1, 0, 0), (0, 1, 0), d / 2,
+                           geo["pie_h"], k.color(P_RUEDAS, "rueda"), ComponentLayer.BASE_ALU, "Pie")
 
     # Bandejas (ya en coordenadas del mundo)
     if k.visible(P_CUERPO) and ver_fija and op.resaltar_que != "perfiles" and \
@@ -397,19 +463,44 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
     pts = [p for f in k.caras for p in f.vertices] or [Point3D(0, 0, 0)]
     caja = (Point3D(min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)),
             Point3D(max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
-    return Malla3D(faces=k.caras, segments=k.segmentos, bounding_box=caja, rotulos=k.rotulos)
+    return Malla3D(faces=k.caras, segments=k.segmentos, bounding_box=caja, rotulos=k.rotulos, calados=k.calados)
+
+
+def _rect_redondeado(x0: float, y0: float, x1: float, y1: float, r: float, por_esquina: int = 8):
+    """Contorno (antihorario) de un rectángulo con esquinas de radio r, como rect_redondeado()."""
+    r = max(0.0, min(r or 0.0, (x1 - x0) / 2 - 0.01, (y1 - y0) / 2 - 0.01))
+    if r <= 0.5:
+        return [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+    pts = []
+    for cx, cy, a0 in ((x1 - r, y0 + r, -90), (x1 - r, y1 - r, 0), (x0 + r, y1 - r, 90), (x0 + r, y0 + r, 180)):
+        for i in range(por_esquina + 1):
+            a = math.radians(a0 + 90 * i / por_esquina)
+            pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+    return pts
 
 
 def _rueda(k: _Constructor, geo: dict, o: Vec, u: Vec, v: Vec, fuera: Vec, cx: float, cy: float,
            freno: bool, ex: float) -> None:
-    """Rueda (rueda_3d) simplificada: placa, horquilla y rueda, hacia `fuera` desde o + cx·u + cy·v."""
+    """rueda_3d(): placa, giratorio, horquilla, rueda y freno, hacia `fuera` desde o + cx·u + cy·v."""
     pl, d = geo["rueda_placa"], geo["rueda_diametro"]
+    r = d / 2
     alto = geo["rueda_alto"] or (d + 25)
+    hf = alto - d
     base = _sum(o, _mul(u, cx), _mul(v, cy), _mul(fuera, ex * 2.2))
+    L = lambda a, b, c: _sum(base, _mul(u, a), _mul(v, b), _mul(fuera, c))   # coords de rueda_3d
     resalta = k.op.paso < 99 and k.op.paso == P_RUEDAS
-    k.caja(_sum(base, _mul(u, -pl[0] / 2), _mul(v, -pl[1] / 2)), u, v, fuera, pl[0], pl[1], 4,
-           "resalte" if resalta else "herraje", ComponentLayer.BASE_ALU, "Rueda")
-    k.caja(_sum(base, _mul(u, -d * 0.15), _mul(v, -d * 0.4), _mul(fuera, 4)), u, v, fuera, d * 0.3, d * 0.8,
-           max(alto - d - 4, 4), "resalte" if resalta else "herraje", ComponentLayer.BASE_ALU, "Rueda")
-    k.cilindro(_sum(base, _mul(fuera, alto - d / 2)), v, u, fuera, d / 2, d * 0.4,
-               "rueda_freno" if freno else "rueda", ComponentLayer.BASE_ALU, "Rueda")
+    c_placa = "resalte" if resalta else "rueda_placa"
+    c_horq = "resalte" if resalta else "rueda_horq"
+    k.caja(L(-pl[0] / 2, -pl[1] / 2, 0), u, v, fuera, pl[0], pl[1], 4, c_placa, ComponentLayer.BASE_ALU, "Rueda")
+    hg = max(hf - 4, 1) * 0.35
+    k.cilindro(L(0, 0, 4 + hg / 2), fuera, u, v, pl[1] * 0.3, hg, c_horq, ComponentLayer.BASE_ALU, "Rueda")
+    for s_ in (-1, 1):   # horquilla: de la placa al eje (hull de rueda_3d)
+        y0, y1 = s_ * r * 0.55 - 1.5, s_ * r * 0.55 + 1.5
+        za, ze = 4, alto - r
+        k.hexaedro([L(-r * 0.2, y0, za), L(r * 0.4, y0, za), L(r * 0.4, y1, za), L(-r * 0.2, y1, za),
+                    L(r * 0.35 - 6, y0, ze + 6), L(r * 0.35 + 6, y0, ze + 6), L(r * 0.35 + 6, y1, ze + 6),
+                    L(r * 0.35 - 6, y1, ze + 6)], c_horq, ComponentLayer.BASE_ALU, "Rueda")
+    k.cilindro(L(r * 0.35, 0, alto - r), v, u, fuera, r, r * 0.8, "rueda", ComponentLayer.BASE_ALU, "Rueda")
+    if freno:
+        k.caja(L(r * 0.35 + r * 0.7, -6, alto - r * 1.4), u, v, fuera, 10, 12, 6, "freno",
+               ComponentLayer.BASE_ALU, "Freno")

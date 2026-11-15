@@ -14,24 +14,32 @@ from typing import Dict, List, Sequence, Tuple
 
 import numpy as np
 from PySide6.QtCore import QRectF, Qt
-from PySide6.QtGui import QBrush, QColor, QFont, QGuiApplication, QImage, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QGuiApplication, QImage, QPainter, QTransform
 
 from .geometria import Malla3D
 
 COLORES: Dict[str, str] = {
-    "base": "#d8c08e",      # cuerpo (neutro, como en las láminas de OpenSCAD)
-    "lid": "#c4a46c",       # tapas
-    "profile": "#b0c4de",   # aluminio (aro macho, aristas)
-    "profile_h": "#708090", # aro hembra de las tapas
-    "rueda": "#262626",
-    "rueda_freno": "#7a1f1f",
-    "herraje": "#5f6670",   # esquineros, cierres, manijas, ruedas
-    "wall": "#9a7b4f",      # bandejas
-    "resalte": "#ff9f1a",   # lo que se agrega en el paso
-    "calado": "#3c342a",    # huecos de los paneles
+    "base": "#deb887",        # BurlyWood: color_placa por defecto de flightcase.scad
+    "lid": "#deb887",         # color_tapa vacío = igual que la placa
+    "profile": "#b0c4de",     # LightSteelBlue: aro macho
+    "profile_h": "#708090",   # SlateGray: aro hembra
+    "aluminio": "#c0c0c0",    # Silver: ángulos de arista
+    "herraje": "#696969",     # DimGray: esquineros, manijas
+    "cierre": "#dcdcdc",      # Gainsboro: cierres y bisagras
+    "rueda": "#222222",
+    "rueda_placa": "#444444",
+    "rueda_horq": "#777777",
+    "freno": "#ff0000",
+    "rueda_freno": "#222222",
+    "base_ruedas": "#5a3d22",
+    "plato": "#3a3a3a",
+    "wall": "#deb887",        # bandejas (color de la placa)
+    "resalte": "#ffa500",     # Orange: lo que se agrega en el paso
+    "rotulo": "#ffffff",
 }
 FONDO = (255, 255, 255)
 SUPER = 2          # supermuestreo (antialias)
+FOV = 22.5         # campo visual de la cámara de OpenSCAD (grados)
 
 
 def _norm(v: Sequence[float]) -> Tuple[float, float, float]:
@@ -93,7 +101,7 @@ class _Lienzo:
             return
         z = l1 * az + l2 * bz + l3 * cz + sesgo
         zona = self.z[y0:y1 + 1, x0:x1 + 1]
-        gana = dentro & (z > zona + 0.05)   # empate (caras coplanares): gana la primera, sin parpadeo
+        gana = dentro & (z > zona * (1 + 2e-5))   # empate (caras coplanares): gana la primera, sin parpadeo
         if not gana.any():
             return
         zona[gana] = z[gana]
@@ -117,7 +125,8 @@ class _Lienzo:
             za = self.z[: self.h - dy, : self.w - dx]
             zb = self.z[dy:, dx:]
             with np.errstate(invalid="ignore"):
-                salto = np.abs(np.where(ambos, za - zb, 0.0)) > 3.0
+                # z = 1/distancia: 3 mm de salto de profundidad
+                salto = np.abs(np.where(ambos, za - zb, 0.0)) > np.where(ambos, 3.0 * za * zb, np.inf)
             e = distinto & (~ambos | dobla | otro_color | salto)
             borde[: self.h - dy, : self.w - dx] |= e
             borde[dy:, dx:] |= e
@@ -139,96 +148,119 @@ def renderizar(malla: Malla3D, ruta: str, camara: str = "0,0,0,62,0,32,0", tam: 
     ojo = np.array(_norm((math.sin(rz) * math.sin(rx), -math.cos(rz) * math.sin(rx), math.cos(rx))))
     der = np.array(_norm((-ojo[1], ojo[0], 0.0)) if abs(ojo[2]) < 0.999 else (1.0, 0.0, 0.0))
     arriba = np.cross(ojo, der)
-    luz = np.array(_norm((0.45, -0.6, 0.75)))
-    base = np.stack([der, arriba, ojo], axis=1)          # punto · base = (x, y, prof)
+    luz = np.array(_norm(-0.35 * der + 0.55 * arriba + 0.75 * ojo))   # luz fija respecto de la cámara, como OpenSCAD
+    base = np.stack([der, arriba, ojo], axis=1)          # (p - centro) · base = (x, y, hacia la cámara)
 
     caras = [f for f in malla.faces if len(f.vertices) >= 3]
     if not caras:
         return False
-    todos = np.array([(p.x, p.y, p.z) for f in caras for p in f.vertices]) @ base
-    margen = 0.06
-    ancho = max(todos[:, 0].max() - todos[:, 0].min(), 1)
-    alto = max(todos[:, 1].max() - todos[:, 1].min(), 1)
-    esc = min(W * (1 - 2 * margen) / ancho, H * (1 - 2 * margen) / alto)
-    cx = (todos[:, 0].max() + todos[:, 0].min()) / 2
-    cy = (todos[:, 1].max() + todos[:, 1].min()) / 2
+    # perspectiva como OpenSCAD con --viewall --autocenter --projection=p (campo visual de 22,5°)
+    todos = np.array([(p.x, p.y, p.z) for f in caras for p in f.vertices])
+    centro = (todos.max(axis=0) + todos.min(axis=0)) / 2
+    radio = max(float(np.linalg.norm(todos.max(axis=0) - todos.min(axis=0))) / 2, 1.0)
+    medio = math.radians(FOV / 2)
+    dist = radio / math.sin(medio)
+    focal = (min(W, H) / 2) / math.tan(medio)
+    camara_pos = centro + ojo * dist
 
     def pantalla(pts: np.ndarray) -> np.ndarray:
-        q = pts @ base
-        return np.stack([W / 2 + (q[:, 0] - cx) * esc, H / 2 - (q[:, 1] - cy) * esc, q[:, 2]], axis=1)
+        q = (pts - centro) @ base
+        zc = dist - q[:, 2]
+        return np.stack([W / 2 + focal * q[:, 0] / zc, H / 2 - focal * q[:, 1] / zc, 1.0 / zc], axis=1)
 
     lienzo = _Lienzo(W, H)
     grupos = {g: i for i, g in enumerate(COLORES)}
     normales: List[Tuple[float, float, float]] = []
     colores_id: List[int] = []
 
-    def poligono(pts3: np.ndarray, normal: np.ndarray, grupo: str, sesgo: float = 0.0,
-                 agujeros: Sequence[np.ndarray] = ()) -> None:
+    def poligono(pts3: np.ndarray, normal: np.ndarray, grupo: str, agujeros: Sequence[np.ndarray] = (),
+                 plano: bool = False) -> int:
         ident = len(normales)
         normales.append(tuple(normal))
         gi = grupos.get(grupo, 0)
         colores_id.append(gi)
-        luzf = 0.62 + 0.38 * max(0.0, float(normal @ luz))
+        luzf = 1.0 if plano else 0.6 + 0.45 * max(0.0, float(normal @ luz))
         color = _rgb(COLORES.get(grupo, COLORES["base"])) * luzf
         s = pantalla(pts3)
         for i in range(1, len(s) - 1):
-            lienzo.triangulo(s[[0, i, i + 1]], color, ident, gi, sesgo, agujeros)
+            lienzo.triangulo(s[[0, i, i + 1]], color, ident, gi, 0.0, agujeros)
+        return ident
 
-    # calados: 4 segmentos seguidos con la misma etiqueta ("Panel: tipo"); son agujeros pasantes
-    # en las dos caras grandes del panel, así se ve lo que hay detrás como en OpenSCAD
+    def mira(n: np.ndarray, p0: np.ndarray) -> bool:
+        return float(n @ (camara_pos - p0)) > 1e-6
+
+    # calados pasantes: se recortan de las dos caras grandes del panel, así se ve lo que hay detrás
     calados: Dict[str, List[np.ndarray]] = {}
-    por_etiqueta: Dict[str, list] = {}
-    for s in malla.segments:
-        por_etiqueta.setdefault(s.label, []).append(s)
-    for etiqueta, segs in por_etiqueta.items():
-        if ":" not in etiqueta:
-            continue
-        panel = etiqueta.split(":")[0]
-        for i in range(0, len(segs) - 3, 4):
-            calados.setdefault(panel, []).append(np.array([(sg.p1.x, sg.p1.y, sg.p1.z) for sg in segs[i:i + 4]]))
+    for panel, contorno in getattr(malla, "calados", []):
+        calados.setdefault(panel, []).append(np.array([(q.x, q.y, q.z) for q in contorno]))
 
     for f in caras:
         n = np.array(_norm(f.normal))
-        if n @ ojo <= 1e-6:
-            continue       # de espaldas: la tapa otra cara más cercana
         pts = np.array([(p.x, p.y, p.z) for p in f.vertices])
+        if not mira(n, pts[0]):
+            continue       # de espaldas: la tapa otra cara más cercana
         agujeros = []
         if f.label in calados and not f.is_endgrain:
             for q in calados[f.label]:
-                plano = q - np.outer((q - pts[0]) @ n, n)      # el calado llevado al plano de esta cara
-                agujeros.append(pantalla(plano)[:, :2])
-        poligono(pts, n, f.color_group, agujeros=agujeros)
+                if abs(float(_norm(np.cross(q[1] - q[0], q[2] - q[0])) @ n)) < 0.99:
+                    continue   # cara de canto
+                sobre = q - np.outer((q - pts[0]) @ n, n)      # el calado llevado al plano de esta cara
+                agujeros.append(pantalla(sobre)[:, :2])
+        poligono(pts, n, f.color_group, agujeros)
+
+    # rótulos como en rotulo(): placa blanca redondeada apoyada sobre el panel, con el texto encima
+    textos = []
+    for r in malla.rotulos:
+        n = np.array(_norm(r.normal))
+        c = np.array([r.centro.x, r.centro.y, r.centro.z])
+        if not mira(n, c):
+            continue
+        s = r.tam
+        ex_, ey_ = np.array(r.der), np.array(r.arriba)
+        ancho_r, alto_r = s * 0.68 * len(r.texto) + s * 0.8, s * 1.6
+        contorno = [c + ex_ * a + ey_ * b + n * 0.3 for a, b in
+                    _rect_redondeado_2d(-ancho_r / 2, -alto_r / 2, ancho_r / 2, alto_r / 2, s * 0.3)]
+        ident = poligono(np.array(contorno), n, "rotulo", plano=True)
+        textos.append((ident, r, c + n * 0.3, ex_, ey_))
 
     lienzo.contornos(np.array(normales + [(0, 0, 1)]), np.array(colores_id + [-1]), grosor=SUPER)
 
+    if textos:
+        capa = QImage(W, H, QImage.Format_ARGB32_Premultiplied)
+        capa.fill(Qt.transparent)
+        pin = QPainter(capa)
+        pin.setRenderHint(QPainter.Antialiasing)
+        pin.setRenderHint(QPainter.TextAntialiasing)
+        for ident, r, c, ex_, ey_ in textos:
+            s = r.tam
+            p0, px, py = pantalla(np.array([c, c + ex_ * s, c - ey_ * s]))[:, :2]
+            k = 1 / (10 * s)   # el texto se dibuja en décimas de mm
+            pin.setTransform(QTransform((px - p0)[0] * k, (px - p0)[1] * k, (py - p0)[0] * k, (py - p0)[1] * k,
+                                        p0[0], p0[1]))
+            fuente = QFont("Sans Serif")
+            fuente.setBold(True)
+            fuente.setPixelSize(max(1, int(s * 10 * 1.35)))
+            pin.setFont(fuente)
+            pin.setPen(QColor("#000000"))
+            pin.drawText(QRectF(-s * 40, -s * 10, s * 80, s * 20), Qt.AlignCenter, r.texto)
+        pin.end()
+        buf = np.frombuffer(capa.constBits(), dtype=np.uint8).reshape(H, capa.bytesPerLine() // 4, 4)[:, :W]
+        alfa = buf[:, :, 3].astype(np.float32) / 255.0
+        alfa *= np.isin(lienzo.ident, [t_[0] for t_ in textos])
+        lienzo.col *= (1 - alfa)[:, :, None]
+
     rgb = np.ascontiguousarray(np.clip(lienzo.col, 0, 255).astype(np.uint8))
     img = QImage(rgb.data, W, H, 3 * W, QImage.Format_RGB888).copy()
-
-    # rótulos: sólo si en su centro no hay nada más cerca que el propio panel
-    pin = QPainter(img)
-    pin.setRenderHint(QPainter.Antialiasing)
-    pin.setRenderHint(QPainter.TextAntialiasing)
-    for r in malla.rotulos:
-        n = np.array(_norm(r.normal))
-        if n @ ojo <= 0.15:
-            continue
-        x, y, z = pantalla(np.array([[r.centro.x, r.centro.y, r.centro.z]]))[0]
-        px, py = int(x), int(y)
-        if not (0 <= px < W and 0 <= py < H) or lienzo.z[py, px] > z + 2.0:
-            continue
-        fuente = QFont("Sans Serif")
-        fuente.setBold(True)
-        fuente.setPixelSize(max(9 * SUPER, int(r.tam * esc * 0.8)))
-        pin.setFont(fuente)
-        ancho_t = pin.fontMetrics().horizontalAdvance(r.texto) + fuente.pixelSize() * 0.8
-        alto_t = fuente.pixelSize() * 1.5
-        caja = QRectF(x - ancho_t / 2, y - alto_t / 2, ancho_t, alto_t)
-        pin.setPen(QPen(QColor("#222222"), 1.2 * SUPER))
-        pin.setBrush(QBrush(QColor("#ffffff")))
-        pin.drawRoundedRect(caja, alto_t * 0.2, alto_t * 0.2)
-        pin.drawText(caja, Qt.AlignCenter, r.texto)
-    pin.end()
     return img.scaled(w, h, Qt.IgnoreAspectRatio, Qt.SmoothTransformation).save(ruta)
+
+
+def _rect_redondeado_2d(x0: float, y0: float, x1: float, y1: float, r: float, por_esquina: int = 6):
+    pts = []
+    for cx, cy, a0 in ((x1 - r, y0 + r, -90), (x1 - r, y1 - r, 0), (x0 + r, y1 - r, 90), (x0 + r, y0 + r, 180)):
+        for i in range(por_esquina + 1):
+            a = math.radians(a0 + 90 * i / por_esquina)
+            pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+    return pts
 
 
 def _dentro_convexo(pol: np.ndarray, xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
