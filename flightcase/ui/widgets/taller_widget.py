@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSplitter,
     QStyledItemDelegate,
     QTableWidget,
@@ -416,6 +417,8 @@ class TallerWidget(QWidget):
     # ------------------------------------------------------------------ UI
     def _init_ui(self) -> None:
         raiz = QVBoxLayout(self)
+        raiz.setContentsMargins(6, 4, 6, 4)
+        raiz.setSpacing(4)
         barra = QHBoxLayout()
         self.lbl_archivo = QLabel("Proyecto nuevo")
         self.lbl_archivo.setStyleSheet("font-weight:600")
@@ -428,30 +431,11 @@ class TallerWidget(QWidget):
             barra.addWidget(b)
         raiz.addLayout(barra)
 
-        fila_medidas = QHBoxLayout()
-        fila_medidas.addWidget(QLabel("Medidas exteriores (sin ruedas):"))
-        self.ext_spins = []
-        for eje in ("Ancho", "Fondo", "Alto"):
-            sp = QDoubleSpinBox()
-            sp.setRange(50, 5000)
-            sp.setDecimals(1)
-            sp.setSuffix(" mm")
-            sp.setKeyboardTracking(False)
-            sp.setToolTip(f"{eje} exterior del case. Al cambiarlo se recalculan las medidas interiores "
-                          "con las paredes, el aluminio y la espuma de este armado. Las tapas conservan su alto.")
-            sp.setPrefix(f"{eje} ")
-            sp.editingFinished.connect(self._exterior_editado)
-            fila_medidas.addWidget(sp)
-            self.ext_spins.append(sp)
-        self.lbl_exterior_nota = QLabel()
-        self.lbl_exterior_nota.setStyleSheet("color:#bbbbbb")
-        fila_medidas.addWidget(self.lbl_exterior_nota, 1)
-        raiz.addLayout(fila_medidas)
 
         fila_estilo = QHBoxLayout()
         fila_estilo.addWidget(QLabel("Estilo de case:"))
         self.cmb_estilo = QComboBox()
-        self.cmb_estilo.setMinimumWidth(280)
+        self.cmb_estilo.setMinimumWidth(200)
         self.cmb_estilo.setToolTip("Aplica una forma de armado (tapas, accesos, bisagras, ruedas…) "
                                    "sin tocar las medidas ni el interior.")
         self.cmb_estilo.activated.connect(self._estilo_elegido)
@@ -465,20 +449,22 @@ class TallerWidget(QWidget):
         self.btn_borrar_estilo = QPushButton("Borrar estilo")
         self.btn_borrar_estilo.clicked.connect(lambda: self.borrar_estilo())
         fila_estilo.addWidget(self.btn_borrar_estilo)
-        fila_estilo.addStretch(1)
+        self.lbl_estilo = QLabel()     # descripción del estilo en la misma fila (completa en el tooltip)
+        self.lbl_estilo.setStyleSheet("font-style:italic; color:#bbbbbb")
+        self.lbl_estilo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        fila_estilo.addWidget(self.lbl_estilo, 1)
         raiz.addLayout(fila_estilo)
-        self.lbl_estilo = QLabel()
-        self.lbl_estilo.setWordWrap(True)
-        self.lbl_estilo.setStyleSheet("font-style:italic")
-        raiz.addWidget(self.lbl_estilo)
         self._cargar_estilos()
 
         divisor = QSplitter(Qt.Horizontal, self)
         self.toolbox = QToolBox()
-        for sec in secciones_parametros():
+        self.toolbox.setMinimumWidth(290)
+        for n_sec, sec in enumerate(secciones_parametros()):
             pagina = QWidget()
             form = QFormLayout(pagina)
             form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+            if n_sec == 0:
+                self._agregar_exterior(form)
             for p in sec["parametros"]:
                 nombre = p["nombre"]
                 if nombre not in self.defectos:
@@ -498,7 +484,11 @@ class TallerWidget(QWidget):
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
             scroll.setWidget(pagina)
-            self.toolbox.addItem(scroll, sec["seccion"])
+            self.toolbox.addItem(scroll, "Medidas (exteriores e interiores)" if n_sec == 0 else sec["seccion"])
+        self.toolbox.layout().setSpacing(1)     # 17 secciones: que entren en la pantalla de una notebook
+        from PySide6.QtWidgets import QAbstractButton
+        for b in self.toolbox.findChildren(QAbstractButton):
+            b.setFixedHeight(22)
         divisor.addWidget(self.toolbox)
 
         derecha = QWidget()
@@ -517,7 +507,8 @@ class TallerWidget(QWidget):
         self.vista_3d = Schema3DCanvas(self)
         self.vista_3d.setMinimumHeight(260)
         self.barra_3d = BarraVista3D(self.vista_3d, self)
-        self.chk_interior = QCheckBox("Ver el interior (tapas abiertas)")
+        self.chk_interior = QCheckBox("Interior")
+        self.chk_interior.setToolTip("Ver el interior: abre las tapas")
         self.chk_interior.toggled.connect(self._actualizar_3d)
         self.barra_3d.layout().addWidget(self.chk_interior)
         l3d.addWidget(self.barra_3d)
@@ -571,6 +562,7 @@ class TallerWidget(QWidget):
     def _mostrar_estilo(self) -> None:
         e = self._estilos.get(self.cmb_estilo.currentData() or "")
         self.lbl_estilo.setText(e.descripcion if e else "")
+        self.lbl_estilo.setToolTip(e.descripcion if e else "")
         self.btn_borrar_estilo.setEnabled(bool(e and e.propio))
 
     def _estilo_elegido(self, _indice: int) -> None:
@@ -630,6 +622,31 @@ class TallerWidget(QWidget):
         return t
 
     # -------------------------------------------------------------- estado
+    def _agregar_exterior(self, form: QFormLayout) -> None:
+        """Medidas exteriores arriba de las interiores: cambiar una recalcula las interiores."""
+        titulo = QLabel("<b>Exteriores</b> (sin ruedas)")
+        titulo.setToolTip("Cargá la medida exterior que necesitás y la app calcula las interiores con las paredes, "
+                          "el aluminio y la espuma de este armado. Las tapas conservan su alto.")
+        form.addRow(titulo)
+        self.ext_spins = []
+        for nombre in ("ancho", "fondo", "alto"):
+            sp = QDoubleSpinBox()
+            sp.setRange(50, 5000)
+            sp.setDecimals(1)
+            sp.setSuffix(" mm")
+            sp.setKeyboardTracking(False)
+            sp.setToolTip(titulo.toolTip())
+            sp.editingFinished.connect(self._exterior_editado)
+            etiqueta = QLabel(f"exterior {nombre}")
+            etiqueta.setToolTip(titulo.toolTip())
+            form.addRow(etiqueta, sp)
+            self.ext_spins.append(sp)
+        self.lbl_exterior_nota = QLabel()
+        self.lbl_exterior_nota.setStyleSheet("color:#bbbbbb")
+        self.lbl_exterior_nota.setWordWrap(True)
+        form.addRow(self.lbl_exterior_nota)
+        form.addRow(QLabel("<b>Interiores</b>"))
+
     def _mostrar_exterior(self) -> None:
         if self.resultado is None:
             return

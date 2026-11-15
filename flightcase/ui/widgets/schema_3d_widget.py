@@ -414,7 +414,8 @@ class Schema3DCanvas(QOpenGLWidget):
 
     def resizeGL(self, w: int, h: int) -> None:
         """Updates OpenGL viewport when widget is resized."""
-        GL.glViewport(0, 0, max(1, w), max(1, h))
+        dpr = self.devicePixelRatioF()      # pantallas Retina / con escala: el buffer tiene más píxeles
+        GL.glViewport(0, 0, max(1, round(w * dpr)), max(1, round(h * dpr)))
 
     def paintGL(self) -> None:
         """Executes full 3D OpenGL pass with depth testing and 2D QPainter overlay."""
@@ -424,7 +425,8 @@ class Schema3DCanvas(QOpenGLWidget):
         # 1. Clear color and depth buffers
         bg = QColor(COLORS.get("bg_schema", "#141419"))
         GL.glClearColor(bg.redF(), bg.greenF(), bg.blueF(), 1.0)
-        GL.glViewport(0, 0, w, h)
+        dpr = self.devicePixelRatioF()      # en Retina el buffer es 2x: si no, el 3D ocupa un cuarto
+        GL.glViewport(0, 0, max(1, round(w * dpr)), max(1, round(h * dpr)))
         GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
 
         if not self.mesh:
@@ -498,7 +500,7 @@ class Schema3DCanvas(QOpenGLWidget):
         # 6. Capture GL Transformation Matrices for 2D Coordinate Unprojecting
         mv_matrix = GL.glGetDoublev(GL.GL_MODELVIEW_MATRIX)
         proj_matrix = GL.glGetDoublev(GL.GL_PROJECTION_MATRIX)
-        viewport = GL.glGetIntegerv(GL.GL_VIEWPORT)
+        viewport = (0, 0, w, h)       # las cotas y los ejes se dibujan en píxeles lógicos (QPainter)
 
         def project_3d_to_screen(p: Point3D) -> QPointF:
             wx, wy, wz = GLU.gluProject(p.x, p.y, p.z, mv_matrix, proj_matrix, viewport)

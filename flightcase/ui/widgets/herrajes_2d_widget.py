@@ -428,7 +428,7 @@ class HerrajesManualesWidget(QWidget):
         f1.addWidget(self.cmb_cara)
         f1.addWidget(QLabel("Herraje:"))
         self.cmb_ref = QComboBox()
-        self.cmb_ref.setMinimumContentsLength(28)
+        self.cmb_ref.setMinimumContentsLength(14)
         self.cmb_ref.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
         for fila in hm.catalogo_colocable(self.cat):
             self.cmb_ref.addItem(f"{NOMBRE_CATEGORIA.get(fila['categoria'], fila['categoria'])} · {fila['nombre']} "
@@ -458,13 +458,17 @@ class HerrajesManualesWidget(QWidget):
         self.cmb_modo = QComboBox()
         self.cmb_modo.addItems(["placa", "grabado"])
         self.cmb_modo.setToolTip("Logo: placa remachada o grabado sobre la madera (capa GRABADO del DXF)")
-        for etiqueta, w in (("X", self.sp_x), ("Y", self.sp_y), ("Giro", self.cmb_giro), ("", self.chk_espejo),
-                            ("Ancho", self.sp_ancho), ("Alto", self.sp_alto), ("", self.cmb_modo)):
+        f2b = QHBoxLayout()      # en dos filas, así entra en una pantalla de notebook
+        for fila, etiqueta, w in ((f2, "X", self.sp_x), (f2, "Y", self.sp_y), (f2, "Giro", self.cmb_giro),
+                                  (f2, "", self.chk_espejo), (f2b, "Ancho", self.sp_ancho), (f2b, "Alto", self.sp_alto),
+                                  (f2b, "", self.cmb_modo)):
             if etiqueta:
-                f2.addWidget(QLabel(etiqueta))
-            f2.addWidget(w)
+                fila.addWidget(QLabel(etiqueta))
+            fila.addWidget(w)
         f2.addStretch(1)
+        f2b.addStretch(1)
         raiz.addLayout(f2)
+        raiz.addLayout(f2b)
         self.sp_x.valueChanged.connect(self._editado)
         self.sp_y.valueChanged.connect(self._editado)
         self.cmb_giro.currentIndexChanged.connect(self._editado)
@@ -477,10 +481,10 @@ class HerrajesManualesWidget(QWidget):
         self.botones: Dict[str, QPushButton] = {}
         for clave, texto, ayuda, slot in (
                 ("copiar", "Copiar", "Duplica el herraje al lado (Ctrl+D)", self.copiar),
-                ("espejar", "Espejar a la cara opuesta", "Pone el mismo herraje, simétrico, en la cara de enfrente",
+                ("espejar", "Espejar", "Pone el mismo herraje, simétrico, en la cara de enfrente",
                  self.espejar),
-                ("girar", "Girar 90°", "Gira el herraje 90° (R)", self.girar),
-                ("reemplazar", "Reemplazar por el elegido", "Cambia el herraje por el elegido arriba, en el mismo lugar",
+                ("girar", "Girar", "Gira el herraje 90° (R)", self.girar),
+                ("reemplazar", "Reemplazar", "Cambia el herraje por el elegido arriba, en el mismo lugar",
                  self.reemplazar),
                 ("quitar", "Quitar", "Quita el herraje (Supr)", self.quitar)):
             b = QPushButton(texto)
