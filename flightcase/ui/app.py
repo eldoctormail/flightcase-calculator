@@ -68,6 +68,8 @@ class FlightCaseMainWindow(QMainWindow):
         m.addSeparator()
         self._accion(m, "Exportar &paquete del taller (planos, DXF, instructivo)...", "Ctrl+P", self._taller_exportar,
                      "DXF por pieza, listas de corte y materiales, planos.pdf e instructivo de montaje")
+        self._accion(m, "Exportar p&lanos (PDF)...", "Ctrl+Shift+P", lambda: self.taller_widget.exportar_planos(),
+                     "planos.pdf: resumen, vistas, cada pieza acotada, placas, perfiles y materiales")
         self._accion(m, "Exportar a &STEP (3D para CAD)...", "Ctrl+Alt+S", self._taller_step,
                      "El case armado para abrir en Fusion, SolidWorks o FreeCAD")
         self._accion(m, "Paquete del &taller desde un .scad sin abrirlo...", "Ctrl+T", self._export_taller_pack)

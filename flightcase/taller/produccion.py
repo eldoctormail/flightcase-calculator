@@ -216,6 +216,38 @@ def _vistas_extra(d: Dict[str, Any], carpeta: str) -> list:
     return vistas
 
 
+def colores_placa(d: Dict[str, Any]) -> Dict[str, str]:
+    """Color de la placa y de la tapa (color_placa / color_tapa del .scad, nombres CSS como en
+    OpenSCAD) para los renders del case terminado. Vacío o desconocido = madera."""
+    from matplotlib.colors import to_hex
+    out: Dict[str, str] = {}
+    col = d["info"].get("color", [])
+    for grupos, nombre in ((("base", "wall"), col[0] if col else ""), (("lid",), col[1] if len(col) > 1 else "")):
+        try:
+            hexa = to_hex(nombre.strip().lower()) if nombre.strip() else None
+        except ValueError:
+            hexa = None
+        if hexa:
+            out.update({g: hexa for g in grupos})
+    return out
+
+
+def _vista_cubierta(res: ResultadoTaller, d: Dict[str, Any], carpeta: str) -> list:
+    """Hoja «Cubierta removible»: el case con la cubierta en U levantada, como la hacía generar.py."""
+    if not d["paneles"].get("acceso_izq", {}).get("nombre", "").endswith("cubierta"):
+        return []
+    from .geometria import Opciones3D, malla_3d
+    from .render import renderizar
+    png = os.path.join(carpeta, "cubierta.png")
+    if not renderizar(malla_3d(res, Opciones3D(cubierta_abierta=300, interior=False)), png,
+                      "0,0,0,68,0,35,0", "1600,1200", colores_placa(d)):
+        return []
+    return [("Cubierta removible", png,
+             "El techo y los laterales de arriba salen juntos como una cubierta en U; la bandeja "
+             "queda fija en la parte de abajo. Para sacarla: abrir las tapas, soltar los cierres "
+             "de las juntas laterales y levantar.")]
+
+
 def _vistas_interior(res: ResultadoTaller, carpeta: str, piezas) -> list:
     """Hojas del interior (espuma por capas, rack, cajones) con una vista 3D con las tapas abiertas."""
     if res.valores.get("interiores") is None:
@@ -363,7 +395,7 @@ def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool =
             render = _renderizador(res)
             if render_png is None:
                 render_png = os.path.join(carpeta, "render.png")
-                if renderizar(malla_3d(res), render_png, "0,0,0,74,0,35,0", "1600,1200"):
+                if renderizar(malla_3d(res), render_png, "0,0,0,74,0,35,0", "1600,1200", colores_placa(d)):
                     paq.archivos.append(render_png)
                 else:
                     render_png = None
@@ -379,7 +411,7 @@ def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool =
                     pasos[fin:fin] = p_int
                 laminas = ins.renderizar_laminas(render, d, piezas, os.path.join(carpeta, "montaje"), pasos)
                 paq.archivos += sorted(set(laminas.values()))
-        vistas = _vistas_extra(d, carpeta) + _vistas_interior(res, carpeta, piezas)
+        vistas = _vistas_extra(d, carpeta) + _vista_cubierta(res, d, carpeta) + _vistas_interior(res, carpeta, piezas)
         ruta = os.path.join(carpeta, "planos.pdf")
         gen.generar_pdf(ruta, d, piezas, placas, barras, render_png, None, laminas.get("explotado"), vistas)
         paq.archivos += [v[1] for v in vistas] + [ruta]

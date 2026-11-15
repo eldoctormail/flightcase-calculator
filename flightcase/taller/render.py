@@ -10,7 +10,7 @@ de Z). Funciona en cualquier equipo, sin placa de video ni OpenSCAD.
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 from PySide6.QtCore import QRectF, Qt
@@ -119,8 +119,11 @@ class _Lienzo:
         self.col[borde] = self.col[borde] * 0.45
 
 
-def renderizar(malla: Malla3D, ruta: str, camara: str = "0,0,0,62,0,32,0", tam: str = "1400,1050") -> bool:
-    """Dibuja la malla y la guarda en `ruta` (PNG). Devuelve True si pudo."""
+def renderizar(malla: Malla3D, ruta: str, camara: str = "0,0,0,62,0,32,0", tam: str = "1400,1050",
+               colores: Optional[Dict[str, str]] = None) -> bool:
+    """Dibuja la malla y la guarda en `ruta` (PNG). Devuelve True si pudo. `colores` reemplaza
+    colores de grupos (por ejemplo el color de la placa: base, lid, wall)."""
+    paleta = dict(COLORES, **(colores or {}))
     if QGuiApplication.instance() is None:
         QGuiApplication([])
     w, h = (int(x) for x in tam.split(","))
@@ -167,7 +170,7 @@ def renderizar(malla: Malla3D, ruta: str, camara: str = "0,0,0,62,0,32,0", tam: 
         gi = grupos.get(grupo, 0)
         colores_id.append(gi)
         luzf = 1.0 if plano else 0.6 + 0.45 * max(0.0, float(normal @ luz))
-        color = _rgb(COLORES.get(grupo, COLORES["base"])) * luzf
+        color = _rgb(paleta.get(grupo, paleta["base"])) * luzf
         s = pantalla(pts3)
         for i in range(1, len(s) - 1):
             lienzo.triangulo(s[[0, i, i + 1]], color, ident, gi, 0.0, agujeros)

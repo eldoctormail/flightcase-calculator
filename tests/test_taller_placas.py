@@ -117,3 +117,30 @@ def test_pestana_placas(tmp_path, monkeypatch):
     assert len(rutas) == len(vp.placas) + 1 and all(os.path.isfile(r) for r in rutas)
     vp.chk_girar.setChecked(False)
     assert not any(pz["rot"] for pl in vp.placas for pz in pl["piezas"])
+
+
+def test_planos_como_generar_py_cubierta_y_color(tmp_path):
+    """La hoja «Cubierta removible» y el color de la placa en los renders, como hacía OpenSCAD."""
+    import json
+    from pathlib import Path
+    from PySide6.QtWidgets import QApplication
+    QApplication.instance() or QApplication([])
+    p = json.loads((Path(__file__).parent / "golden" / "taller" / "rack_audio.json").read_text(encoding="utf-8"))["params"]
+    res = calcular(p)
+    d = PR.datos(res)
+    assert PR.colores_placa(d)["base"] == "#000000"          # color_placa = "Black"
+    assert PR.colores_placa(dict(d, info=dict(d["info"], color=["", "NoExiste"]))) == {}
+    vistas = PR._vista_cubierta(res, d, str(tmp_path))
+    assert [v[0] for v in vistas] == ["Cubierta removible"] and os.path.getsize(vistas[0][1]) > 10000
+    assert PR._vista_cubierta(calcular(parametros_por_defecto()), PR.datos(calcular(parametros_por_defecto())),
+                              str(tmp_path)) == []
+
+
+def test_exportar_solo_planos(tmp_path):
+    from PySide6.QtWidgets import QApplication
+    QApplication.instance() or QApplication([])
+    from flightcase.ui.widgets import TallerWidget
+    w = TallerWidget()
+    ruta = w.exportar_planos(str(tmp_path / "Planos - case.pdf"))
+    assert ruta and (tmp_path / "Planos - case.pdf").read_bytes()[:4] == b"%PDF"
+    assert os.listdir(tmp_path) == ["Planos - case.pdf"]
