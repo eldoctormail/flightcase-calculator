@@ -599,6 +599,9 @@ class TallerWidget(QWidget):
         self.tabla_perfiles = self._tabla(["Perfil", "Descripción", "Largo", "Cant.", "Corte"])
         self.tabla_herrajes = self._tabla(["Herraje", "Cant.", "Detalle", "Ref."])
         self.tabs.addTab(self.tabla_paneles, "Paneles")
+        from .placas_widget import PlacasWidget
+        self.vista_placas = PlacasWidget(self)
+        self.tabs.addTab(self.vista_placas, "Placas")
         self.tabs.addTab(self.tabla_perfiles, "Perfiles")
         self.tabs.addTab(self.tabla_herrajes, "Herrajes")
         pagina_int = QWidget()
@@ -987,6 +990,7 @@ class TallerWidget(QWidget):
             self._llenar(self.tabla_interior, [])
         self._habia_interior = interior is not None
         self.herrajes.set_resultado(res, self.params.get("herrajes_manuales", []), self.params.get("_carpeta", ""))
+        self.vista_placas.set_resultado(res)
         self._actualizar_3d()
 
     def _actualizar_3d(self, *_args) -> None:
@@ -1104,7 +1108,8 @@ class TallerWidget(QWidget):
             carpeta = os.path.join(base, f"salida_{nombre}")
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
-            paq = exportar(self.resultado, carpeta)
+            from .placas_widget import girar_permitido
+            paq = exportar(self.resultado, carpeta, rotar=girar_permitido())
         except Exception as e:
             QApplication.restoreOverrideCursor()
             QMessageBox.critical(self, "Paquete del taller", f"No se pudo generar el paquete:\n{e}")

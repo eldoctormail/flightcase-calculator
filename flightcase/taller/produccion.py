@@ -11,7 +11,6 @@ from __future__ import annotations
 import csv
 import math
 import os
-from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -280,8 +279,9 @@ def _exportar_espuma(res: ResultadoTaller, carpeta: str, paq: "PaqueteTaller") -
 
 def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool = True,
              render_png: Optional[str] = None, instructivo: bool = True, step: bool = True) -> PaqueteTaller:
-    """Escribe dxf/*.dxf, lista_cortes.csv, materiales.csv, case_3d.step, planos.pdf e
-    instructivo_montaje.pdf en `carpeta`."""
+    """Escribe dxf/*.dxf (una por pieza), dxf/placas/*.dxf (una por placa, con las piezas
+    acomodadas), lista_cortes.csv, placas.csv, materiales.csv, case_3d.step, planos.pdf e
+    instructivo_montaje.pdf en `carpeta`. `rotar` permite girar piezas en la placa (sin veta)."""
     os.makedirs(os.path.join(carpeta, "dxf"), exist_ok=True)
     d = datos(res)
     paq = PaqueteTaller(carpeta=carpeta, avisos=list(d["avisos"]))
@@ -311,23 +311,16 @@ def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool =
 
     _exportar_espuma(res, carpeta, paq)
 
-    # Placas por material y barras de perfil
-    material_principal = d["info"]["material"]
-    por_material: "OrderedDict[str, list]" = OrderedDict()
-    for pz in piezas:
-        corto = pz["nombre"] if pz.get("extra") else \
-            d["paneles"][pz["ids"][0]]["nombre"].replace(" cuerpo", "").replace(" tapa", "")
-        mat = pz.get("material", material_principal)
-        for _ in range(pz["cant"] * N):
-            por_material.setdefault(mat, []).append(dict(num=pz["num"], w=pz["w"], h=pz["h"], nombre_corto=corto))
-    pl = d["info"]["placa"]
-    placas = []
-    for mat, sueltas in por_material.items():
-        pls, ne = gen.acomodar_placas(sueltas, float(pl[0]), float(pl[1]), float(pl[2]), float(pl[3]), rotar=rotar)
-        for p in pls:
-            p.update(material=mat, L=float(pl[0]), A=float(pl[1]))
-        placas += pls
-        paq.avisos += [f"La pieza {p['num']} ({fmt(p['w'])} x {fmt(p['h'])}) no entra en la placa." for p in ne]
+    # Placas por material (optimizadas) y barras de perfil
+    from . import placas as P
+    placas, av = P.armar_placas(d, piezas, rotar=rotar, cantidad=N)
+    paq.avisos += av
+    trazos = {pz["num"]: trazos_manuales(d["manuales"].get(pz["ids"][0], [])) for pz in piezas if not pz.get("extra")}
+    paq.archivos += P.escribir_dxf_placas(placas, piezas, os.path.join(carpeta, "dxf", "placas"), trazos)
+    ruta = os.path.join(carpeta, "placas.csv")
+    with open(ruta, "w", newline="", encoding="utf-8-sig") as f:
+        csv.writer(f, delimiter=";").writerows(P.filas_csv(placas, "dxf/placas/"))
+    paq.archivos.append(ruta)
     barras = gen.cortar_barras([dict(p, cant=p["cant"] * N) for p in d["perfiles"]],
                                float(d["info"]["barra"][0]), float(d["info"]["barra"][1]))
     paq.piezas, paq.placas, paq.barras = piezas, placas, barras
