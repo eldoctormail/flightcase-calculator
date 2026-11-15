@@ -1,0 +1,492 @@
+[
+ {
+  "seccion": "Medidas interiores",
+  "parametros": [
+   {
+    "nombre": "int_ancho",
+    "ayuda": "ancho útil interior (X)"
+   },
+   {
+    "nombre": "int_prof",
+    "ayuda": "profundidad útil interior (Y)"
+   },
+   {
+    "nombre": "int_alto_cuerpo",
+    "ayuda": "del piso interior al plano de cierre"
+   },
+   {
+    "nombre": "int_alto_tapa",
+    "ayuda": "del plano de cierre al techo interior"
+   }
+  ]
+ },
+ {
+  "seccion": "Tipo de case",
+  "parametros": [
+   {
+    "nombre": "tapas",
+    "ayuda": "tapas = 1: cuerpo con piso y una tapa. tapas = 2: cuerpo abierto con una tapa en cada extremo (por ejemplo, cases que se abren por los dos costados)."
+   },
+   {
+    "nombre": "int_alto_tapa2",
+    "ayuda": "interior de la segunda tapa (-1 = igual a int_alto_tapa)"
+   },
+   {
+    "nombre": "orientacion",
+    "ayuda": "\"vertical\": las tapas abren hacia arriba (y abajo). \"horizontal\": acostado, las tapas abren a los costados. int_ancho = ALTO del case, int_prof = profundidad, int_alto_* = largos de cuerpo y tapas. \"frontal\": parado, las tapas abren adelante (y atrás), como un rack. int_ancho = ANCHO, int_prof = ALTO, int_alto_* = profundidades de cuerpo y tapas."
+   },
+   {
+    "nombre": "descuento_entre",
+    "ayuda": "mm extra que se descuentan a los paneles que van entre otros (juego de armado)"
+   },
+   {
+    "nombre": "acceso_lateral",
+    "ayuda": "Tapa de acceso en los costados del cuerpo: el lateral se parte en una tapa removible (alto acceso_lateral, del lado del techo) y una parte fija, unidas por un par de perfiles macho/hembra con cierre. 0 = sin tapa de acceso"
+   },
+   {
+    "nombre": "acceso_junta",
+    "ayuda": "espacio entre las dos partes (-1 = cierre_m_sup + cierre_h_sup)"
+   },
+   {
+    "nombre": "acceso_cierres_n",
+    "ayuda": "cierres en cada junta de acceso"
+   },
+   {
+    "nombre": "acceso_tipo",
+    "ayuda": "\"paneles\": cada tapa de acceso lateral se saca sola. \"cubierta\": techo del cuerpo + las dos tapas de acceso forman una cubierta en U que sale entera (los aros macho del cuerpo se cortan a la altura de la junta)."
+   },
+   {
+    "nombre": "paredes_enteras",
+    "ayuda": "par de paredes que va de punta a punta: \"frente\" o \"laterales\""
+   },
+   {
+    "nombre": "paredes_enteras_cuerpo",
+    "ayuda": "lo mismo solo para el cuerpo (\"\" = igual que paredes_enteras)"
+   },
+   {
+    "nombre": "cantidad_cases",
+    "ayuda": "cuántos cases iguales se fabrican (multiplica cortes y materiales)"
+   },
+   {
+    "nombre": "extremos_cubren",
+    "ayuda": "true: piso, techo y caras de las tapas van enteros y tapan el canto de las paredes"
+   },
+   {
+    "nombre": "manijas_en",
+    "ayuda": "\"auto\" (laterales en vertical, frente y trasera en horizontal), \"laterales\", \"frente\""
+   },
+   {
+    "nombre": "piezas_extra",
+    "ayuda": "piezas adicionales que no son parte de la caja (bases, separadores, refuerzos): [[nombre, ancho, alto, espesor, cantidad, material], ...]"
+   }
+  ]
+ },
+ {
+  "seccion": "Placa",
+  "parametros": [
+   {
+    "nombre": "placa_esp",
+    "ayuda": "espesor del multilaminado / fenólico"
+   },
+   {
+    "nombre": "placa_material",
+    "ayuda": ""
+   }
+  ]
+ },
+ {
+  "seccion": "Sistema de armado",
+  "parametros": [
+   {
+    "nombre": "sistema",
+    "ayuda": "\"angulo\": ángulo de aluminio remachado por fuera; el frente y la trasera van de punta a punta, los laterales entre ellos, el piso y el techo quedan adentro de las paredes. \"hibrido\": perfil híbrido de canal; ningún panel toca a otro, todos se retiran 'hibrido_descuento' desde la arista exterior."
+   },
+   {
+    "nombre": "angulo_ala",
+    "ayuda": "ala del ángulo de aluminio"
+   },
+   {
+    "nombre": "angulo_esp",
+    "ayuda": "espesor del ángulo"
+   },
+   {
+    "nombre": "hibrido_descuento",
+    "ayuda": "retiro del borde del panel respecto de la arista"
+   },
+   {
+    "nombre": "hibrido_pared",
+    "ayuda": "pared del perfil por fuera del panel"
+   }
+  ]
+ },
+ {
+  "seccion": "Esquineros",
+  "parametros": [
+   {
+    "nombre": "esq_pata",
+    "ayuda": "largo de pata del esquinero bola"
+   },
+   {
+    "nombre": "esq_descuento",
+    "ayuda": "cuánto se acorta CADA extremo del perfil que llega a un esquinero"
+   }
+  ]
+ },
+ {
+  "seccion": "Perfil de cierre macho (cuerpo) / hembra (tapa)",
+  "parametros": [
+   {
+    "nombre": "cierre_m_alto",
+    "ayuda": "alto del macho, desde su borde inferior hasta el plano de cierre"
+   },
+   {
+    "nombre": "cierre_m_sup",
+    "ayuda": "parte del macho que sobresale por encima del panel"
+   },
+   {
+    "nombre": "cierre_h_alto",
+    "ayuda": "alto de la hembra, desde el plano de cierre hasta su borde superior"
+   },
+   {
+    "nombre": "cierre_h_sup",
+    "ayuda": "parte de la hembra que sobresale por debajo del panel"
+   },
+   {
+    "nombre": "cierre_saliente",
+    "ayuda": "cuánto sobresale el perfil de la cara exterior del panel"
+   },
+   {
+    "nombre": "cierre_hibrido",
+    "ayuda": "true: el mismo perfil de cierre en cuerpo y tapa (hermafrodita); usa las medidas del macho"
+   }
+  ]
+ },
+ {
+  "seccion": "Manijas embutidas (laterales del cuerpo)",
+  "parametros": [
+   {
+    "nombre": "manijas",
+    "ayuda": ""
+   },
+   {
+    "nombre": "manija_corte_ancho",
+    "ayuda": ""
+   },
+   {
+    "nombre": "manija_corte_alto",
+    "ayuda": ""
+   },
+   {
+    "nombre": "manija_corte_radio",
+    "ayuda": ""
+   },
+   {
+    "nombre": "manija_centro_desde_arriba",
+    "ayuda": "del borde superior del panel al centro del calado"
+   },
+   {
+    "nombre": "manijas_n",
+    "ayuda": "manijas por pared (1 o 2, una al lado de la otra)"
+   },
+   {
+    "nombre": "manija_sep",
+    "ayuda": "distancia entre centros con 2 manijas (0 = automática)"
+   },
+   {
+    "nombre": "manija_pos",
+    "ayuda": "case acostado o frontal: posición a lo alto de la pared (0 = abajo, 1 = arriba)"
+   }
+  ]
+ },
+ {
+  "seccion": "Cierres mariposa",
+  "parametros": [
+   {
+    "nombre": "cierre_margen",
+    "ayuda": "distancia del borde del case al primer cierre"
+   },
+   {
+    "nombre": "cierres_laterales",
+    "ayuda": "\"auto\" (si la profundidad > 450), \"si\", \"no\""
+   },
+   {
+    "nombre": "cierres_frente_n",
+    "ayuda": "cierres por plano en frente/trasera (0 = automático según el largo, -1 = sin cierres: solo laterales)"
+   },
+   {
+    "nombre": "cierres_lateral_n",
+    "ayuda": "cierres por plano en cada lateral (0 = automático)"
+   }
+  ]
+ },
+ {
+  "seccion": "Ruedas",
+  "parametros": [
+   {
+    "nombre": "ruedas",
+    "ayuda": "0 = sin ruedas, 4 = una en cada esquina"
+   },
+   {
+    "nombre": "rueda_diametro",
+    "ayuda": "diámetro de la rueda"
+   },
+   {
+    "nombre": "rueda_alto",
+    "ayuda": "alto total de la rueda, de la placa al piso"
+   },
+   {
+    "nombre": "rueda_frenos",
+    "ayuda": "cuántas de las 4 llevan freno"
+   },
+   {
+    "nombre": "rueda_placa",
+    "ayuda": "placa de montaje (largo, ancho)"
+   },
+   {
+    "nombre": "rueda_agujeros",
+    "ayuda": "distancia entre centros de los agujeros de la placa"
+   },
+   {
+    "nombre": "rueda_agujero_d",
+    "ayuda": "diámetro de perforación en el piso (0 = no perforar en el DXF)"
+   },
+   {
+    "nombre": "rueda_margen",
+    "ayuda": "separación extra respecto del esquinero"
+   },
+   {
+    "nombre": "base_ruedas",
+    "ayuda": "Base de ruedas: placa exterior más gruesa (p. ej. fenólico 18) atornillada bajo el piso; las ruedas se montan en ella. [medida a lo ancho del plano del piso, a lo alto del plano, espesor] ej. [530, 750, 18]; vacío = las ruedas van directo al piso"
+   },
+   {
+    "nombre": "base_material",
+    "ayuda": ""
+   },
+   {
+    "nombre": "base_pasantes",
+    "ayuda": "los bulones de las ruedas atraviesan también el piso del case"
+   }
+  ]
+ },
+ {
+  "seccion": "Bandejas internas",
+  "parametros": [
+   {
+    "nombre": "bandejas",
+    "ayuda": "[[ancho, fondo, altura, espesor (opcional), material (opcional)], ...] ancho: de costado a costado; fondo: en profundidad; altura: de la cara de arriba de la bandeja al piso interior. Se centran en el cuerpo y se fijan con escuadras a los costados."
+   },
+   {
+    "nombre": "bandeja_soportes",
+    "ayuda": "escuadras por bandeja"
+   },
+   {
+    "nombre": "ref_escuadra",
+    "ayuda": "ej. \"08-40403\" (escuadra 40x34 del catálogo FR)"
+   }
+  ]
+ },
+ {
+  "seccion": "Encastres de apilado (platos en el techo)",
+  "parametros": [
+   {
+    "nombre": "encastres",
+    "ayuda": "Platos embutidos en el techo, alineados con las ruedas, para que otro case igual apoye sus ruedas encima sin desplazarse."
+   },
+   {
+    "nombre": "encastre_corte",
+    "ayuda": "calado en el techo (lo indica el fabricante del plato)"
+   },
+   {
+    "nombre": "encastre_radio",
+    "ayuda": "radio de las esquinas del calado"
+   },
+   {
+    "nombre": "encastre_ala",
+    "ayuda": "reborde del plato por fuera del calado"
+   },
+   {
+    "nombre": "encastre_profundidad",
+    "ayuda": "cuánto se mete el plato dentro de la tapa"
+   },
+   {
+    "nombre": "encastre_remaches",
+    "ayuda": "remaches por plato"
+   }
+  ]
+ },
+ {
+  "seccion": "Corte y compra",
+  "parametros": [
+   {
+    "nombre": "barra_largo",
+    "ayuda": "largo de barra de perfil"
+   },
+   {
+    "nombre": "sierra_kerf",
+    "ayuda": "pérdida por corte de sierra (perfiles)"
+   },
+   {
+    "nombre": "placa_largo",
+    "ayuda": ""
+   },
+   {
+    "nombre": "placa_ancho",
+    "ayuda": ""
+   },
+   {
+    "nombre": "placa_kerf",
+    "ayuda": "pérdida por corte en placa (sierra o fresa)"
+   },
+   {
+    "nombre": "placa_margen",
+    "ayuda": "margen perimetral de la placa (bordes dañados)"
+   },
+   {
+    "nombre": "remache_paso",
+    "ayuda": "separación de remaches en perfiles"
+   },
+   {
+    "nombre": "remache_d",
+    "ayuda": "diámetro del remache pop"
+   }
+  ]
+ },
+ {
+  "seccion": "Herrajes del catálogo FR Sistemas",
+  "parametros": [
+   {
+    "nombre": "ref_placa",
+    "ayuda": "Poné la referencia del catálogo (ver flightcase_gen/catalogo_fr.scad) y sus medidas reemplazan a los parámetros de arriba. Vacío = usar los parámetros. ej. \"05-001\" tablero abedul 9,6 mm"
+   },
+   {
+    "nombre": "ref_angulo",
+    "ayuda": "ej. \"08-6105\" ángulo 30x30"
+   },
+   {
+    "nombre": "ref_hibrido",
+    "ayuda": "ej. \"08-6203\" híbrido 10 mm"
+   },
+   {
+    "nombre": "ref_cierre_macho",
+    "ayuda": "ej. \"08-Q6502M\""
+   },
+   {
+    "nombre": "ref_cierre_hembra",
+    "ayuda": "ej. \"08-Q6502F\""
+   },
+   {
+    "nombre": "ref_esquinero",
+    "ayuda": "ej. \"08-41076\" bola grande paso 30"
+   },
+   {
+    "nombre": "ref_cierre",
+    "ayuda": "ej. \"08-17250S\" mariposa grande embutido"
+   },
+   {
+    "nombre": "ref_manija",
+    "ayuda": "ej. \"08-34082\" asa retráctil mediana"
+   },
+   {
+    "nombre": "ref_rueda",
+    "ayuda": "ej. \"08-372151\" rueda 100 mm sin freno"
+   },
+   {
+    "nombre": "ref_rueda_freno",
+    "ayuda": "ej. \"08-372191\" rueda 100 mm con freno"
+   },
+   {
+    "nombre": "ref_plato",
+    "ayuda": "ej. \"08-38083\" base empotrable (plato de apilado)"
+   },
+   {
+    "nombre": "ref_remache",
+    "ayuda": "vacío = el más corto que alcance, según placa y perfil"
+   },
+   {
+    "nombre": "usar_catalogo_remaches",
+    "ayuda": ""
+   }
+  ]
+ },
+ {
+  "seccion": "Otros accesorios",
+  "parametros": [
+   {
+    "nombre": "pies",
+    "ayuda": "0 o 4 pies en el piso (en lugar de ruedas)"
+   },
+   {
+    "nombre": "ref_pie",
+    "ayuda": "ej. \"08-4907\" pie de goma 38x15"
+   },
+   {
+    "nombre": "pie_diametro",
+    "ayuda": ""
+   },
+   {
+    "nombre": "pie_alto",
+    "ayuda": ""
+   },
+   {
+    "nombre": "bisagras",
+    "ayuda": "0 = tapa suelta; 2 o 3 = tapa abisagrada atrás (1 con bisagra de piano)"
+   },
+   {
+    "nombre": "ref_bisagra",
+    "ayuda": "ej. \"08-2251\" desmontable, \"08-2605\" piano"
+   },
+   {
+    "nombre": "topes",
+    "ayuda": "topes que sostienen la tapa abierta"
+   },
+   {
+    "nombre": "refuerzos",
+    "ayuda": "Refuerzos de esquina en L en las juntas de cierre, sobre el ángulo y junto al perfil de cierre. por esquina de junta: 0 = sin, 1 = solo en el cuerpo, 2 = en el cuerpo y en la tapa"
+   },
+   {
+    "nombre": "refuerzo_nombre",
+    "ayuda": ""
+   },
+   {
+    "nombre": "refuerzo_ala",
+    "ayuda": "largo de cada ala desde la arista"
+   },
+   {
+    "nombre": "refuerzo_alto",
+    "ayuda": "alto del refuerzo (en el sentido de la arista)"
+   },
+   {
+    "nombre": "refuerzo_remaches",
+    "ayuda": "remaches por refuerzo"
+   },
+   {
+    "nombre": "refuerzo_esp",
+    "ayuda": "espesor del refuerzo: profundidad del rebaje en la base de ruedas"
+   },
+   {
+    "nombre": "rebaje_refuerzos",
+    "ayuda": "case frontal o acostado con base de ruedas: rebaja la base donde apoya sobre los refuerzos de abajo"
+   },
+   {
+    "nombre": "rebaje_holgura",
+    "ayuda": "holgura del rebaje alrededor del refuerzo"
+   },
+   {
+    "nombre": "ref_tope",
+    "ayuda": "ej. \"08-2709\""
+   },
+   {
+    "nombre": "espuma_esp",
+    "ayuda": "espuma interior (mm); las medidas interiores pasan a ser el espacio útil"
+   },
+   {
+    "nombre": "ref_espuma",
+    "ayuda": "ej. \"08-019310\" plastazote 10 mm"
+   },
+   {
+    "nombre": "extras",
+    "ayuda": "otros artículos para la lista: [[\"08-3476031\", 1], [\"08-5740A\", 4]]"
+   }
+  ]
+ }
+]
