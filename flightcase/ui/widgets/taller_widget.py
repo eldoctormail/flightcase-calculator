@@ -146,6 +146,11 @@ class _Numero(QDoubleSpinBox):
         return f"{valor:.{self.decimals()}f}".rstrip("0").rstrip(".") if self.decimals() else f"{valor:.0f}"
 
 
+def _con_codigo(ayuda: str, nombre: str) -> str:
+    """La ayuda con el nombre del parámetro en el .scad, para quien edite el archivo a mano."""
+    return f"{ayuda}\n\nEn el .scad: {nombre}" if ayuda else f"En el .scad: {nombre}"
+
+
 def _ayuda(texto: str) -> str:
     return f"<p style='white-space:pre-wrap'>{texto}</p>" if texto else ""
 
@@ -463,22 +468,23 @@ class TallerWidget(QWidget):
             pagina = QWidget()
             form = QFormLayout(pagina)
             form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+            form.setRowWrapPolicy(QFormLayout.WrapLongRows)   # nombre largo: el campo pasa abajo
             if n_sec == 0:
                 self._seccion_medidas(form, sec)
             for p in ([] if n_sec == 0 else sec["parametros"]):
                 nombre = p["nombre"]
                 if nombre not in self.defectos:
                     continue
-                etiqueta = QLabel(nombre)
-                etiqueta.setToolTip(_ayuda(p["ayuda"]))
+                etiqueta = QLabel(p.get("etiqueta") or nombre)
+                etiqueta.setToolTip(_ayuda(_con_codigo(p["ayuda"], nombre)))
                 if nombre in TABLAS:
                     ed = _EditorTabla(nombre, self.defectos[nombre], self._programar)
-                    ed.widget.setToolTip(_ayuda(p["ayuda"]))
+                    ed.widget.setToolTip(_ayuda(_con_codigo(p["ayuda"], nombre)))
                     form.addRow(etiqueta)
                     form.addRow(ed.widget)
                 else:
                     ed = _Editor(nombre, self.defectos[nombre], self._programar)
-                    ed.widget.setToolTip(_ayuda(p["ayuda"]))
+                    ed.widget.setToolTip(_ayuda(_con_codigo(p["ayuda"], nombre)))
                     form.addRow(etiqueta, ed.widget)
                 self.editores[nombre] = ed
             scroll = QScrollArea()
@@ -671,7 +677,7 @@ class TallerWidget(QWidget):
                 form.addRow(QLabel(texto), self._con_mm(sp))
                 continue
             ed = _Editor(nombre, self.defectos[nombre], self._programar)
-            ed.widget.setToolTip(_ayuda(ayudas.get(nombre, "")))
+            ed.widget.setToolTip(_ayuda(_con_codigo(ayudas.get(nombre, ""), nombre)))
             self.editores[nombre] = ed
             if nombre == "int_alto_cuerpo":       # se maneja con el alto interior total
                 form.addRow(ed.widget)
@@ -680,7 +686,7 @@ class TallerWidget(QWidget):
             if nombre == "int_alto_tapa":
                 ed.widget.valueChanged.connect(self._alto_tapa_editado)
             etiqueta = QLabel(texto)
-            etiqueta.setToolTip(_ayuda(ayudas.get(nombre, "")))
+            etiqueta.setToolTip(_ayuda(_con_codigo(ayudas.get(nombre, ""), nombre)))
             form.addRow(etiqueta, self._con_mm(ed.widget))
         self.lbl_exterior_nota = QLabel()
         self.lbl_exterior_nota.setStyleSheet("color:#bbbbbb")

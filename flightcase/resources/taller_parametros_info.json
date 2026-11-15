@@ -4,19 +4,23 @@
   "parametros": [
    {
     "nombre": "int_ancho",
-    "ayuda": "ancho útil interior (X)"
+    "ayuda": "ancho útil interior (X)",
+    "etiqueta": "Ancho interior"
    },
    {
     "nombre": "int_prof",
-    "ayuda": "profundidad útil interior (Y)"
+    "ayuda": "profundidad útil interior (Y)",
+    "etiqueta": "Largo interior"
    },
    {
     "nombre": "int_alto_cuerpo",
-    "ayuda": "del piso interior al plano de cierre"
+    "ayuda": "del piso interior al plano de cierre",
+    "etiqueta": "Alto interior del cuerpo"
    },
    {
     "nombre": "int_alto_tapa",
-    "ayuda": "del plano de cierre al techo interior"
+    "ayuda": "del plano de cierre al techo interior",
+    "etiqueta": "Alto de tapa"
    }
   ]
  },
@@ -25,59 +29,73 @@
   "parametros": [
    {
     "nombre": "tapas",
-    "ayuda": "tapas = 1: cuerpo con piso y una tapa. tapas = 2: cuerpo abierto con una tapa en cada extremo (por ejemplo, cases que se abren por los dos costados)."
+    "ayuda": "tapas = 1: cuerpo con piso y una tapa. tapas = 2: cuerpo abierto con una tapa en cada extremo (por ejemplo, cases que se abren por los dos costados).",
+    "etiqueta": "Cantidad de tapas"
    },
    {
     "nombre": "int_alto_tapa2",
-    "ayuda": "interior de la segunda tapa (-1 = igual a int_alto_tapa)"
+    "ayuda": "interior de la segunda tapa (-1 = igual a int_alto_tapa)",
+    "etiqueta": "Alto de la segunda tapa"
    },
    {
     "nombre": "orientacion",
-    "ayuda": "\"vertical\": las tapas abren hacia arriba (y abajo). \"horizontal\": acostado, las tapas abren a los costados. int_ancho = ALTO del case, int_prof = profundidad, int_alto_* = largos de cuerpo y tapas. \"frontal\": parado, las tapas abren adelante (y atrás), como un rack. int_ancho = ANCHO, int_prof = ALTO, int_alto_* = profundidades de cuerpo y tapas."
+    "ayuda": "\"vertical\": las tapas abren hacia arriba (y abajo). \"horizontal\": acostado, las tapas abren a los costados. int_ancho = ALTO del case, int_prof = profundidad, int_alto_* = largos de cuerpo y tapas. \"frontal\": parado, las tapas abren adelante (y atrás), como un rack. int_ancho = ANCHO, int_prof = ALTO, int_alto_* = profundidades de cuerpo y tapas.",
+    "etiqueta": "Orientación"
    },
    {
     "nombre": "descuento_entre",
-    "ayuda": "mm extra que se descuentan a los paneles que van entre otros (juego de armado)"
+    "ayuda": "mm extra que se descuentan a los paneles que van entre otros (juego de armado)",
+    "etiqueta": "Descuento de armado"
    },
    {
     "nombre": "acceso_lateral",
-    "ayuda": "Tapa de acceso en los costados del cuerpo: el lateral se parte en una tapa removible (alto acceso_lateral, del lado del techo) y una parte fija, unidas por un par de perfiles macho/hembra con cierre. 0 = sin tapa de acceso"
+    "ayuda": "Tapa de acceso en los costados del cuerpo: el lateral se parte en una tapa removible (alto acceso_lateral, del lado del techo) y una parte fija, unidas por un par de perfiles macho/hembra con cierre. 0 = sin tapa de acceso",
+    "etiqueta": "Tapa de acceso lateral (alto)"
    },
    {
     "nombre": "acceso_junta",
-    "ayuda": "espacio entre las dos partes (-1 = cierre_m_sup + cierre_h_sup)"
+    "ayuda": "espacio entre las dos partes (-1 = cierre_m_sup + cierre_h_sup)",
+    "etiqueta": "Junta de la tapa de acceso"
    },
    {
     "nombre": "acceso_cierres_n",
-    "ayuda": "cierres en cada junta de acceso"
+    "ayuda": "cierres en cada junta de acceso",
+    "etiqueta": "Cierres por junta de acceso"
    },
    {
     "nombre": "acceso_tipo",
-    "ayuda": "\"paneles\": cada tapa de acceso lateral se saca sola. \"cubierta\": techo del cuerpo + las dos tapas de acceso forman una cubierta en U que sale entera (los aros macho del cuerpo se cortan a la altura de la junta)."
+    "ayuda": "\"paneles\": cada tapa de acceso lateral se saca sola. \"cubierta\": techo del cuerpo + las dos tapas de acceso forman una cubierta en U que sale entera (los aros macho del cuerpo se cortan a la altura de la junta).",
+    "etiqueta": "Tipo de acceso"
    },
    {
     "nombre": "paredes_enteras",
-    "ayuda": "par de paredes que va de punta a punta: \"frente\" o \"laterales\""
+    "ayuda": "par de paredes que va de punta a punta: \"frente\" o \"laterales\"",
+    "etiqueta": "Paredes enteras"
    },
    {
     "nombre": "paredes_enteras_cuerpo",
-    "ayuda": "lo mismo solo para el cuerpo (\"\" = igual que paredes_enteras)"
+    "ayuda": "lo mismo solo para el cuerpo (\"\" = igual que paredes_enteras)",
+    "etiqueta": "Paredes enteras del cuerpo"
    },
    {
     "nombre": "cantidad_cases",
-    "ayuda": "cuántos cases iguales se fabrican (multiplica cortes y materiales)"
+    "ayuda": "cuántos cases iguales se fabrican (multiplica cortes y materiales)",
+    "etiqueta": "Cantidad de cases"
    },
    {
     "nombre": "extremos_cubren",
-    "ayuda": "true: piso, techo y caras de las tapas van enteros y tapan el canto de las paredes"
+    "ayuda": "true: piso, techo y caras de las tapas van enteros y tapan el canto de las paredes",
+    "etiqueta": "Piso y techo tapan los cantos"
    },
    {
     "nombre": "manijas_en",
-    "ayuda": "\"auto\" (laterales en vertical, frente y trasera en horizontal), \"laterales\", \"frente\""
+    "ayuda": "\"auto\" (laterales en vertical, frente y trasera en horizontal), \"laterales\", \"frente\"",
+    "etiqueta": "Manijas en"
    },
    {
     "nombre": "piezas_extra",
-    "ayuda": "piezas adicionales que no son parte de la caja (bases, separadores, refuerzos): [[nombre, ancho, alto, espesor, cantidad, material], ...]"
+    "ayuda": "piezas adicionales que no son parte de la caja (bases, separadores, refuerzos): [[nombre, ancho, alto, espesor, cantidad, material], ...]",
+    "etiqueta": "Piezas extra"
    }
   ]
  },
@@ -86,11 +104,13 @@
   "parametros": [
    {
     "nombre": "placa_esp",
-    "ayuda": "espesor del multilaminado / fenólico"
+    "ayuda": "espesor del multilaminado / fenólico",
+    "etiqueta": "Espesor de la placa"
    },
    {
     "nombre": "placa_material",
-    "ayuda": ""
+    "ayuda": "",
+    "etiqueta": "Material de la placa"
    }
   ]
  },
@@ -99,23 +119,28 @@
   "parametros": [
    {
     "nombre": "sistema",
-    "ayuda": "\"angulo\": ángulo de aluminio remachado por fuera; el frente y la trasera van de punta a punta, los laterales entre ellos, el piso y el techo quedan adentro de las paredes. \"hibrido\": perfil híbrido de canal; ningún panel toca a otro, todos se retiran 'hibrido_descuento' desde la arista exterior."
+    "ayuda": "\"angulo\": ángulo de aluminio remachado por fuera; el frente y la trasera van de punta a punta, los laterales entre ellos, el piso y el techo quedan adentro de las paredes. \"hibrido\": perfil híbrido de canal; ningún panel toca a otro, todos se retiran 'hibrido_descuento' desde la arista exterior.",
+    "etiqueta": "Sistema de armado"
    },
    {
     "nombre": "angulo_ala",
-    "ayuda": "ala del ángulo de aluminio"
+    "ayuda": "ala del ángulo de aluminio",
+    "etiqueta": "Ala del ángulo"
    },
    {
     "nombre": "angulo_esp",
-    "ayuda": "espesor del ángulo"
+    "ayuda": "espesor del ángulo",
+    "etiqueta": "Espesor del ángulo"
    },
    {
     "nombre": "hibrido_descuento",
-    "ayuda": "retiro del borde del panel respecto de la arista"
+    "ayuda": "retiro del borde del panel respecto de la arista",
+    "etiqueta": "Retiro del perfil híbrido"
    },
    {
     "nombre": "hibrido_pared",
-    "ayuda": "pared del perfil por fuera del panel"
+    "ayuda": "pared del perfil por fuera del panel",
+    "etiqueta": "Pared del perfil híbrido"
    }
   ]
  },
@@ -124,11 +149,13 @@
   "parametros": [
    {
     "nombre": "esq_pata",
-    "ayuda": "largo de pata del esquinero bola"
+    "ayuda": "largo de pata del esquinero bola",
+    "etiqueta": "Pata del esquinero"
    },
    {
     "nombre": "esq_descuento",
-    "ayuda": "cuánto se acorta CADA extremo del perfil que llega a un esquinero"
+    "ayuda": "cuánto se acorta CADA extremo del perfil que llega a un esquinero",
+    "etiqueta": "Descuento del perfil en el esquinero"
    }
   ]
  },
@@ -137,27 +164,33 @@
   "parametros": [
    {
     "nombre": "cierre_m_alto",
-    "ayuda": "alto del macho, desde su borde inferior hasta el plano de cierre"
+    "ayuda": "alto del macho, desde su borde inferior hasta el plano de cierre",
+    "etiqueta": "Alto del macho"
    },
    {
     "nombre": "cierre_m_sup",
-    "ayuda": "parte del macho que sobresale por encima del panel"
+    "ayuda": "parte del macho que sobresale por encima del panel",
+    "etiqueta": "Macho sobre el panel"
    },
    {
     "nombre": "cierre_h_alto",
-    "ayuda": "alto de la hembra, desde el plano de cierre hasta su borde superior"
+    "ayuda": "alto de la hembra, desde el plano de cierre hasta su borde superior",
+    "etiqueta": "Alto de la hembra"
    },
    {
     "nombre": "cierre_h_sup",
-    "ayuda": "parte de la hembra que sobresale por debajo del panel"
+    "ayuda": "parte de la hembra que sobresale por debajo del panel",
+    "etiqueta": "Hembra bajo el panel"
    },
    {
     "nombre": "cierre_saliente",
-    "ayuda": "cuánto sobresale el perfil de la cara exterior del panel"
+    "ayuda": "cuánto sobresale el perfil de la cara exterior del panel",
+    "etiqueta": "Saliente del perfil de cierre"
    },
    {
     "nombre": "cierre_hibrido",
-    "ayuda": "true: el mismo perfil de cierre en cuerpo y tapa (hermafrodita); usa las medidas del macho"
+    "ayuda": "true: el mismo perfil de cierre en cuerpo y tapa (hermafrodita); usa las medidas del macho",
+    "etiqueta": "Perfil de cierre hermafrodita"
    }
   ]
  },
@@ -166,35 +199,43 @@
   "parametros": [
    {
     "nombre": "manijas",
-    "ayuda": ""
+    "ayuda": "",
+    "etiqueta": "Manijas"
    },
    {
     "nombre": "manija_corte_ancho",
-    "ayuda": ""
+    "ayuda": "",
+    "etiqueta": "Ancho del calado de la manija"
    },
    {
     "nombre": "manija_corte_alto",
-    "ayuda": ""
+    "ayuda": "",
+    "etiqueta": "Alto del calado de la manija"
    },
    {
     "nombre": "manija_corte_radio",
-    "ayuda": ""
+    "ayuda": "",
+    "etiqueta": "Radio del calado de la manija"
    },
    {
     "nombre": "manija_centro_desde_arriba",
-    "ayuda": "del borde superior del panel al centro del calado"
+    "ayuda": "del borde superior del panel al centro del calado",
+    "etiqueta": "Centro de la manija desde arriba"
    },
    {
     "nombre": "manijas_n",
-    "ayuda": "manijas por pared (1 o 2, una al lado de la otra)"
+    "ayuda": "manijas por pared (1 o 2, una al lado de la otra)",
+    "etiqueta": "Manijas por pared"
    },
    {
     "nombre": "manija_sep",
-    "ayuda": "distancia entre centros con 2 manijas (0 = automática)"
+    "ayuda": "distancia entre centros con 2 manijas (0 = automática)",
+    "etiqueta": "Separación entre manijas"
    },
    {
     "nombre": "manija_pos",
-    "ayuda": "case acostado o frontal: posición a lo alto de la pared (0 = abajo, 1 = arriba)"
+    "ayuda": "case acostado o frontal: posición a lo alto de la pared (0 = abajo, 1 = arriba)",
+    "etiqueta": "Altura de la manija (0 a 1)"
    }
   ]
  },
@@ -203,19 +244,23 @@
   "parametros": [
    {
     "nombre": "cierre_margen",
-    "ayuda": "distancia del borde del case al primer cierre"
+    "ayuda": "distancia del borde del case al primer cierre",
+    "etiqueta": "Margen del primer cierre"
    },
    {
     "nombre": "cierres_laterales",
-    "ayuda": "\"auto\" (si la profundidad > 450), \"si\", \"no\""
+    "ayuda": "\"auto\" (si la profundidad > 450), \"si\", \"no\"",
+    "etiqueta": "Cierres en los laterales"
    },
    {
     "nombre": "cierres_frente_n",
-    "ayuda": "cierres por plano en frente/trasera (0 = automático según el largo, -1 = sin cierres: solo laterales)"
+    "ayuda": "cierres por plano en frente/trasera (0 = automático según el largo, -1 = sin cierres: solo laterales)",
+    "etiqueta": "Cierres en frente y trasera"
    },
    {
     "nombre": "cierres_lateral_n",
-    "ayuda": "cierres por plano en cada lateral (0 = automático)"
+    "ayuda": "cierres por plano en cada lateral (0 = automático)",
+    "etiqueta": "Cierres en cada lateral"
    }
   ]
  },
@@ -224,47 +269,58 @@
   "parametros": [
    {
     "nombre": "ruedas",
-    "ayuda": "0 = sin ruedas, 4 = una en cada esquina"
+    "ayuda": "0 = sin ruedas, 4 = una en cada esquina",
+    "etiqueta": "Ruedas"
    },
    {
     "nombre": "rueda_diametro",
-    "ayuda": "diámetro de la rueda"
+    "ayuda": "diámetro de la rueda",
+    "etiqueta": "Diámetro de la rueda"
    },
    {
     "nombre": "rueda_alto",
-    "ayuda": "alto total de la rueda, de la placa al piso"
+    "ayuda": "alto total de la rueda, de la placa al piso",
+    "etiqueta": "Alto de la rueda"
    },
    {
     "nombre": "rueda_frenos",
-    "ayuda": "cuántas de las 4 llevan freno"
+    "ayuda": "cuántas de las 4 llevan freno",
+    "etiqueta": "Ruedas con freno"
    },
    {
     "nombre": "rueda_placa",
-    "ayuda": "placa de montaje (largo, ancho)"
+    "ayuda": "placa de montaje (largo, ancho)",
+    "etiqueta": "Placa de la rueda (largo, ancho)"
    },
    {
     "nombre": "rueda_agujeros",
-    "ayuda": "distancia entre centros de los agujeros de la placa"
+    "ayuda": "distancia entre centros de los agujeros de la placa",
+    "etiqueta": "Distancia entre agujeros de la placa"
    },
    {
     "nombre": "rueda_agujero_d",
-    "ayuda": "diámetro de perforación en el piso (0 = no perforar en el DXF)"
+    "ayuda": "diámetro de perforación en el piso (0 = no perforar en el DXF)",
+    "etiqueta": "Diámetro de perforación de la rueda"
    },
    {
     "nombre": "rueda_margen",
-    "ayuda": "separación extra respecto del esquinero"
+    "ayuda": "separación extra respecto del esquinero",
+    "etiqueta": "Separación de la rueda al esquinero"
    },
    {
     "nombre": "base_ruedas",
-    "ayuda": "Base de ruedas: placa exterior más gruesa (p. ej. fenólico 18) atornillada bajo el piso; las ruedas se montan en ella. [medida a lo ancho del plano del piso, a lo alto del plano, espesor] ej. [530, 750, 18]; vacío = las ruedas van directo al piso"
+    "ayuda": "Base de ruedas: placa exterior más gruesa (p. ej. fenólico 18) atornillada bajo el piso; las ruedas se montan en ella. [medida a lo ancho del plano del piso, a lo alto del plano, espesor] ej. [530, 750, 18]; vacío = las ruedas van directo al piso",
+    "etiqueta": "Base de ruedas"
    },
    {
     "nombre": "base_material",
-    "ayuda": ""
+    "ayuda": "",
+    "etiqueta": "Material de la base de ruedas"
    },
    {
     "nombre": "base_pasantes",
-    "ayuda": "los bulones de las ruedas atraviesan también el piso del case"
+    "ayuda": "los bulones de las ruedas atraviesan también el piso del case",
+    "etiqueta": "Bulones pasantes al piso"
    }
   ]
  },
@@ -273,15 +329,18 @@
   "parametros": [
    {
     "nombre": "bandejas",
-    "ayuda": "[[ancho, fondo, altura, espesor (opcional), material (opcional)], ...] ancho: de costado a costado; fondo: en profundidad; altura: de la cara de arriba de la bandeja al piso interior. Se centran en el cuerpo y se fijan con escuadras a los costados."
+    "ayuda": "[[ancho, fondo, altura, espesor (opcional), material (opcional)], ...] ancho: de costado a costado; fondo: en profundidad; altura: de la cara de arriba de la bandeja al piso interior. Se centran en el cuerpo y se fijan con escuadras a los costados.",
+    "etiqueta": "Bandejas"
    },
    {
     "nombre": "bandeja_soportes",
-    "ayuda": "escuadras por bandeja"
+    "ayuda": "escuadras por bandeja",
+    "etiqueta": "Escuadras por bandeja"
    },
    {
     "nombre": "ref_escuadra",
-    "ayuda": "ej. \"08-40403\" (escuadra 40x34 del catálogo FR)"
+    "ayuda": "ej. \"08-40403\" (escuadra 40x34 del catálogo FR)",
+    "etiqueta": "Escuadra de bandeja (catálogo)"
    }
   ]
  },
@@ -290,55 +349,68 @@
   "parametros": [
    {
     "nombre": "equipos",
-    "ayuda": "Lo que va adentro del case: [[nombre, ancho, fondo, alto, peso kg, x, y, z], ...]. x desde el costado izquierdo, y desde el frente del cuerpo, z desde el piso interior (todo en mm, adentro del forro de espuma si hay). Sin x o y (o \"c\") el equipo va centrado. Se usa para los calados de la espuma y para controlar que todo entre sin chocar. Forma del calado en la espuma (columnas del final, opcionales): vacío o «rect» = rectángulo, «redondo» = redondo u ovalado (para micrófonos, tachos, focos), o la ruta de un dibujo .dxf o .svg con el contorno del equipo, que se encaja en su ancho y fondo. Radio = esquinas redondeadas del calado (vacío = espuma_radio). Dedos = huecos para meter los dedos y sacar el equipo: 0, 1 (del lado de adelante) o 2 (en los dos lados largos)."
+    "ayuda": "Lo que va adentro del case: [[nombre, ancho, fondo, alto, peso kg, x, y, z], ...]. x desde el costado izquierdo, y desde el frente del cuerpo, z desde el piso interior (todo en mm, adentro del forro de espuma si hay). Sin x o y (o \"c\") el equipo va centrado. Se usa para los calados de la espuma y para controlar que todo entre sin chocar. Forma del calado en la espuma (columnas del final, opcionales): vacío o «rect» = rectángulo, «redondo» = redondo u ovalado (para micrófonos, tachos, focos), o la ruta de un dibujo .dxf o .svg con el contorno del equipo, que se encaja en su ancho y fondo. Radio = esquinas redondeadas del calado (vacío = espuma_radio). Dedos = huecos para meter los dedos y sacar el equipo: 0, 1 (del lado de adelante) o 2 (en los dos lados largos).",
+    "etiqueta": "Equipos"
    },
    {
     "nombre": "espumas",
-    "ayuda": "Bloques de espuma con calados para los equipos: [[ancho, fondo, alto, x, y, z], ...]. Una medida en 0 llega hasta el borde del cuerpo; sin x o y el bloque va centrado, y sin z apoya en el piso (en un case frontal, sin y va contra el fondo del cuerpo). Cada equipo que cae dentro del bloque lleva su calado (más la holgura) desde la cara abierta hasta el fondo del equipo. El bloque se corta en capas de espuma_plancha y cada capa sale en su DXF."
+    "ayuda": "Bloques de espuma con calados para los equipos: [[ancho, fondo, alto, x, y, z], ...]. Una medida en 0 llega hasta el borde del cuerpo; sin x o y el bloque va centrado, y sin z apoya en el piso (en un case frontal, sin y va contra el fondo del cuerpo). Cada equipo que cae dentro del bloque lleva su calado (más la holgura) desde la cara abierta hasta el fondo del equipo. El bloque se corta en capas de espuma_plancha y cada capa sale en su DXF.",
+    "etiqueta": "Bloques de espuma"
    },
    {
     "nombre": "espuma_plancha",
-    "ayuda": "espesor de las planchas de espuma con que se arman los bloques (mm)"
+    "ayuda": "espesor de las planchas de espuma con que se arman los bloques (mm)",
+    "etiqueta": "Espesor de la plancha de espuma"
    },
    {
     "nombre": "espuma_holgura",
-    "ayuda": "juego del calado alrededor del equipo, por lado (mm)"
+    "ayuda": "juego del calado alrededor del equipo, por lado (mm)",
+    "etiqueta": "Holgura del calado"
    },
    {
     "nombre": "espuma_pared_min",
-    "ayuda": "espuma mínima entre calados y hasta el borde del bloque (mm)"
+    "ayuda": "espuma mínima entre calados y hasta el borde del bloque (mm)",
+    "etiqueta": "Pared mínima de espuma"
    },
    {
     "nombre": "espuma_fondo_min",
-    "ayuda": "espuma mínima bajo cada equipo (mm)"
+    "ayuda": "espuma mínima bajo cada equipo (mm)",
+    "etiqueta": "Fondo mínimo de espuma"
    },
    {
     "nombre": "espuma_radio",
-    "ayuda": "radio de las esquinas de los calados (normalmente el de la fresa). 0 = esquinas vivas"
+    "ayuda": "radio de las esquinas de los calados (normalmente el de la fresa). 0 = esquinas vivas",
+    "etiqueta": "Radio de las esquinas del calado"
    },
    {
     "nombre": "espuma_dedo_ancho",
-    "ayuda": "ancho de los huecos para los dedos"
+    "ayuda": "ancho de los huecos para los dedos",
+    "etiqueta": "Ancho del hueco para los dedos"
    },
    {
     "nombre": "espuma_dedo_largo",
-    "ayuda": "cuánto entra el hueco para los dedos en la espuma, desde el borde del calado"
+    "ayuda": "cuánto entra el hueco para los dedos en la espuma, desde el borde del calado",
+    "etiqueta": "Largo del hueco para los dedos"
    },
    {
     "nombre": "espuma_densidad",
-    "ayuda": "densidad de la espuma de los bloques (kg/m³), para el peso"
+    "ayuda": "densidad de la espuma de los bloques (kg/m³), para el peso",
+    "etiqueta": "Densidad de la espuma"
    },
    {
     "nombre": "espuma_material",
-    "ayuda": "nombre de la espuma de los bloques en la lista de materiales"
+    "ayuda": "nombre de la espuma de los bloques en la lista de materiales",
+    "etiqueta": "Material de la espuma"
    },
    {
     "nombre": "espuma_plancha_medidas",
-    "ayuda": "medidas de la plancha que se compra [largo, ancho] (mm)"
+    "ayuda": "medidas de la plancha que se compra [largo, ancho] (mm)",
+    "etiqueta": "Medidas de la plancha de espuma"
    },
    {
     "nombre": "ref_espuma_bloques",
-    "ayuda": "referencia del catálogo para la espuma de los bloques (ej. \"08-019330\" plastazote 30 mm): reemplaza material y espesor de plancha"
+    "ayuda": "referencia del catálogo para la espuma de los bloques (ej. \"08-019330\" plastazote 30 mm): reemplaza material y espesor de plancha",
+    "etiqueta": "Espuma de los bloques (catálogo)"
    }
   ]
  },
@@ -347,43 +419,53 @@
   "parametros": [
    {
     "nombre": "cajones",
-    "ayuda": "Cajones con correderas telescópicas, para cases frontales: [[alto del frente, altura desde el piso, ancho, largo de corredera], ...]. Ancho 0 o vacío = todo el ancho interior; largo 0 o vacío = la corredera más larga que entra. Cada cajón agrega frente, 2 laterales, trasera y piso a la lista de cortes."
+    "ayuda": "Cajones con correderas telescópicas, para cases frontales: [[alto del frente, altura desde el piso, ancho, largo de corredera], ...]. Ancho 0 o vacío = todo el ancho interior; largo 0 o vacío = la corredera más larga que entra. Cada cajón agrega frente, 2 laterales, trasera y piso a la lista de cortes.",
+    "etiqueta": "Cajones"
    },
    {
     "nombre": "cajon_esp",
-    "ayuda": "espesor de la placa de los cajones (mm)"
+    "ayuda": "espesor de la placa de los cajones (mm)",
+    "etiqueta": "Espesor de la placa del cajón"
    },
    {
     "nombre": "cajon_material",
-    "ayuda": "material de los cajones (vacío = \"Placa <espesor> mm\")"
+    "ayuda": "material de los cajones (vacío = \"Placa <espesor> mm\")",
+    "etiqueta": "Material del cajón"
    },
    {
     "nombre": "cajon_holgura",
-    "ayuda": "luz alrededor del frente del cajón (mm)"
+    "ayuda": "luz alrededor del frente del cajón (mm)",
+    "etiqueta": "Luz alrededor del frente"
    },
    {
     "nombre": "cajon_desc_alto",
-    "ayuda": "cuánto más baja que el frente es la caja del cajón (mm)"
+    "ayuda": "cuánto más baja que el frente es la caja del cajón (mm)",
+    "etiqueta": "Diferencia de alto caja / frente"
    },
    {
     "nombre": "cajon_retiro",
-    "ayuda": "distancia del plano de cierre al frente del cajón (mm)"
+    "ayuda": "distancia del plano de cierre al frente del cajón (mm)",
+    "etiqueta": "Retiro del frente del cajón"
    },
    {
     "nombre": "corredera_esp",
-    "ayuda": "espacio que ocupa cada corredera a cada lado (mm, 12,7 la estándar)"
+    "ayuda": "espacio que ocupa cada corredera a cada lado (mm, 12,7 la estándar)",
+    "etiqueta": "Espacio de la corredera"
    },
    {
     "nombre": "corredera_largos",
-    "ayuda": "largos de corredera que se consiguen (mm)"
+    "ayuda": "largos de corredera que se consiguen (mm)",
+    "etiqueta": "Largos de corredera disponibles"
    },
    {
     "nombre": "ref_corredera",
-    "ayuda": "referencia del catálogo de la corredera (vacío = genérica)"
+    "ayuda": "referencia del catálogo de la corredera (vacío = genérica)",
+    "etiqueta": "Corredera (catálogo)"
    },
    {
     "nombre": "densidad_placa",
-    "ayuda": "densidad de la placa (kg/m³), para el peso de cajones"
+    "ayuda": "densidad de la placa (kg/m³), para el peso de cajones",
+    "etiqueta": "Densidad de la placa"
    }
   ]
  },
@@ -392,47 +474,58 @@
   "parametros": [
    {
     "nombre": "rack_u",
-    "ayuda": "unidades de rack (1 U = 44,45 mm). 0 = sin rack. En un case frontal los rieles van verticales y los equipos entran de frente; en uno vertical van a lo largo y los equipos entran desde arriba."
+    "ayuda": "unidades de rack (1 U = 44,45 mm). 0 = sin rack. En un case frontal los rieles van verticales y los equipos entran de frente; en uno vertical van a lo largo y los equipos entran desde arriba.",
+    "etiqueta": "Unidades de rack (U)"
    },
    {
     "nombre": "rack_equipos",
-    "ayuda": "Equipos de 19\": [[nombre, U, fondo, peso kg, desde U, sobresale adelante], ...]. Sin \"desde U\" se apilan desde la U1 (abajo en un frontal, adelante en un vertical). Se controla que entren de fondo con lugar para los cables, que no se pisen y que lo que sobresale entre en la tapa. Las unidades libres se tapan con carátulas ciegas."
+    "ayuda": "Equipos de 19\": [[nombre, U, fondo, peso kg, desde U, sobresale adelante], ...]. Sin \"desde U\" se apilan desde la U1 (abajo en un frontal, adelante en un vertical). Se controla que entren de fondo con lugar para los cables, que no se pisen y que lo que sobresale entre en la tapa. Las unidades libres se tapan con carátulas ciegas.",
+    "etiqueta": "Equipos de rack"
    },
    {
     "nombre": "rack_desde",
-    "ayuda": "posición del comienzo de los rieles desde el piso (frontal) o el frente (vertical), en mm. -1 = centrados"
+    "ayuda": "posición del comienzo de los rieles desde el piso (frontal) o el frente (vertical), en mm. -1 = centrados",
+    "etiqueta": "Comienzo de los rieles"
    },
    {
     "nombre": "rack_retiro",
-    "ayuda": "distancia del plano de cierre a la cara de los rieles (mm): deja lugar para perillas y manijas"
+    "ayuda": "distancia del plano de cierre a la cara de los rieles (mm): deja lugar para perillas y manijas",
+    "etiqueta": "Retiro de los rieles"
    },
    {
     "nombre": "rack_cables",
-    "ayuda": "lugar detrás de cada equipo para conectores y cables (mm)"
+    "ayuda": "lugar detrás de cada equipo para conectores y cables (mm)",
+    "etiqueta": "Lugar para cables"
    },
    {
     "nombre": "rack_traseros",
-    "ayuda": "rieles traseros para sostener equipos pesados o largos"
+    "ayuda": "rieles traseros para sostener equipos pesados o largos",
+    "etiqueta": "Rieles traseros"
    },
    {
     "nombre": "rack_dist_traseros",
-    "ayuda": "distancia entre la cara de los rieles delanteros y la de los traseros (mm, 0 = lo más atrás que entre)"
+    "ayuda": "distancia entre la cara de los rieles delanteros y la de los traseros (mm, 0 = lo más atrás que entre)",
+    "etiqueta": "Distancia a los rieles traseros"
    },
    {
     "nombre": "riel_ala",
-    "ayuda": "ancho del ala del riel donde apoyan las orejas (mm). Si el interior es más ancho que el riel, se calcula el suplemento para cada costado."
+    "ayuda": "ancho del ala del riel donde apoyan las orejas (mm). Si el interior es más ancho que el riel, se calcula el suplemento para cada costado.",
+    "etiqueta": "Ala del riel (orejas)"
    },
    {
     "nombre": "riel_fondo",
-    "ayuda": "ala del riel que va atornillada al costado (mm)"
+    "ayuda": "ala del riel que va atornillada al costado (mm)",
+    "etiqueta": "Ala del riel al costado"
    },
    {
     "nombre": "riel_esp",
-    "ayuda": "espesor del riel (mm): elige la tuerca enjaulada"
+    "ayuda": "espesor del riel (mm): elige la tuerca enjaulada",
+    "etiqueta": "Espesor del riel"
    },
    {
     "nombre": "ref_riel",
-    "ayuda": "referencia del perfil de rack del catálogo (barra de 45 U)"
+    "ayuda": "referencia del perfil de rack del catálogo (barra de 45 U)",
+    "etiqueta": "Perfil de rack (catálogo)"
    }
   ]
  },
@@ -441,27 +534,33 @@
   "parametros": [
    {
     "nombre": "encastres",
-    "ayuda": "Platos embutidos en el techo, alineados con las ruedas, para que otro case igual apoye sus ruedas encima sin desplazarse."
+    "ayuda": "Platos embutidos en el techo, alineados con las ruedas, para que otro case igual apoye sus ruedas encima sin desplazarse.",
+    "etiqueta": "Platos de apilado"
    },
    {
     "nombre": "encastre_corte",
-    "ayuda": "calado en el techo (lo indica el fabricante del plato)"
+    "ayuda": "calado en el techo (lo indica el fabricante del plato)",
+    "etiqueta": "Calado del plato"
    },
    {
     "nombre": "encastre_radio",
-    "ayuda": "radio de las esquinas del calado"
+    "ayuda": "radio de las esquinas del calado",
+    "etiqueta": "Radio del calado del plato"
    },
    {
     "nombre": "encastre_ala",
-    "ayuda": "reborde del plato por fuera del calado"
+    "ayuda": "reborde del plato por fuera del calado",
+    "etiqueta": "Reborde del plato"
    },
    {
     "nombre": "encastre_profundidad",
-    "ayuda": "cuánto se mete el plato dentro de la tapa"
+    "ayuda": "cuánto se mete el plato dentro de la tapa",
+    "etiqueta": "Profundidad del plato"
    },
    {
     "nombre": "encastre_remaches",
-    "ayuda": "remaches por plato"
+    "ayuda": "remaches por plato",
+    "etiqueta": "Remaches por plato"
    }
   ]
  },
@@ -470,35 +569,43 @@
   "parametros": [
    {
     "nombre": "barra_largo",
-    "ayuda": "largo de barra de perfil"
+    "ayuda": "largo de barra de perfil",
+    "etiqueta": "Largo de barra de perfil"
    },
    {
     "nombre": "sierra_kerf",
-    "ayuda": "pérdida por corte de sierra (perfiles)"
+    "ayuda": "pérdida por corte de sierra (perfiles)",
+    "etiqueta": "Corte de sierra (perfiles)"
    },
    {
     "nombre": "placa_largo",
-    "ayuda": ""
+    "ayuda": "",
+    "etiqueta": "Largo de la placa entera"
    },
    {
     "nombre": "placa_ancho",
-    "ayuda": ""
+    "ayuda": "",
+    "etiqueta": "Ancho de la placa entera"
    },
    {
     "nombre": "placa_kerf",
-    "ayuda": "pérdida por corte en placa (sierra o fresa)"
+    "ayuda": "pérdida por corte en placa (sierra o fresa)",
+    "etiqueta": "Corte de sierra (placa)"
    },
    {
     "nombre": "placa_margen",
-    "ayuda": "margen perimetral de la placa (bordes dañados)"
+    "ayuda": "margen perimetral de la placa (bordes dañados)",
+    "etiqueta": "Margen de la placa"
    },
    {
     "nombre": "remache_paso",
-    "ayuda": "separación de remaches en perfiles"
+    "ayuda": "separación de remaches en perfiles",
+    "etiqueta": "Separación de remaches"
    },
    {
     "nombre": "remache_d",
-    "ayuda": "diámetro del remache pop"
+    "ayuda": "diámetro del remache pop",
+    "etiqueta": "Diámetro del remache"
    }
   ]
  },
@@ -507,55 +614,68 @@
   "parametros": [
    {
     "nombre": "ref_placa",
-    "ayuda": "Elegí el artículo de la lista (escribí parte del nombre o del número para buscar) y sus medidas reemplazan a los parámetros de arriba. Vacío = usar los parámetros. Los marcados con * tienen medidas estimadas: verificalas con la pieza. ej. \"05-001\" tablero abedul 9,6 mm"
+    "ayuda": "Elegí el artículo de la lista (escribí parte del nombre o del número para buscar) y sus medidas reemplazan a los parámetros de arriba. Vacío = usar los parámetros. Los marcados con * tienen medidas estimadas: verificalas con la pieza. ej. \"05-001\" tablero abedul 9,6 mm",
+    "etiqueta": "Placa (catálogo)"
    },
    {
     "nombre": "ref_angulo",
-    "ayuda": "ej. \"08-6105\" ángulo 30x30"
+    "ayuda": "ej. \"08-6105\" ángulo 30x30",
+    "etiqueta": "Ángulo (catálogo)"
    },
    {
     "nombre": "ref_hibrido",
-    "ayuda": "ej. \"08-6203\" híbrido 10 mm"
+    "ayuda": "ej. \"08-6203\" híbrido 10 mm",
+    "etiqueta": "Perfil híbrido (catálogo)"
    },
    {
     "nombre": "ref_cierre_macho",
-    "ayuda": "ej. \"08-Q6502M\""
+    "ayuda": "ej. \"08-Q6502M\"",
+    "etiqueta": "Perfil de cierre macho (catálogo)"
    },
    {
     "nombre": "ref_cierre_hembra",
-    "ayuda": "ej. \"08-Q6502F\""
+    "ayuda": "ej. \"08-Q6502F\"",
+    "etiqueta": "Perfil de cierre hembra (catálogo)"
    },
    {
     "nombre": "ref_esquinero",
-    "ayuda": "ej. \"08-41076\" bola grande paso 30"
+    "ayuda": "ej. \"08-41076\" bola grande paso 30",
+    "etiqueta": "Esquinero (catálogo)"
    },
    {
     "nombre": "ref_cierre",
-    "ayuda": "ej. \"08-17250S\" mariposa grande embutido"
+    "ayuda": "ej. \"08-17250S\" mariposa grande embutido",
+    "etiqueta": "Cierre (catálogo)"
    },
    {
     "nombre": "ref_manija",
-    "ayuda": "ej. \"08-34082\" asa retráctil mediana"
+    "ayuda": "ej. \"08-34082\" asa retráctil mediana",
+    "etiqueta": "Manija (catálogo)"
    },
    {
     "nombre": "ref_rueda",
-    "ayuda": "ej. \"08-372151\" rueda 100 mm sin freno"
+    "ayuda": "ej. \"08-372151\" rueda 100 mm sin freno",
+    "etiqueta": "Rueda sin freno (catálogo)"
    },
    {
     "nombre": "ref_rueda_freno",
-    "ayuda": "ej. \"08-372191\" rueda 100 mm con freno"
+    "ayuda": "ej. \"08-372191\" rueda 100 mm con freno",
+    "etiqueta": "Rueda con freno (catálogo)"
    },
    {
     "nombre": "ref_plato",
-    "ayuda": "ej. \"08-38083\" base empotrable (plato de apilado)"
+    "ayuda": "ej. \"08-38083\" base empotrable (plato de apilado)",
+    "etiqueta": "Plato de apilado (catálogo)"
    },
    {
     "nombre": "ref_remache",
-    "ayuda": "vacío = el más corto que alcance, según placa y perfil"
+    "ayuda": "vacío = el más corto que alcance, según placa y perfil",
+    "etiqueta": "Remache (catálogo)"
    },
    {
     "nombre": "usar_catalogo_remaches",
-    "ayuda": ""
+    "ayuda": "",
+    "etiqueta": "Remaches del catálogo"
    }
   ]
  },
@@ -564,79 +684,98 @@
   "parametros": [
    {
     "nombre": "pies",
-    "ayuda": "0 o 4 pies en el piso (en lugar de ruedas)"
+    "ayuda": "0 o 4 pies en el piso (en lugar de ruedas)",
+    "etiqueta": "Pies"
    },
    {
     "nombre": "ref_pie",
-    "ayuda": "ej. \"08-4907\" pie de goma 38x15"
+    "ayuda": "ej. \"08-4907\" pie de goma 38x15",
+    "etiqueta": "Pie (catálogo)"
    },
    {
     "nombre": "pie_diametro",
-    "ayuda": ""
+    "ayuda": "",
+    "etiqueta": "Diámetro del pie"
    },
    {
     "nombre": "pie_alto",
-    "ayuda": ""
+    "ayuda": "",
+    "etiqueta": "Alto del pie"
    },
    {
     "nombre": "bisagras",
-    "ayuda": "0 = tapa suelta; 2 o 3 = tapa abisagrada atrás (1 con bisagra de piano)"
+    "ayuda": "0 = tapa suelta; 2 o 3 = tapa abisagrada atrás (1 con bisagra de piano)",
+    "etiqueta": "Bisagras"
    },
    {
     "nombre": "ref_bisagra",
-    "ayuda": "ej. \"08-2251\" desmontable, \"08-2605\" piano"
+    "ayuda": "ej. \"08-2251\" desmontable, \"08-2605\" piano",
+    "etiqueta": "Bisagra (catálogo)"
    },
    {
     "nombre": "topes",
-    "ayuda": "topes que sostienen la tapa abierta"
+    "ayuda": "topes que sostienen la tapa abierta",
+    "etiqueta": "Topes de tapa"
    },
    {
     "nombre": "refuerzos",
-    "ayuda": "Refuerzos de esquina en L en las juntas de cierre, sobre el ángulo y junto al perfil de cierre. por esquina de junta: 0 = sin, 1 = solo en el cuerpo, 2 = en el cuerpo y en la tapa"
+    "ayuda": "Refuerzos de esquina en L en las juntas de cierre, sobre el ángulo y junto al perfil de cierre. por esquina de junta: 0 = sin, 1 = solo en el cuerpo, 2 = en el cuerpo y en la tapa",
+    "etiqueta": "Refuerzos de esquina"
    },
    {
     "nombre": "refuerzo_nombre",
-    "ayuda": ""
+    "ayuda": "",
+    "etiqueta": "Nombre del refuerzo"
    },
    {
     "nombre": "refuerzo_ala",
-    "ayuda": "largo de cada ala desde la arista"
+    "ayuda": "largo de cada ala desde la arista",
+    "etiqueta": "Ala del refuerzo"
    },
    {
     "nombre": "refuerzo_alto",
-    "ayuda": "alto del refuerzo (en el sentido de la arista)"
+    "ayuda": "alto del refuerzo (en el sentido de la arista)",
+    "etiqueta": "Alto del refuerzo"
    },
    {
     "nombre": "refuerzo_remaches",
-    "ayuda": "remaches por refuerzo"
+    "ayuda": "remaches por refuerzo",
+    "etiqueta": "Remaches por refuerzo"
    },
    {
     "nombre": "refuerzo_esp",
-    "ayuda": "espesor del refuerzo: profundidad del rebaje en la base de ruedas"
+    "ayuda": "espesor del refuerzo: profundidad del rebaje en la base de ruedas",
+    "etiqueta": "Espesor del refuerzo"
    },
    {
     "nombre": "rebaje_refuerzos",
-    "ayuda": "case frontal o acostado con base de ruedas: rebaja la base donde apoya sobre los refuerzos de abajo"
+    "ayuda": "case frontal o acostado con base de ruedas: rebaja la base donde apoya sobre los refuerzos de abajo",
+    "etiqueta": "Rebaje para refuerzos"
    },
    {
     "nombre": "rebaje_holgura",
-    "ayuda": "holgura del rebaje alrededor del refuerzo"
+    "ayuda": "holgura del rebaje alrededor del refuerzo",
+    "etiqueta": "Holgura del rebaje"
    },
    {
     "nombre": "ref_tope",
-    "ayuda": "ej. \"08-2709\""
+    "ayuda": "ej. \"08-2709\"",
+    "etiqueta": "Tope (catálogo)"
    },
    {
     "nombre": "espuma_esp",
-    "ayuda": "espuma interior (mm); las medidas interiores pasan a ser el espacio útil"
+    "ayuda": "espuma interior (mm); las medidas interiores pasan a ser el espacio útil",
+    "etiqueta": "Espesor de la espuma interior"
    },
    {
     "nombre": "ref_espuma",
-    "ayuda": "ej. \"08-019310\" plastazote 10 mm"
+    "ayuda": "ej. \"08-019310\" plastazote 10 mm",
+    "etiqueta": "Espuma interior (catálogo)"
    },
    {
     "nombre": "extras",
-    "ayuda": "Otros artículos del catálogo para la lista de compras (asas telescópicas, argollas, tornillos, carátulas de rack…): agregá una fila, elegí el artículo y poné la cantidad."
+    "ayuda": "Otros artículos del catálogo para la lista de compras (asas telescópicas, argollas, tornillos, carátulas de rack…): agregá una fila, elegí el artículo y poné la cantidad.",
+    "etiqueta": "Otros artículos"
    }
   ]
  }
