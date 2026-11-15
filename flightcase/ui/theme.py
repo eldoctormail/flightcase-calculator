@@ -37,6 +37,8 @@ COLORS = {
     "freno_fill": "#dc2626",
     "base_ruedas_edge": "#a16207",
     "base_ruedas_fill": "#5a3d22",
+    "remache_edge": "#e5e7eb",
+    "remache_fill": "#9ca3af",
     "plato_edge": "#94a3b8",
     "plato_fill": "#3a3a3a",
     "herraje_edge": "#cbd5e1",    # Herrajes del taller (esquineros, cierres, manijas)

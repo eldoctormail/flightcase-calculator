@@ -306,26 +306,31 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
                     k.caja(_sum(o, _mul(u, a0), _mul(vv, b0)), u, vv, n, aw, bh, prof, col_p,
                            ComponentLayer.BASE_ALU, "Plato")
             if c.tipo == "manija" and k.visible(P_MANIJAS):
-                k.caja(_sum(o, _mul(u, x0 - 10), _mul(vv, y0 - 10), _mul(fuera, 2)), u, vv, n,
-                       c.ancho + 20, c.alto + 20, 2, k.color(P_MANIJAS, "herraje"), ComponentLayer.BASE_ALU, "Manija")
+                _manija_embutida(k, o, u, vv, n, x0, y0, x1, y1, k.color(P_MANIJAS, "herraje"))
         for m in marcas.get(p.id, []):
             if m.tipo == "manija_sup" and k.visible(P_MANIJAS):
-                k.caja(_sum(o, _mul(u, m.x - m.ancho / 2), _mul(vv, m.y - 12), _mul(fuera, 12)), u, vv, n,
-                       m.ancho, 24, 12, k.color(P_MANIJAS, "herraje"), ComponentLayer.BASE_ALU, "Manija")
+                _manija_superficie(k, o, u, vv, n, m.x, m.y, m.ancho, k.color(P_MANIJAS, "herraje"))
             elif m.tipo == "cierre_acceso" and k.visible(P_CIERRES):
                 dx = 1 if m.texto == "+" else -1
                 lado = m.panel in ("cuerpo_izq", "cuerpo_der")
                 xs = (m.x - 35 * dx, m.x + 18 * dx) if lado else (m.x - 22 * dx, m.x + 14 * dx)
-                k.caja(_sum(o, _mul(u, min(xs)), _mul(vv, m.y - 25), _mul(fuera, 6 + s)), u, vv, n,
-                       abs(xs[1] - xs[0]), 50, 6, k.color(P_CIERRES, "cierre"), ComponentLayer.BASE_ALU, "Cierre")
+                # el mismo cierre mariposa, acostado (cruza la junta de la tapa de acceso a lo ancho)
+                if lado:
+                    _cierre_mariposa(k, o, vv, u, n, m.y, xs, s, k.color(P_CIERRES, "cierre"))
+                else:
+                    _gancho_cierre(k, o, vv, u, n, m.y, xs, s, k.color(P_CIERRES, "cierre"))
             elif m.tipo in ("cierre", "bisagra") and k.visible(P_CIERRES):
                 d = (1 if m.texto == "c1" else -1) if grupo == "cuerpo" else (-1 if grupo == "tapa" else 1)
                 a = 50 if m.tipo == "cierre" else 60
                 ys = ((m.y - 35 * d, m.y + (14 if m.tipo == "bisagra" else 18) * d) if grupo == "cuerpo"
                       else (m.y - 22 * d, m.y + 14 * d))
-                k.caja(_sum(o, _mul(u, m.x - a / 2), _mul(vv, min(ys)), _mul(fuera, 6 + s)), u, vv, n,
-                       a, abs(ys[1] - ys[0]), 6, k.color(P_CIERRES, "cierre"), ComponentLayer.BASE_ALU,
-                       "Bisagra" if m.tipo == "bisagra" else "Cierre")
+                col_c = k.color(P_CIERRES, "cierre")
+                if m.tipo == "bisagra":
+                    _bisagra(k, o, u, vv, n, m.x, ys, d, s, col_c)
+                elif grupo == "cuerpo":
+                    _cierre_mariposa(k, o, u, vv, n, m.x, ys, s, col_c)
+                else:
+                    _gancho_cierre(k, o, u, vv, n, m.x, ys, s, col_c)
             elif m.tipo == "rueda" and (geo["horizontal"] or geo["frontal"]) and not geo["base"] and k.visible(P_RUEDAS):
                 _rueda(k, geo, o, u, vv, fuera, m.x, m.y, m.texto == "freno", ex)
             elif m.tipo == "pie" and (geo["horizontal"] or geo["frontal"]) and k.visible(P_RUEDAS):
@@ -388,6 +393,12 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
         col = k.color(paso, "aluminio")
         k.caja(_sum(o, _mul(b, -ala)), a, b, c, e_ar, ala + e_ar, L, col, ComponentLayer.BASE_ALU, "Ángulo de arista")
         k.caja(_sum(o, _mul(a, -ala)), a, b, c, ala + e_ar, e_ar, L, col, ComponentLayer.BASE_ALU, "Ángulo de arista")
+        # remaches cada ~150 mm en las dos alas
+        n_r = max(2, int(L // 150) + 1)
+        for i in range(n_r):
+            zc_ = 25 + (L - 50) * i / max(n_r - 1, 1)
+            _remache(k, _sum(o, _mul(a, e_ar), _mul(b, -ala / 2), _mul(c, zc_)), a, b, c)
+            _remache(k, _sum(o, _mul(b, e_ar), _mul(a, -ala / 2), _mul(c, zc_)), b, a, c)
 
     def esquinero(o: Vec, a: Vec, b: Vec, c: Vec) -> None:
         if not k.visible(P_ESQ):
@@ -399,6 +410,10 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
         k.caja(_sum(o, _mul(a, -p_), _mul(c, -p_)), a, b, c, p_, e, p_, col, ComponentLayer.BASE_ALU, "Esquinero")
         k.caja(_sum(o, _mul(a, -p_), _mul(b, -p_)), a, b, c, p_, p_, e, col, ComponentLayer.BASE_ALU, "Esquinero")
         k.esfera(o, 12, col, ComponentLayer.BASE_ALU, "Esquinero")
+        for f1, f2 in ((0.35, 0.72), (0.72, 0.35)):     # dos remaches por ala
+            _remache(k, _sum(o, _mul(a, e), _mul(b, -p_ * f1), _mul(c, -p_ * f2)), a, b, c)
+            _remache(k, _sum(o, _mul(b, e), _mul(a, -p_ * f1), _mul(c, -p_ * f2)), b, a, c)
+            _remache(k, _sum(o, _mul(c, e), _mul(a, -p_ * f1), _mul(b, -p_ * f2)), c, a, b)
 
     if ver_fija or ver_cub:
         for z, sz in ((0.0, -1), (Z, 1)):
@@ -504,3 +519,85 @@ def _rueda(k: _Constructor, geo: dict, o: Vec, u: Vec, v: Vec, fuera: Vec, cx: f
     if freno:
         k.caja(L(r * 0.35 + r * 0.7, -6, alto - r * 1.4), u, v, fuera, 10, 12, 6, "freno",
                ComponentLayer.BASE_ALU, "Freno")
+
+
+# ---- herrajes con su forma (coordenadas del panel: u ancho, v alto, n hacia adentro) ----
+
+def _remache(k: _Constructor, centro: Vec, eje: Vec, a: Vec, b: Vec, r: float = 2.6) -> None:
+    """Cabeza de remache: disco bajo apoyado en `centro`, hacia `eje`."""
+    k.cilindro(_sum(centro, _mul(eje, 0.5)), eje, a, b, r, 1.0, "remache", ComponentLayer.BASE_ALU, "Remache", lados=8)
+
+
+def _cierre_mariposa(k: _Constructor, o: Vec, u: Vec, v: Vec, n: Vec, x: float, ys, s: float, col: str) -> None:
+    """Cierre mariposa embutido: placa con cazoleta y la mariposa encima."""
+    fuera = _mul(n, -1)
+    y0, y1 = min(ys), max(ys)
+    a = 50.0
+    P = lambda i, j, h: _sum(o, _mul(u, i), _mul(v, j), _mul(fuera, s + h))
+    k.caja(P(x - a / 2, y0, 1.5), u, v, n, a, y1 - y0, 1.5, col, ComponentLayer.BASE_ALU, "Cierre")
+    yc = y0 + (y1 - y0) * 0.42
+    k.cilindro(P(x, yc, 3.5), fuera, u, v, a * 0.34, 4, "herraje", ComponentLayer.BASE_ALU, "Cierre", lados=20)
+    # mariposa: dos alas en rombo sobre el eje
+    for sx in (-1, 1):
+        k.hexaedro([P(x, yc - 4, 5.5), P(x + sx * a * 0.3, yc - 2, 5.5), P(x + sx * a * 0.3, yc + 2, 5.5), P(x, yc + 4, 5.5),
+                    P(x, yc - 4, 8), P(x + sx * a * 0.3, yc - 2, 7.5), P(x + sx * a * 0.3, yc + 2, 7.5), P(x, yc + 4, 8)],
+                   col, ComponentLayer.BASE_ALU, "Cierre")
+    k.cilindro(P(x, yc, 8.5), fuera, u, v, 5, 1.5, col, ComponentLayer.BASE_ALU, "Cierre", lados=12)
+
+
+def _gancho_cierre(k: _Constructor, o: Vec, u: Vec, v: Vec, n: Vec, x: float, ys, s: float, col: str) -> None:
+    """Contraparte del cierre en la tapa: placa con el gancho."""
+    fuera = _mul(n, -1)
+    y0, y1 = min(ys), max(ys)
+    a = 44.0
+    P = lambda i, j, h: _sum(o, _mul(u, i), _mul(v, j), _mul(fuera, s + h))
+    k.caja(P(x - a / 2, y0, 1.5), u, v, n, a, y1 - y0, 1.5, col, ComponentLayer.BASE_ALU, "Cierre")
+    ym = (y0 + y1) / 2
+    k.caja(P(x - a * 0.25, ym - 4, 6), u, v, n, a * 0.5, 8, 4.5, col, ComponentLayer.BASE_ALU, "Cierre")
+    for sx in (-1, 1):
+        k.caja(P(x + sx * a * 0.25 - 2, ym - 5, 6), u, v, n, 4, 10, 4.5, "herraje", ComponentLayer.BASE_ALU, "Cierre")
+
+
+def _bisagra(k: _Constructor, o: Vec, u: Vec, v: Vec, n: Vec, x: float, ys, d: float, s: float, col: str) -> None:
+    """Bisagra: hoja atornillada al panel y el nudo (eje) en la línea de cierre."""
+    fuera = _mul(n, -1)
+    y0, y1 = min(ys), max(ys)
+    a = 60.0
+    P = lambda i, j, h: _sum(o, _mul(u, i), _mul(v, j), _mul(fuera, s + h))
+    k.caja(P(x - a / 2, y0, 1.5), u, v, n, a, y1 - y0, 1.5, col, ComponentLayer.BASE_ALU, "Bisagra")
+    yn = y1 if d > 0 else y0
+    k.cilindro(P(x, yn, 4.5), u, v, fuera, 4.5, a * 0.9, col, ComponentLayer.BASE_ALU, "Bisagra", lados=12)
+    for i in (-0.3, 0.3):
+        _remache(k, P(x + a * i, (y0 + y1) / 2, 1.5), fuera, u, v, 2.4)
+
+
+def _manija_embutida(k: _Constructor, o: Vec, u: Vec, v: Vec, n: Vec, x0: float, y0: float, x1: float, y1: float,
+                     col: str) -> None:
+    """Manija embutida: reborde alrededor del calado, cubeta hacia adentro y el asa."""
+    fuera = _mul(n, -1)
+    P = lambda i, j, h: _sum(o, _mul(u, i), _mul(v, j), _mul(fuera, h))
+    ala, e, prof = 10.0, 1.5, 38.0
+    for a0, b0, aw, bh in ((x0 - ala, y0 - ala, x1 - x0 + 2 * ala, ala), (x0 - ala, y1, x1 - x0 + 2 * ala, ala),
+                           (x0 - ala, y0, ala, y1 - y0), (x1, y0, ala, y1 - y0)):
+        k.caja(P(a0, b0, 2), u, v, n, aw, bh, 2, col, ComponentLayer.BASE_ALU, "Manija")
+    for a0, b0, aw, bh in ((x0, y0, x1 - x0, e), (x0, y1 - e, x1 - x0, e), (x0, y0, e, y1 - y0), (x1 - e, y0, e, y1 - y0)):
+        k.caja(P(a0, b0, 0), u, v, n, aw, bh, prof, "plato", ComponentLayer.BASE_ALU, "Manija")
+    k.caja(_sum(P(x0, y0, 0), _mul(n, prof - e)), u, v, n, x1 - x0, y1 - y0, e, "plato", ComponentLayer.BASE_ALU, "Manija")
+    # asa: barra a lo ancho, arriba de la cubeta, con sus dos soportes
+    ya = y1 - (y1 - y0) * 0.3
+    largo = (x1 - x0) * 0.8
+    k.cilindro(_sum(P((x0 + x1) / 2, ya, 0), _mul(n, 8)), u, v, fuera, 6, largo, col, ComponentLayer.BASE_ALU,
+               "Manija", lados=12)
+    for xs_ in ((x0 + x1) / 2 - largo / 2, (x0 + x1) / 2 + largo / 2 - 6):
+        k.caja(_sum(P(xs_, ya - 6, 0), _mul(n, 2)), u, v, n, 6, 12, 12, col, ComponentLayer.BASE_ALU, "Manija")
+
+
+def _manija_superficie(k: _Constructor, o: Vec, u: Vec, v: Vec, n: Vec, x: float, y: float, ancho: float,
+                       col: str) -> None:
+    """Asa de superficie: dos soportes atornillados y la barra entre ellos."""
+    fuera = _mul(n, -1)
+    P = lambda i, j, h: _sum(o, _mul(u, i), _mul(v, j), _mul(fuera, h))
+    for xs_ in (x - ancho / 2, x + ancho / 2 - 22):
+        k.caja(P(xs_, y - 15, 3), u, v, n, 22, 30, 3, col, ComponentLayer.BASE_ALU, "Manija")
+        k.caja(P(xs_ + 4, y - 7, 14), u, v, n, 14, 14, 11, col, ComponentLayer.BASE_ALU, "Manija")
+    k.cilindro(P(x, y, 10), u, v, fuera, 7, ancho - 30, "rueda", ComponentLayer.BASE_ALU, "Manija", lados=14)

@@ -36,6 +36,7 @@ COLORES: Dict[str, str] = {
     "wall": "#deb887",        # bandejas (color de la placa)
     "resalte": "#ffa500",     # Orange: lo que se agrega en el paso
     "rotulo": "#ffffff",
+    "remache": "#b4b4b4",
 }
 FONDO = (255, 255, 255)
 SUPER = 2          # supermuestreo (antialias)
@@ -172,11 +173,17 @@ def renderizar(malla: Malla3D, ruta: str, camara: str = "0,0,0,62,0,32,0", tam: 
     grupos = {g: i for i, g in enumerate(COLORES)}
     normales: List[Tuple[float, float, float]] = []
     colores_id: List[int] = []
+    tangentes: List[Tuple[float, float, float]] = []
+    materiales: List[int] = []
 
     def poligono(pts3: np.ndarray, normal: np.ndarray, grupo: str, agujeros: Sequence[np.ndarray] = (),
-                 plano: bool = False) -> int:
+                 plano: bool = False, material: int = MAT_NINGUNO) -> int:
         ident = len(normales)
         normales.append(tuple(normal))
+        lados = [pts3[(i + 1) % len(pts3)] - pts3[i] for i in range(len(pts3))]
+        largo = max(lados, key=lambda d: float(d @ d))
+        tangentes.append(tuple(_norm(largo)))
+        materiales.append(material)
         gi = grupos.get(grupo, 0)
         colores_id.append(gi)
         luzf = 1.0 if plano else 0.6 + 0.45 * max(0.0, float(normal @ luz))
@@ -206,7 +213,7 @@ def renderizar(malla: Malla3D, ruta: str, camara: str = "0,0,0,62,0,32,0", tam: 
                     continue   # cara de canto
                 sobre = q - np.outer((q - pts[0]) @ n, n)      # el calado llevado al plano de esta cara
                 agujeros.append(pantalla(sobre)[:, :2])
-        poligono(pts, n, f.color_group, agujeros)
+        poligono(pts, n, f.color_group, agujeros, material=_material(f))
 
     # rótulos como en rotulo(): placa blanca redondeada apoyada sobre el panel, con el texto encima
     textos = []
@@ -223,6 +230,8 @@ def renderizar(malla: Malla3D, ruta: str, camara: str = "0,0,0,62,0,32,0", tam: 
         ident = poligono(np.array(contorno), n, "rotulo", plano=True)
         textos.append((ident, r, c + n * 0.3, ex_, ey_))
 
+    _texturas(lienzo, np.array(normales + [(0, 0, 1)]), np.array(tangentes + [(1, 0, 0)]),
+              np.array(materiales + [MAT_NINGUNO]), luz, camara_pos, centro, base, dist, focal)
     lienzo.contornos(np.array(normales + [(0, 0, 1)]), np.array(colores_id + [-1]), grosor=SUPER)
 
     if textos:
@@ -252,6 +261,93 @@ def renderizar(malla: Malla3D, ruta: str, camara: str = "0,0,0,62,0,32,0", tam: 
     rgb = np.ascontiguousarray(np.clip(lienzo.col, 0, 255).astype(np.uint8))
     img = QImage(rgb.data, W, H, 3 * W, QImage.Format_RGB888).copy()
     return img.scaled(w, h, Qt.IgnoreAspectRatio, Qt.SmoothTransformation).save(ruta)
+
+
+MAT_NINGUNO, MAT_MADERA, MAT_CANTO, MAT_ALUMINIO, MAT_METAL, MAT_GOMA = range(6)
+_ALUMINIO = {"Ángulo de arista", "Perfil de cierre", "Junta de acceso", "Perfil híbrido"}
+_METAL = {"Esquinero", "Cierre", "Bisagra", "Manija", "Plato", "Remache", "Tope"}
+
+
+def _material(f) -> int:
+    """Material de una cara según la pieza (la etiqueta) y su color."""
+    g, et = f.color_group, f.label or ""
+    if et in _ALUMINIO or g in ("aluminio", "profile", "profile_h"):
+        return MAT_ALUMINIO
+    if et in _METAL or g in ("herraje", "cierre", "plato", "rueda_placa", "rueda_horq"):
+        return MAT_METAL
+    if g in ("rueda", "rueda_freno"):
+        return MAT_GOMA
+    if g in ("base", "lid", "wall", "base_ruedas", "resalte"):
+        return MAT_CANTO if f.is_endgrain else MAT_MADERA
+    return MAT_NINGUNO
+
+
+_RUIDO = np.random.default_rng(7).random((256, 256)).astype(np.float32)
+
+
+def _ruido(x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """Ruido de valores 2D suave (0..1), periódico cada 256 unidades."""
+    xi, yi = np.floor(x), np.floor(y)
+    fx, fy = x - xi, y - yi
+    fx, fy = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy)
+    xi, yi = xi.astype(np.int64) & 255, yi.astype(np.int64) & 255
+    x1, y1 = (xi + 1) & 255, (yi + 1) & 255
+    a = _RUIDO[yi, xi] * (1 - fx) + _RUIDO[yi, x1] * fx
+    b = _RUIDO[y1, xi] * (1 - fx) + _RUIDO[y1, x1] * fx
+    return a * (1 - fy) + b * fy
+
+
+def _texturas(lienzo: "_Lienzo", normales: np.ndarray, tangentes: np.ndarray, materiales: np.ndarray,
+              luz: np.ndarray, camara_pos: np.ndarray, centro: np.ndarray, base: np.ndarray,
+              dist: float, focal: float) -> None:
+    """Veta de madera, aluminio cepillado y brillo de los metales, píxel por píxel."""
+    ys, xs = np.nonzero(lienzo.ident >= 0)
+    if len(xs) == 0:
+        return
+    ident = lienzo.ident[ys, xs]
+    mat = materiales[ident]
+    usar = mat != MAT_NINGUNO
+    ys, xs, ident, mat = ys[usar], xs[usar], ident[usar], mat[usar]
+    H, W = lienzo.h, lienzo.w
+    # posición en el mundo de cada píxel a partir de su profundidad (z = 1/distancia a la cámara)
+    zc = 1.0 / lienzo.z[ys, xs]
+    cx = (xs + 0.5 - W / 2) * zc / focal
+    cy = -(ys + 0.5 - H / 2) * zc / focal
+    pos = centro + cx[:, None] * base[:, 0] + cy[:, None] * base[:, 1] + (dist - zc)[:, None] * base[:, 2]
+    n, tg = normales[ident], tangentes[ident]
+    bt = np.cross(n, tg)
+    s = (pos * tg).sum(axis=1)          # a lo largo de la pieza
+    t = (pos * bt).sum(axis=1)          # a lo ancho
+    sem = (ident * 37 % 251).astype(np.float64)   # cada pieza con su propia veta
+    f = np.ones(len(xs), dtype=np.float32)
+
+    m = mat == MAT_MADERA                 # veta: anillos ondulados a lo largo de la pieza
+    if m.any():
+        sm, tm, se = s[m], t[m], sem[m]
+        onda = _ruido(sm / 220 + se, tm / 35 + se) * 7.0 + _ruido(sm / 40, tm / 12) * 1.2
+        veta = np.sin((tm / 6.5 + onda) * 2 * np.pi) * (0.5 + _ruido(sm / 300 + 50, tm / 25 + se))
+        poro = _ruido(sm / 2.5 + se * 3, tm / 0.6)
+        f[m] = 1 + 0.045 * veta + 0.05 * (poro - 0.5) + 0.06 * (_ruido(sm / 60 + se, tm / 60) - 0.5)
+    m = mat == MAT_CANTO                  # canto del multilaminado: capas finas
+    if m.any():
+        f[m] = 0.92 + 0.06 * np.sin(t[m] / 1.3 * 2 * np.pi)
+    m = mat == MAT_ALUMINIO               # cepillado: rayas finas a lo largo del perfil
+    if m.any():
+        f[m] = 1 + 0.07 * (_ruido(s[m] / 90, t[m] * 2.5) - 0.5) + 0.04 * (_ruido(s[m] / 9, t[m] * 6) - 0.5)
+
+    # brillo especular (Blinn) según el material
+    brillo = np.zeros(len(xs), dtype=np.float32)
+    vista = camara_pos - pos
+    vista /= np.linalg.norm(vista, axis=1)[:, None]
+    medio = vista + luz
+    medio /= np.linalg.norm(medio, axis=1)[:, None]
+    nh = np.clip((n * medio).sum(axis=1), 0, 1)
+    for mid, k, e in ((MAT_ALUMINIO, 0.55, 18), (MAT_METAL, 0.7, 40), (MAT_GOMA, 0.12, 8), (MAT_MADERA, 0.06, 6)):
+        mm = mat == mid
+        if mm.any():
+            brillo[mm] = k * nh[mm] ** e
+    col = lienzo.col[ys, xs] * f[:, None] + 255.0 * brillo[:, None]
+    lienzo.col[ys, xs] = col
 
 
 def _rect_redondeado_2d(x0: float, y0: float, x1: float, y1: float, r: float, por_esquina: int = 6):
