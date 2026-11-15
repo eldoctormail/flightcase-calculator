@@ -19,6 +19,8 @@ SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64compatible
 ChangesAssociations=yes
+SetupIconFile=icono\icono.ico
+UninstallDisplayIcon={app}\{#AppName}.exe
 
 [Languages]
 Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"

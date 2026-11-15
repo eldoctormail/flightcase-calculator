@@ -125,13 +125,24 @@ En GitHub corren solos en cada PR y en cada cambio a main (`.github/workflows/te
 
 ## Reglas del taller (proyectos OpenSCAD)
 
-`flightcase/taller/` tiene en Python las reglas de construcción del generador de OpenSCAD del taller (placa de 10 mm, ángulo 32x32, perfil híbrido, refuerzos, tapas, cubiertas, bandejas, base de ruedas, catálogo FR Sistemas / Adam Hall), más los interiores (espuma, cajones, rack 19"). En la pestaña **Taller (reglas propias)** se editan todos los parámetros del generador (agrupados como en `flightcase.scad`, con su explicación al pasar el mouse) y se ven al instante los paneles, perfiles, herrajes y avisos; desde ahí se abre y se guarda el `.scad` y se exporta el paquete. También, con **Archivo → Paquete del taller desde proyecto OpenSCAD (.scad)** se abre un proyecto `.scad` (por ejemplo `mi_case.scad`) y se genera, sin tener OpenSCAD instalado:
+`flightcase/taller/` tiene en Python las reglas de construcción del generador de OpenSCAD del taller (placa de 10 mm, ángulo 32x32, perfil híbrido, refuerzos, tapas, cubiertas, bandejas, base de ruedas, catálogo FR Sistemas / Adam Hall), más los interiores (espuma, cajones, rack 19"). La app abre en la pestaña **Taller**, que es la parte principal (el cálculo rápido de `.fcproj` quedó en las otras dos pestañas y en **Archivo → Cálculo rápido**). En el Taller se editan todos los parámetros del generador (agrupados como en `flightcase.scad`, con su explicación al pasar el mouse) y se ven al instante los paneles, perfiles, herrajes y avisos; desde ahí se abre y se guarda el `.scad` y se exporta el paquete. También, con **Archivo → Paquete del taller desde proyecto OpenSCAD (.scad)** se abre un proyecto `.scad` (por ejemplo `mi_case.scad`) y se genera, sin tener OpenSCAD instalado:
 
 - `dxf/*.dxf`: un DXF por pieza distinta, con calados (capa 0) y rebajes (capa `REBAJE`)
 - `lista_cortes.csv` y `materiales.csv` (separador `;`, se abren directo en Excel)
 - `planos.pdf`: piezas acotadas, aprovechamiento de placas, cortes de perfiles y materiales
 - `instructivo_montaje.pdf`: perspectiva explotada y pasos de armado con sus láminas 3D (`montaje/*.png`, dibujadas por la app; el aluminio y los herrajes van simplificados)
 - `case_3d.step`: el case armado en 3D para abrir en Fusion, SolidWorks o FreeCAD (ver abajo)
+
+### Atajos del Taller
+
+- `Ctrl+N` nuevo case, `Ctrl+O` abrir `.scad`, `Ctrl+S` guardar (sin preguntar si ya tiene archivo), `Ctrl+Shift+S` guardar como
+- `Ctrl+P` exportar el paquete del taller (planos, DXF, instructivo)
+- `Ctrl+1` Taller, `Ctrl+2` y `Ctrl+3` las vistas del cálculo rápido
+- Al abrir la app se vuelve a cargar el último `.scad` que usaste, y la barra de estado muestra medidas, paneles, material y avisos del case
+
+### Ícono de la app
+
+Sale de `packaging/icono/icono.svg`. Si lo cambiás, regenerá el `.ico` (Windows), el `.icns` (Mac) y el `.png` de la ventana con `python tools/generar_icono.py`.
 
 ### Estilos de case y herrajes del catálogo
 
@@ -149,6 +160,7 @@ En las secciones **Interior** de la pestaña Taller se carga lo que va adentro, 
 
 - **Equipos**: medidas, peso y posición de cada cosa que va en el case.
 - **Espuma**: bloques que se cortan en capas del espesor de la plancha; cada equipo que cae en un bloque lleva su calado (con holgura) desde la cara abierta hasta el fondo del equipo. Si el fondo cae dentro de una capa, esa capa lleva un rebaje. Sale un DXF por capa (`dxf/espuma/`) y `espuma.csv`; la espuma de la tapa abre hacia el cuerpo.
+- **Forma de cada calado** (columnas *Forma en la espuma*, *Radio* y *Dedos* de la tabla de equipos): rectángulo, **redondo** (micrófonos, tachos, focos) o el **contorno de un dibujo** `.dxf` / `.svg` del equipo, que se encaja en su ancho y fondo. Las esquinas se redondean con el radio de la fresa (`espuma_radio`, o uno por equipo) y se pueden agregar **huecos para los dedos** en uno o los dos lados largos (`espuma_dedo_ancho`, `espuma_dedo_largo`). Los calados con forma salen en el DXF de cada capa como polilíneas cerradas (en la capa 0 si son pasantes, en REBAJE si no), en los planos con su dibujo y en la vista 3D y el STEP en escalones; el peso de la espuma descuenta el área real.
 - **Cajones** (cases frontales): frente, laterales, trasera y piso con correderas telescópicas (12,7 mm por lado; la corredera más larga que entra si no se indica). Las piezas pasan a la lista de cortes, los DXF y las placas.
 - **Rack 19"** (frontal: rieles verticales; vertical: rack de tapa superior): rieles, suplementos si el interior es más ancho, equipos por U, carátulas ciegas para las unidades libres, tuercas enjauladas y tornillos.
 - **Chequeos**: piezas que se salen del interior o del cuerpo, choques entre equipos, bandejas, cajones, rieles y espuma, fondo del rack con lugar para cables, perillas contra la tapa, equipos pesados sin soporte trasero, paredes y fondo mínimos de la espuma.

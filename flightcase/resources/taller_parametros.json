@@ -74,6 +74,9 @@
  "espuma_holgura": 3,
  "espuma_pared_min": 15,
  "espuma_fondo_min": 10,
+ "espuma_radio": 0,
+ "espuma_dedo_ancho": 30,
+ "espuma_dedo_largo": 25,
  "espuma_densidad": 30,
  "espuma_material": "Espuma de polietileno",
  "espuma_plancha_medidas": [

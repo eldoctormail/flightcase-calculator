@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="fondo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3d7cc4"/><stop offset="1" stop-color="#1d4378"/>
+    </linearGradient>
+    <linearGradient id="caja" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b2f36"/><stop offset="1" stop-color="#15171b"/>
+    </linearGradient>
+    <linearGradient id="alu" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f2f4f7"/><stop offset="0.5" stop-color="#b9c0c9"/><stop offset="1" stop-color="#8a929c"/>
+    </linearGradient>
+    <radialGradient id="bola" cx="0.35" cy="0.3" r="0.75">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="0.45" stop-color="#c3c9d1"/><stop offset="1" stop-color="#6b737d"/>
+    </radialGradient>
+  </defs>
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="url(#fondo)"/>
+  <!-- manija arriba -->
+  <rect x="196" y="78" width="120" height="34" rx="12" fill="none" stroke="url(#alu)" stroke-width="14"/>
+  <!-- cuerpo del case -->
+  <rect x="78" y="104" width="356" height="318" rx="14" fill="url(#caja)"/>
+  <!-- marco de aluminio -->
+  <rect x="78" y="104" width="356" height="318" rx="14" fill="none" stroke="url(#alu)" stroke-width="22"/>
+  <!-- junta de la tapa -->
+  <rect x="70" y="186" width="372" height="22" fill="url(#alu)"/>
+  <!-- cierres mariposa (naranja del taller) -->
+  <g fill="#f29a1f" stroke="#a85d00" stroke-width="4">
+    <rect x="140" y="168" width="58" height="58" rx="10"/>
+    <rect x="314" y="168" width="58" height="58" rx="10"/>
+  </g>
+  <g fill="#ffd08a">
+    <ellipse cx="169" cy="197" rx="18" ry="9"/>
+    <ellipse cx="343" cy="197" rx="18" ry="9"/>
+  </g>
+  <!-- esquineros de bola -->
+  <g fill="url(#bola)" stroke="#4a515b" stroke-width="3">
+    <circle cx="86" cy="112" r="30"/><circle cx="426" cy="112" r="30"/>
+    <circle cx="86" cy="414" r="30"/><circle cx="426" cy="414" r="30"/>
+  </g>
+  <!-- remaches -->
+  <g fill="#d9dee5">
+    <circle cx="160" cy="104" r="5"/><circle cx="256" cy="104" r="5"/><circle cx="352" cy="104" r="5"/>
+    <circle cx="160" cy="422" r="5"/><circle cx="256" cy="422" r="5"/><circle cx="352" cy="422" r="5"/>
+    <circle cx="78" cy="300" r="5"/><circle cx="434" cy="300" r="5"/>
+  </g>
+</svg>

@@ -61,7 +61,8 @@ TABLAS: Dict[str, List[tuple]] = {
     "bandejas": [("Ancho", "num", None), ("Fondo", "num", None), ("Altura (cara de arriba)", "num", None),
                  ("Espesor", "num", None), ("Material", "texto", None)],
     "equipos": [("Nombre", "texto", ""), ("Ancho", "num", None), ("Fondo", "num", None), ("Alto", "num", None),
-                ("Peso kg", "num", 0), ("X", "num", "c"), ("Y", "num", "c"), ("Z", "num", 0)],
+                ("Peso kg", "num", 0), ("X", "num", "c"), ("Y", "num", "c"), ("Z", "num", 0),
+                ("Forma en la espuma", "forma", ""), ("Radio", "num", -1), ("Dedos", "num", 0)],
     "espumas": [("Ancho", "num", 0), ("Fondo", "num", 0), ("Alto", "num", 0), ("X", "num", "c"), ("Y", "num", "c"),
                 ("Z", "num", 0)],
     "cajones": [("Alto del frente", "num", None), ("Altura desde el piso", "num", None), ("Ancho", "num", 0),
@@ -255,6 +256,30 @@ class _DelegadoArticulo(QStyledItemDelegate):
         model.setData(index, etiqueta_ref(ref_de_texto(editor.currentText())))
 
 
+class _DelegadoForma(QStyledItemDelegate):
+    """Forma del calado de espuma: rect, redondo o un dibujo (.dxf / .svg) elegido del disco."""
+
+    ELEGIR = "Elegir dibujo (.dxf / .svg)…"
+
+    def createEditor(self, parent, option, index):  # noqa: N802 (nombre de Qt)
+        w = QComboBox(parent)
+        w.setEditable(True)
+        w.addItems(["rect", "redondo", self.ELEGIR])
+        w.activated.connect(lambda i, w=w: self._elegir(w) if w.itemText(i) == self.ELEGIR else None)
+        return w
+
+    def _elegir(self, w: QComboBox) -> None:
+        ruta, _ = QFileDialog.getOpenFileName(w, "Contorno del equipo", "", "Dibujos (*.dxf *.svg)")
+        w.setEditText(ruta or "")
+
+    def setEditorData(self, editor, index):  # noqa: N802
+        editor.setEditText(index.data() or "")
+
+    def setModelData(self, editor, model, index):  # noqa: N802
+        t = editor.currentText().strip()
+        model.setData(index, "" if t == self.ELEGIR else t)
+
+
 class _EditorTabla:
     """Editor de una lista de listas (bandejas, equipos, cajones...) como tabla con filas."""
 
@@ -270,11 +295,15 @@ class _EditorTabla:
         self.tabla.verticalHeader().setVisible(False)
         self.tabla.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.tabla.horizontalHeader().setStretchLastSection(True)
-        self.tabla.setMinimumHeight(110)
+        self.tabla.setMinimumHeight(140)
         for c, (_, tipo, _r) in enumerate(self.columnas):
-            if tipo == "ref":
-                self._delegado = _DelegadoArticulo(self.tabla)
+            if tipo in ("ref", "forma"):
+                self._delegado = _DelegadoArticulo(self.tabla) if tipo == "ref" else _DelegadoForma(self.tabla)
                 self.tabla.setItemDelegateForColumn(c, self._delegado)
+            if tipo == "forma":   # una ruta larga no tapa las columnas de al lado
+                self.tabla.horizontalHeader().setSectionResizeMode(c, QHeaderView.Interactive)
+                self.tabla.setColumnWidth(c, 150)
+                self.tabla.setTextElideMode(Qt.ElideLeft)
         self.tabla.cellChanged.connect(lambda *_: self._al_cambiar())
         lay.addWidget(self.tabla)
         botones = QHBoxLayout()
@@ -306,7 +335,8 @@ class _EditorTabla:
                 self.tabla.insertRow(r)
                 celdas = fila if isinstance(fila, list) else [fila]
                 for c, v in enumerate(celdas[:len(self.columnas)]):
-                    texto = "" if v == "c" else (fmt(v) if isinstance(v, (int, float)) else str(v))
+                    vacio = v == "c" or (v == -1 and self.columnas[c][2] == -1)   # relleno que se muestra vacío
+                    texto = "" if vacio else (fmt(v) if isinstance(v, (int, float)) else str(v))
                     if self.columnas[c][1] == "ref":
                         texto = etiqueta_ref(texto)
                     self.tabla.setItem(r, c, QTableWidgetItem(texto))
@@ -728,6 +758,20 @@ class TallerWidget(QWidget):
             filas.append(e)
         if filas:
             self.params["herrajes_manuales"] = filas
+        equipos = []
+        for e in self.params.get("equipos") or []:   # contornos de espuma (.dxf / .svg) con ruta relativa
+            if (isinstance(e, list) and len(e) > 8 and isinstance(e[8], str)
+                    and e[8].lower().endswith((".dxf", ".svg"))):
+                absoluta = e[8] if os.path.isabs(e[8]) else os.path.abspath(os.path.join(vieja or carpeta, e[8]))
+                try:
+                    rel = os.path.relpath(absoluta, carpeta)
+                except ValueError:
+                    rel = absoluta
+                e = list(e)
+                e[8] = absoluta if rel.startswith("..") else rel.replace(os.sep, "/")
+            equipos.append(e)
+        if equipos:
+            self.params["equipos"] = equipos
         self.params["_carpeta"] = carpeta
 
     def exportar(self, carpeta: Optional[str] = None):

@@ -23,6 +23,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from . import formas_espuma as formas
 from .modelo import CatalogoTaller, fmt, s
 
 # 19" (EIA-310 / IEC 60297)
@@ -225,6 +226,10 @@ def calcular(P: Dict[str, Any], ctx: Dict[str, Any], cat: CatalogoTaller) -> Res
     # ---- equipos sueltos ----
     peso_eq = 0.0
     equipos: List[Solido] = []
+    forma_de: Dict[str, formas.Forma] = {}     # forma del calado de cada equipo (por grupo)
+    radio_def = float(g("espuma_radio", 0) or 0)
+    dedo_a = float(g("espuma_dedo_ancho", 30) or 30)
+    dedo_l = float(g("espuma_dedo_largo", 25) or 25)
     for i, e in enumerate(g("equipos") or []):
         if not isinstance(e, (list, tuple)) or len(e) < 4:
             A.append(s("El equipo ", i + 1, " está mal cargado: van nombre, ancho, fondo y alto."))
@@ -240,6 +245,16 @@ def calcular(P: Dict[str, Any], ctx: Dict[str, Any], cat: CatalogoTaller) -> Res
             pos[2] = 0.0
         c = Caja.rangos([ubicar(k, med[k], pos[k]) for k in range(3)])
         sol = Solido(nombre, "equipo", c, f"equipo{i}")
+        try:
+            tipo_f, archivo = formas.forma_de_texto(str(e[8]) if len(e) > 8 and e[8] is not None else "")
+        except ValueError:
+            A.append(s("La forma «", e[8], "» del equipo ", nombre, " no se entiende: va rectangular. ",
+                       "Poné rect, redondo o la ruta de un .dxf o .svg."))
+            tipo_f, archivo = "rect", ""
+        radio = _campo(e, 9)
+        dedos = int(_campo(e, 10) or 0)
+        forma_de[sol.grupo] = formas.Forma(tipo_f, archivo, radio_def if radio is None or radio < 0 else radio,
+                                           max(0, min(dedos, 2)), dedo_a, dedo_l)
         equipos.append(sol)
         R.solidos.append(sol)
         peso_eq += peso
@@ -304,7 +319,19 @@ def calcular(P: Dict[str, Any], ctx: Dict[str, Any], cat: CatalogoTaller) -> Res
             v1 = min(eq.caja.hi(va) + holg, c.hi(va)) - c.lo(va)
             fondo = (eq.caja.lo(eje_t) - c.lo(eje_t)) if arriba else (c.hi(eje_t) - eq.caja.hi(eje_t))
             fondo = max(0.0, fondo)
-            bl.bolsillos.append(dict(equipo=eq.nombre, u0=u0, u1=u1, v0=v0, v1=v1, fondo=fondo))
+            bolsillo = dict(equipo=eq.nombre, u0=u0, u1=u1, v0=v0, v1=v1, fondo=fondo)
+            polis, av = formas.contorno(u0, u1, v0, v1, forma_de.get(eq.grupo, formas.Forma()),
+                                        c.med(ua), c.med(va), str(g("_carpeta") or ""))
+            A.extend(av)
+            if polis:
+                bolsillo["contorno"] = polis
+                bolsillo["area"] = formas.area(polis)
+                # lo que ocupa de verdad (con los huecos para los dedos), para los chequeos de bordes
+                u0 = min(x for p_ in polis for x, _ in p_)
+                u1 = max(x for p_ in polis for x, _ in p_)
+                v0 = min(y for p_ in polis for _, y in p_)
+                v1 = max(y for p_ in polis for _, y in p_)
+            bl.bolsillos.append(bolsillo)
             if fondo <= 0.01:
                 A.append(s("El equipo ", eq.nombre, " atraviesa la ", nombre.lower(),
                            ": el calado queda pasante y el equipo apoya en lo que haya debajo."))
@@ -343,6 +370,8 @@ def calcular(P: Dict[str, Any], ctx: Dict[str, Any], cat: CatalogoTaller) -> Res
                 capa.calados.append(dict(tipo=tipo, cx=(b_["u0"] + b_["u1"]) / 2, cy=(b_["v0"] + b_["v1"]) / 2,
                                          w=b_["u1"] - b_["u0"], h=b_["v1"] - b_["v0"], r=0.0, prof=round(prof, 2),
                                          equipo=b_["equipo"]))
+                if "contorno" in b_:
+                    capa.calados[-1]["puntos"] = b_["contorno"]
                 if tipo == "rebaje":
                     rebajes.append((b_["equipo"], j + 1, round(prof, 1)))
             bl.capas.append(capa)
@@ -354,7 +383,7 @@ def calcular(P: Dict[str, Any], ctx: Dict[str, Any], cat: CatalogoTaller) -> Res
         if n > 1 and abs(resto - plancha) > 0.5:
             A.append(s("La ", nombre.lower(), " mide ", round(L, 1), " mm: ", n - 1, " capas de ", plancha,
                        " y una de ", round(resto, 1), " mm."))
-        vol = c.volumen() - sum((b_["u1"] - b_["u0"]) * (b_["v1"] - b_["v0"]) * (L - b_["fondo"])
+        vol = c.volumen() - sum(b_.get("area", (b_["u1"] - b_["u0"]) * (b_["v1"] - b_["v0"])) * (L - b_["fondo"])
                                 for b_ in bl.bolsillos)
         peso_esp += max(vol, 0) / 1e9 * dens_esp
         R.espumas.append(bl)
