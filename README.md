@@ -62,7 +62,8 @@ Herramienta de escritorio de diseño y cálculo (CAD/CAM) hecha con Python, PySi
 - `PySide6`: interfaz de escritorio moderna basada en Qt
 - `PyOpenGL`: renderizado 3D acelerado por hardware (alambre y superficies sólidas)
 - `numpy`: transformaciones geométricas 3D rápidas con vectores y matrices
-- `pytest`: tests automáticos
+
+Para desarrollo, `pytest` (tests automáticos) está en el grupo `dev`: `uv` lo instala solo, y con pip se instala con `pip install -e . --group dev`.
 
 ---
 
@@ -114,9 +115,11 @@ Para correr todos los tests:
 
 ```bash
 uv run pytest
-# o con el entorno virtual activado:
+# o con el entorno virtual activado (después de pip install -e . --group dev):
 pytest
 ```
+
+En GitHub corren solos en cada PR y en cada cambio a main (`.github/workflows/tests.yml`).
 
 ---
 
