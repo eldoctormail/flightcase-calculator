@@ -1,0 +1,93 @@
+[
+ {
+  "id": "baul_tapa_suelta",
+  "nombre": "Baúl con tapa suelta",
+  "descripcion": "El case clásico de gira: la tapa sale entera, cuatro ruedas abajo y platos de apilado en el techo.",
+  "params": {"orientacion": "vertical", "tapas": 1, "ruedas": 4, "encastres": true}
+ },
+ {
+  "id": "baul_bisagras",
+  "nombre": "Baúl con tapa abisagrada",
+  "descripcion": "Tapa con tres bisagras atrás y dos topes que la sostienen abierta, refuerzos en L en la junta y ruedas.",
+  "params": {"orientacion": "vertical", "tapas": 1, "bisagras": 3, "topes": 2, "refuerzos": 1, "ruedas": 4}
+ },
+ {
+  "id": "baul_base_ruedas",
+  "nombre": "Baúl grande con base de ruedas",
+  "descripcion": "Para cargas pesadas: las ruedas van en una base de fenólico de 18 mm bajo el piso, con tapa abisagrada y dos manijas por lado.",
+  "params": {"orientacion": "vertical", "tapas": 1, "bisagras": 3, "topes": 2, "refuerzos": 1, "ruedas": 4,
+             "manijas_n": 2, "_base_ruedas": "auto"}
+ },
+ {
+  "id": "case_mano_pies",
+  "nombre": "Case de mano con pies",
+  "descripcion": "Case chico para llevar a mano: sin ruedas, cuatro pies de goma en el piso y manijas a los costados.",
+  "params": {"orientacion": "vertical", "tapas": 1, "ruedas": 0, "pies": 4, "manijas": true}
+ },
+ {
+  "id": "clamshell",
+  "nombre": "Case de dos mitades (clamshell)",
+  "descripcion": "Cuerpo y tapa de la misma altura, unidos con bisagras: se abre como un libro. Reparte el alto interior total en dos mitades iguales.",
+  "params": {"orientacion": "vertical", "tapas": 1, "bisagras": 3, "topes": 1, "ruedas": 0, "pies": 4,
+             "_mitades": true}
+ },
+ {
+  "id": "tapa_piano",
+  "nombre": "Case con bisagra de piano",
+  "descripcion": "Tapa con una bisagra de piano a todo el largo y un tope, apoyado sobre pies.",
+  "params": {"orientacion": "vertical", "tapas": 1, "bisagras": 1, "ref_bisagra": "08-2605", "topes": 1,
+             "ruedas": 0, "pies": 4}
+ },
+ {
+  "id": "dos_tapas_vertical",
+  "nombre": "Case con tapa arriba y abajo",
+  "descripcion": "Cuerpo abierto en los dos extremos, con una tapa en cada uno: para equipos a los que se llega desde arriba y desde abajo.",
+  "params": {"orientacion": "vertical", "tapas": 2, "ruedas": 0}
+ },
+ {
+  "id": "rack_una_tapa",
+  "nombre": "Rack 19\" con tapa adelante",
+  "descripcion": "Rack parado con la tapa adelante y la trasera cerrada. Las ruedas van en una base de fenólico.",
+  "params": {"orientacion": "frontal", "tapas": 1, "extremos_cubren": true, "refuerzos": 1, "ruedas": 4,
+             "_base_ruedas": "auto"}
+ },
+ {
+  "id": "rack_dos_tapas",
+  "nombre": "Rack 19\" con tapa adelante y atrás",
+  "descripcion": "Rack parado con tapas en el frente y en la trasera, cerradas con cierres en los costados, y base de ruedas.",
+  "params": {"orientacion": "frontal", "tapas": 2, "paredes_enteras_cuerpo": "frente", "extremos_cubren": true,
+             "cierres_laterales": "si", "cierres_frente_n": -1, "cierres_lateral_n": 1, "refuerzos": 1,
+             "ruedas": 4, "_base_ruedas": "auto"}
+ },
+ {
+  "id": "rack_acceso_paneles",
+  "nombre": "Rack 19\" con tapas de acceso a los costados",
+  "descripcion": "Rack con tapa adelante y atrás y una tapa removible en la parte de arriba de cada costado, para llegar a los cables.",
+  "params": {"orientacion": "frontal", "tapas": 2, "paredes_enteras": "laterales", "paredes_enteras_cuerpo": "frente",
+             "extremos_cubren": true, "_acceso": 0.31, "acceso_cierres_n": 2, "acceso_tipo": "paneles",
+             "manijas_n": 2, "manija_pos": 0.55, "cierres_frente_n": 1, "cierres_lateral_n": 2, "refuerzos": 1,
+             "ruedas": 4, "_base_ruedas": "auto"}
+ },
+ {
+  "id": "rack_cubierta",
+  "nombre": "Rack 19\" con cubierta que sale entera",
+  "descripcion": "Rack con tapa adelante y atrás donde el techo y las dos tapas de acceso forman una cubierta en U que sale de una vez (para mezcladoras y equipos de arriba).",
+  "params": {"orientacion": "frontal", "tapas": 2, "paredes_enteras": "laterales", "paredes_enteras_cuerpo": "frente",
+             "extremos_cubren": true, "_acceso": 0.31, "acceso_cierres_n": 2, "acceso_tipo": "cubierta",
+             "manijas_n": 2, "manija_pos": 0.55, "cierres_frente_n": 1, "cierres_lateral_n": 2, "refuerzos": 1,
+             "ruedas": 4, "_base_ruedas": "auto"}
+ },
+ {
+  "id": "acostado_dos_tapas",
+  "nombre": "Case acostado con tapas a los costados",
+  "descripcion": "Case que viaja acostado, con una tapa en cada costado: para pantallas, tableros y equipos largos. Base de ruedas abajo.",
+  "params": {"orientacion": "horizontal", "tapas": 2, "paredes_enteras": "laterales", "extremos_cubren": true,
+             "cierres_laterales": "no", "refuerzos": 1, "ruedas": 4, "_base_ruedas": "auto"}
+ },
+ {
+  "id": "hibrido_liviano",
+  "nombre": "Case liviano con perfil híbrido",
+  "descripcion": "Armado con perfil híbrido en lugar de ángulo: más liviano y prolijo, para cases chicos y medianos que se llevan a mano.",
+  "params": {"orientacion": "vertical", "tapas": 1, "sistema": "hibrido", "ruedas": 0, "pies": 4}
+ }
+]
