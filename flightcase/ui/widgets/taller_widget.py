@@ -277,7 +277,8 @@ class TallerWidget(QWidget):
         self.lbl_archivo.setStyleSheet("font-weight:600")
         barra.addWidget(self.lbl_archivo, 1)
         for texto, slot in (("Nuevo", self.nuevo), ("Abrir .scad…", self.abrir),
-                            ("Guardar .scad…", self.guardar), ("Exportar paquete…", self.exportar)):
+                            ("Guardar .scad…", self.guardar), ("Exportar paquete…", self.exportar),
+                            ("Exportar STEP…", self.exportar_step)):
             b = QPushButton(texto)
             b.clicked.connect(slot)
             barra.addWidget(b)
@@ -543,3 +544,29 @@ class TallerWidget(QWidget):
         QMessageBox.information(self, "Paquete del taller",
                                 f"Se generaron {len(paq.archivos)} archivos en:\n{carpeta}{avisos}")
         return paq
+
+    def exportar_step(self, ruta: Optional[str] = None):
+        """Modelo 3D del case armado (.step) para abrir en Fusion, SolidWorks o FreeCAD."""
+        from ...taller.step import exportar_step
+        if self.resultado is None:
+            return None
+        nombre = os.path.splitext(os.path.basename(self.ruta))[0] if self.ruta else "case"
+        if not ruta:
+            ruta, _ = QFileDialog.getSaveFileName(self, "Exportar el case a STEP", f"{nombre}.step",
+                                                  "Modelo 3D STEP (*.step *.stp)")
+            if not ruta:
+                return None
+            if not ruta.lower().endswith((".step", ".stp")):
+                ruta += ".step"
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            st = exportar_step(self.resultado, ruta, nombre)
+        except Exception as e:
+            QApplication.restoreOverrideCursor()
+            QMessageBox.critical(self, "Exportar STEP", f"No se pudo exportar el STEP:\n{e}")
+            return None
+        QApplication.restoreOverrideCursor()
+        avisos = ("\n\nAvisos:\n" + "\n".join(f"• {a}" for a in st.avisos)) if st.avisos else ""
+        QMessageBox.information(self, "Exportar STEP",
+                                f"Se exportó el case armado ({st.piezas} piezas, {st.cuerpos} cuerpos) a:\n{ruta}{avisos}")
+        return st

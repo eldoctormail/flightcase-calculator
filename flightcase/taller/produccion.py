@@ -269,8 +269,8 @@ def _exportar_espuma(res: ResultadoTaller, carpeta: str, paq: "PaqueteTaller") -
 
 
 def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool = True,
-             render_png: Optional[str] = None, instructivo: bool = True) -> PaqueteTaller:
-    """Escribe dxf/*.dxf, lista_cortes.csv, materiales.csv, planos.pdf e
+             render_png: Optional[str] = None, instructivo: bool = True, step: bool = True) -> PaqueteTaller:
+    """Escribe dxf/*.dxf, lista_cortes.csv, materiales.csv, case_3d.step, planos.pdf e
     instructivo_montaje.pdf en `carpeta`."""
     os.makedirs(os.path.join(carpeta, "dxf"), exist_ok=True)
     d = datos(res)
@@ -344,6 +344,13 @@ def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool =
         for fl in gen.lista_materiales(d, placas, barras):
             w.writerow([fl["ref"], fl["material"], fl["cant"], fl["detalle"]])
     paq.archivos.append(ruta)
+
+    if step:    # modelo 3D para Fusion, SolidWorks o FreeCAD
+        from .step import exportar_step
+        nombre = os.path.basename(os.path.normpath(carpeta)).removeprefix("salida_") or "Flightcase"
+        st = exportar_step(res, os.path.join(carpeta, "case_3d.step"), nombre)
+        paq.archivos.append(st.ruta)
+        paq.avisos += st.avisos
 
     if pdf:
         laminas, pasos = {}, []

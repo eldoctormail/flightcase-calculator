@@ -93,3 +93,11 @@ def test_vista_3d_se_actualiza(widget):
     widget.recalcular()
     a, b = widget.vista_3d.mesh.bounding_box
     assert b.x - a.x >= widget.resultado.valores["ext_ancho"]
+
+
+def test_exportar_step(widget, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+    monkeypatch.setattr(QMessageBox, "critical", lambda *a, **k: pytest.fail(a[2]))
+    st = widget.exportar_step(str(tmp_path / "case.step"))
+    assert st.cuerpos > 0 and (tmp_path / "case.step").read_text(encoding="ascii").startswith("ISO-10303-21;")

@@ -16,32 +16,8 @@ import numpy as np
 from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QGuiApplication, QImage, QPainter, QTransform
 
-from .geometria import Malla3D
+from .geometria import COLORES, Malla3D
 
-COLORES: Dict[str, str] = {
-    "base": "#deb887",        # BurlyWood: color_placa por defecto de flightcase.scad
-    "lid": "#deb887",         # color_tapa vacío = igual que la placa
-    "profile": "#b0c4de",     # LightSteelBlue: aro macho
-    "profile_h": "#708090",   # SlateGray: aro hembra
-    "aluminio": "#c0c0c0",    # Silver: ángulos de arista
-    "herraje": "#696969",     # DimGray: esquineros, manijas
-    "cierre": "#dcdcdc",      # Gainsboro: cierres y bisagras
-    "rueda": "#222222",
-    "rueda_placa": "#444444",
-    "rueda_horq": "#777777",
-    "freno": "#ff0000",
-    "rueda_freno": "#222222",
-    "base_ruedas": "#5a3d22",
-    "plato": "#3a3a3a",
-    "wall": "#deb887",        # bandejas (color de la placa)
-    "equipo": "#3d4b5c",      # equipos dentro del case
-    "rack_frente": "#2f2f2f",
-    "espuma": "#3a3a3a",      # espuma gris oscura
-    "cajon": "#c9a26b",
-    "resalte": "#ffa500",     # Orange: lo que se agrega en el paso
-    "rotulo": "#ffffff",
-    "remache": "#b4b4b4",
-}
 FONDO = (255, 255, 255)
 SUPER = 2          # supermuestreo (antialias)
 FOV = 22.5         # campo visual de la cámara de OpenSCAD (grados)

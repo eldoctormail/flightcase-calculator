@@ -27,6 +27,32 @@ Vec = Tuple[float, float, float]
 # Pasos del instructivo (los mismos números que flightcase.scad)
 P_AROS, P_CUERPO, P_TAPA, P_ARISTAS, P_ESQ, P_CIERRES, P_MANIJAS, P_RUEDAS = 2, 3, 4, 5, 6, 7, 8, 9
 
+# Colores de cada grupo (los de flightcase.scad), para las láminas y el STEP
+COLORES: Dict[str, str] = {
+    "base": "#deb887",        # BurlyWood: color_placa por defecto de flightcase.scad
+    "lid": "#deb887",         # color_tapa vacío = igual que la placa
+    "profile": "#b0c4de",     # LightSteelBlue: aro macho
+    "profile_h": "#708090",   # SlateGray: aro hembra
+    "aluminio": "#c0c0c0",    # Silver: ángulos de arista
+    "herraje": "#696969",     # DimGray: esquineros, manijas
+    "cierre": "#dcdcdc",      # Gainsboro: cierres y bisagras
+    "rueda": "#222222",
+    "rueda_placa": "#444444",
+    "rueda_horq": "#777777",
+    "freno": "#ff0000",
+    "rueda_freno": "#222222",
+    "base_ruedas": "#5a3d22",
+    "plato": "#3a3a3a",
+    "wall": "#deb887",        # bandejas (color de la placa)
+    "equipo": "#3d4b5c",      # equipos dentro del case
+    "rack_frente": "#2f2f2f",
+    "espuma": "#3a3a3a",      # espuma gris oscura
+    "cajon": "#c9a26b",
+    "resalte": "#ffa500",     # Orange: lo que se agrega en el paso
+    "rotulo": "#ffffff",
+    "remache": "#b4b4b4",
+}
+
 _GRUPO_COLOR = {"cuerpo": "base", "tapa": "lid", "tapa2": "lid"}
 _GRUPO_CAPA = {"cuerpo": ComponentLayer.OUTER_BASE_WALLS, "tapa": ComponentLayer.LID_WALLS,
                "tapa2": ComponentLayer.LID_WALLS}
@@ -89,10 +115,22 @@ def _ejes_rotulo(normal: Vec) -> Tuple[Vec, Vec]:
 
 
 @dataclass
+class Solido3D:
+    """Un cuerpo cerrado de la malla: las caras faces[desde:hasta] (para exportar a STEP).
+    `agujeros` son los calados pasantes de un panel, sobre una de sus caras."""
+    nombre: str
+    color: str
+    desde: int
+    hasta: int
+    agujeros: List[List[Point3D]] = field(default_factory=list)
+
+
+@dataclass
 class Malla3D(WireframeMesh3D):
     rotulos: List[Rotulo] = field(default_factory=list)
     # calados pasantes: (nombre del panel, contorno en el mundo sobre la cara exterior)
     calados: List[Tuple[str, List[Point3D]]] = field(default_factory=list)
+    solidos: List[Solido3D] = field(default_factory=list)
 
 
 def _sum(*vs: Sequence[float]) -> Vec:
@@ -128,6 +166,12 @@ class _Constructor:
         self.segmentos: List[Segment3D] = []
         self.rotulos: List[Rotulo] = []
         self.calados: List[Tuple[str, List[Point3D]]] = []
+        self.solidos: List[Solido3D] = []
+
+    def cerrar(self, desde: int, color: str, etiqueta: str) -> None:
+        """Las caras agregadas desde `desde` forman un cuerpo cerrado."""
+        if len(self.caras) > desde:
+            self.solidos.append(Solido3D(etiqueta, color, desde, len(self.caras)))
 
     def visible(self, paso: int) -> bool:
         return self.op.paso >= paso
@@ -163,6 +207,7 @@ class _Constructor:
             return vec if mundo else self.girar(vec)
 
         menos = lambda w: _mul(w, -1)
+        desde = len(self.caras)
         caras = [
             ((P(0, 0, 0), P(a, 0, 0), P(a, b, 0), P(0, b, 0)), N(menos(n)), False),
             ((P(0, 0, c), P(0, b, c), P(a, b, c), P(a, 0, c)), N(n), False),
@@ -174,11 +219,13 @@ class _Constructor:
         for verts, normal, canto in caras:
             self.caras.append(PolygonFace3D(vertices=verts, normal=normal, color_group=color, label=etiqueta,
                                             is_endgrain=canto and color in ("base", "lid"), layer_order=capa))
+        self.cerrar(desde, color, etiqueta)
 
     def hexaedro(self, v8: Sequence[Vec], color: str, capa: int, etiqueta: str = "") -> None:
         """Hexaedro convexo: v8 = 4 vértices de abajo y 4 de arriba, en el mismo orden (coords locales)."""
         P = [self._p(q, False) for q in v8]
         cen = _mul(_sum(*v8), 1 / 8)
+        desde = len(self.caras)
         for idx in ((0, 1, 2, 3), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)):
             a, b, c = (v8[i] for i in idx[:3])
             e1, e2 = _sum(b, _mul(a, -1)), _sum(c, _mul(a, -1))
@@ -192,6 +239,7 @@ class _Constructor:
                 nrm = _mul(nrm, -1)
             self.caras.append(PolygonFace3D(vertices=tuple(P[i] for i in idx), normal=self.girar(nrm),
                                             color_group=color, label=etiqueta, layer_order=capa))
+        self.cerrar(desde, color, etiqueta)
 
     def esfera(self, centro: Vec, r: float, color: str, capa: int, etiqueta: str = "",
                lados: int = 16, pisos: int = 8) -> None:
@@ -199,6 +247,7 @@ class _Constructor:
         def pt(i: int, j: int) -> Vec:
             th, ph = 2 * math.pi * i / lados, math.pi * j / pisos
             return (math.sin(ph) * math.cos(th), math.sin(ph) * math.sin(th), math.cos(ph))
+        desde = len(self.caras)
         for j in range(pisos):
             for i in range(lados):
                 dirs = [pt(i, j), pt(i + 1, j), pt(i + 1, j + 1), pt(i, j + 1)]
@@ -211,6 +260,7 @@ class _Constructor:
                 l = math.sqrt(sum(x * x for x in nrm)) or 1.0
                 self.caras.append(PolygonFace3D(vertices=tuple(verts), normal=self.girar(_mul(nrm, 1 / l)),
                                                 color_group=color, label=etiqueta, layer_order=capa))
+        self.cerrar(desde, color, etiqueta)
 
     def cilindro(self, centro: Vec, eje: Vec, a: Vec, b: Vec, r: float, largo: float, color: str,
                  capa: int, etiqueta: str = "", lados: int = 20) -> None:
@@ -220,6 +270,7 @@ class _Constructor:
         abajo = [_sum(centro, _mul(eje, -largo / 2), _mul(d, r)) for d in rad]
         arriba = [_sum(centro, _mul(eje, largo / 2), _mul(d, r)) for d in rad]
         P = lambda q: self._p(q, False)
+        desde = len(self.caras)
         self.caras.append(PolygonFace3D(vertices=tuple(P(q) for q in reversed(abajo)), normal=self.girar(_mul(eje, -1)),
                                         color_group=color, label=etiqueta, layer_order=capa))
         self.caras.append(PolygonFace3D(vertices=tuple(P(q) for q in arriba), normal=self.girar(eje),
@@ -229,6 +280,7 @@ class _Constructor:
             normal = self.girar(_mul(_sum(rad[i], rad[j]), 0.5))
             self.caras.append(PolygonFace3D(vertices=(P(abajo[i]), P(abajo[j]), P(arriba[j]), P(arriba[i])),
                                             normal=normal, color_group=color, label=etiqueta, layer_order=capa))
+        self.cerrar(desde, color, etiqueta)
 
     def contorno(self, puntos: Iterable[Vec], color: str, etiqueta: str = "") -> None:
         pts = [self._p(p, False) for p in puntos]
@@ -287,6 +339,7 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
         o = _sum(col["o"], (0, 0, desplaz.get(grupo, 0.0)), _mul(n, -ex), (0, cl if cub else 0, 0))
         color = "resalte" if (cub and op.resaltar_cubierta) else k.color(paso_p, _GRUPO_COLOR.get(grupo, "base"))
         k.caja(o, u, vv, n, p.ancho, p.alto, t, color, _GRUPO_CAPA.get(grupo, 30), p.nombre)
+        sol_panel = k.solidos[-1]
         fuera = _mul(n, -1)
         if col["id"] in op.etiquetas:
             man = [c for c in calados.get(p.id, []) if c.tipo == "manija"]
@@ -307,6 +360,7 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
                        "profile", f"{p.nombre}: {c.tipo}")
             k.calados.append((p.nombre, [k._p(_sum(o, _mul(u, a), _mul(vv, b)), False)
                                          for a, b in _rect_redondeado(x0, y0, x1, y1, c.radio)]))
+            sol_panel.agujeros.append(k.calados[-1][1])
             if c.tipo.startswith("encastre") and k.visible(P_RUEDAS):
                 # plato de apilado: reborde por fuera y cubeta metida en la tapa (encastre de flightcase.scad)
                 ala, prof = geo.get("encastre_ala", 10), geo.get("encastre_prof", 30)
@@ -504,7 +558,8 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
     pts = [p for f in k.caras for p in f.vertices] or [Point3D(0, 0, 0)]
     caja = (Point3D(min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)),
             Point3D(max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
-    return Malla3D(faces=k.caras, segments=k.segmentos, bounding_box=caja, rotulos=k.rotulos, calados=k.calados)
+    return Malla3D(faces=k.caras, segments=k.segmentos, bounding_box=caja, rotulos=k.rotulos, calados=k.calados,
+                   solidos=k.solidos)
 
 
 _COLOR_INTERIOR = {"equipo": "equipo", "rack": "equipo", "riel": "aluminio", "corredera": "aluminio",
@@ -572,28 +627,45 @@ def _espuma_3d(k: _Constructor, bl, capa: int, c=None, color: str = "espuma") ->
             for b in bl.bolsillos:
                 if b["u0"] < um < b["u1"] and b["v0"] < vm < b["v1"]:
                     alto[i][j] = min(alto[i][j], b["fondo"])
-    cara([P(0, 0, 0), P(Wu, 0, 0), P(Wu, Wv, 0), P(0, Wv, 0)], eje(a, -sg))
+    # Para que el bloque sea un sólido cerrado (STEP), el fondo va partido en las celdas
+    # de la grilla y cada pared lleva vértices en todas las alturas que se juntan en sus
+    # aristas verticales: así cada arista la comparten exactamente dos caras.
+    H = lambda i, j: alto[i][j] if 0 <= i < nu and 0 <= j < nv and alto[i][j] > 0.01 else 0.0
+    desde = len(k.caras)
+
+    def alturas(i: int, j: int, lo_: float, hi_: float) -> List[float]:
+        """Alturas de las celdas que tocan el nudo (i, j) de la grilla, entre lo_ y hi_."""
+        hs = {H(i - 1, j - 1), H(i, j - 1), H(i - 1, j), H(i, j), 0.0}
+        return sorted(h for h in hs if lo_ + 0.01 < h < hi_ - 0.01)
+
+    def pared(n0, n1, punto, lo_, hi_, normal):
+        """Pared vertical entre los nudos n0 y n1 (de lo_ a hi_), subiendo por n1 y bajando por n0."""
+        verts = [punto(n0, lo_), punto(n1, lo_)]
+        verts += [punto(n1, h) for h in alturas(*n1, lo_, hi_)]
+        verts += [punto(n1, hi_), punto(n0, hi_)]
+        verts += [punto(n0, h) for h in reversed(alturas(*n0, lo_, hi_))]
+        cara(verts, normal)
+
+    nudo = lambda nd, d: P(us[nd[0]], vs[nd[1]], d)
     for i in range(nu):
         for j in range(nv):
-            h = alto[i][j]
-            if h > 0.01:
+            h = H(i, j)
+            if h > 0:
+                cara([P(us[i], vs[j], 0), P(us[i + 1], vs[j], 0), P(us[i + 1], vs[j + 1], 0), P(us[i], vs[j + 1], 0)],
+                     eje(a, -sg))
                 cara([P(us[i], vs[j], h), P(us[i + 1], vs[j], h), P(us[i + 1], vs[j + 1], h), P(us[i], vs[j + 1], h)],
                      eje(a, sg))
-    H = lambda i, j: alto[i][j] if 0 <= i < nu and 0 <= j < nv else 0.0
     for i in range(nu + 1):          # paredes perpendiculares a u
         for j in range(nv):
             h0, h1 = H(i - 1, j), H(i, j)
             if abs(h0 - h1) > 0.01:
-                lo_, hi_ = min(h0, h1), max(h0, h1)
-                cara([P(us[i], vs[j], lo_), P(us[i], vs[j + 1], lo_), P(us[i], vs[j + 1], hi_), P(us[i], vs[j], hi_)],
-                     eje(ua, 1.0 if h0 > h1 else -1.0))
+                pared((i, j), (i, j + 1), nudo, min(h0, h1), max(h0, h1), eje(ua, 1.0 if h0 > h1 else -1.0))
     for j in range(nv + 1):          # paredes perpendiculares a v
         for i in range(nu):
             h0, h1 = H(i, j - 1), H(i, j)
             if abs(h0 - h1) > 0.01:
-                lo_, hi_ = min(h0, h1), max(h0, h1)
-                cara([P(us[i], vs[j], lo_), P(us[i + 1], vs[j], lo_), P(us[i + 1], vs[j], hi_), P(us[i], vs[j], hi_)],
-                     eje(va, 1.0 if h0 > h1 else -1.0))
+                pared((i, j), (i + 1, j), nudo, min(h0, h1), max(h0, h1), eje(va, 1.0 if h0 > h1 else -1.0))
+    k.cerrar(desde, color, bl.nombre)
 
 
 def _rect_redondeado(x0: float, y0: float, x1: float, y1: float, r: float, por_esquina: int = 8):
@@ -760,10 +832,12 @@ def _herraje_manual(k: _Constructor, geo: dict, o: Vec, u: Vec, v: Vec, n: Vec, 
                 L = math.hypot(c - a, d - b)
                 if L < 1e-6:
                     continue
-                na, nb = -(d - b) / L * trazo / 2, (c - a) / L * trazo / 2
-                cara = [P(a + na, b + nb, z), P(c + na, d + nb, z), P(c - na, d - nb, z), P(a - na, b - nb, z)]
-                k.caras.append(PolygonFace3D(vertices=tuple(k._p(q, False) for q in cara), normal=k.girar(fuera),
-                                             color_group=color_t, label=h.nombre, layer_order=capa))
+                # cada trazo es una barra fina sobre la cara (un sólido, también para el STEP)
+                tx, ty = (c - a) / L, (d - b) / L
+                dir_ = _sum(_mul(u, tx), _mul(v, ty))
+                perp = _sum(_mul(u, -ty), _mul(v, tx))
+                k.caja(_sum(P(a, b, z), _mul(perp, -trazo / 2)), dir_, perp, fuera, L, trazo, 0.3, color_t, capa,
+                       h.nombre)
     else:
         alto = 8.0 if h.categoria != "tope" else 12.0
         k.caja(P(x0, y0, 0), u, v, fuera, h.pw, h.ph, alto, col, capa, h.nombre)
