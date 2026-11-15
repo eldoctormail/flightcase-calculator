@@ -43,6 +43,7 @@ class Opciones3D:
     cubierta_abierta: float = 0.0
     etiquetas: Dict[str, str] = field(default_factory=dict)   # id de panel -> "P3"
     interior: bool = True           # equipos, espuma, cajones y rack (sólo con paso = 99)
+    resaltar_interior: str = ""     # tipos del interior en naranja, separados por coma ("espuma,equipo")
 
     @classmethod
     def desde_defs(cls, defs: dict) -> "Opciones3D":
@@ -55,7 +56,8 @@ class Opciones3D:
                    abrir_tapa=float(defs.get("abrir_tapa", 0)), resaltar_que=str(defs.get("resaltar_que", "")),
                    resaltar_cubierta=bool(defs.get("resaltar_cubierta", False)),
                    vista_parte=str(defs.get("vista_parte", "")),
-                   cubierta_abierta=float(defs.get("cubierta_abierta", 0)), etiquetas=dict(et))
+                   cubierta_abierta=float(defs.get("cubierta_abierta", 0)), etiquetas=dict(et),
+                   resaltar_interior=str(defs.get("resaltar_interior", "")))
 
 
 @dataclass
@@ -497,6 +499,7 @@ def _interior_3d(k: _Constructor, interior, lift: float = 0.0) -> None:
     está dentro de una tapa (espuma de la tapa, un equipo que entra en ella) se mueve con ella."""
     capa = ComponentLayer.INTERNAL_DIVIDERS
     arriba = k.girar((0.0, 0.0, 1.0))   # hacia la tapa 1, en el mundo
+    resaltar = {x.strip() for x in k.op.resaltar_interior.split(",") if x.strip()}
 
     def mover(c):
         t = interior.en_tapa(c) * interior.signo_tapa * lift
@@ -511,13 +514,15 @@ def _interior_3d(k: _Constructor, interior, lift: float = 0.0) -> None:
         color = _COLOR_INTERIOR.get(so.tipo, "equipo")
         if so.tipo == "rack" and so.nombre.endswith("(frente)"):
             color = "rack_frente"
+        if so.tipo in resaltar:
+            color = "resalte"
         k.caja((c.x0, c.y0, c.z0), (1, 0, 0), (0, 1, 0), (0, 0, 1), c.med(0), c.med(1), c.med(2), color, capa,
                so.nombre, mundo=True)
     for bl in interior.espumas:
-        _espuma_3d(k, bl, capa, mover(bl.caja))
+        _espuma_3d(k, bl, capa, mover(bl.caja), "resalte" if "espuma" in resaltar else "espuma")
 
 
-def _espuma_3d(k: _Constructor, bl, capa: int, c=None) -> None:
+def _espuma_3d(k: _Constructor, bl, capa: int, c=None, color: str = "espuma") -> None:
     """Bloque de espuma como relieve: cada celda de la grilla que forman los calados tiene su
     propia altura (el fondo del calado o la cara abierta del bloque)."""
     c, a = c or bl.caja, bl.eje
@@ -537,7 +542,7 @@ def _espuma_3d(k: _Constructor, bl, capa: int, c=None) -> None:
         return (n[0], n[1], n[2])
 
     def cara(verts, normal):
-        k.caras.append(PolygonFace3D(vertices=tuple(verts), normal=normal, color_group="espuma",
+        k.caras.append(PolygonFace3D(vertices=tuple(verts), normal=normal, color_group=color,
                                      label=bl.nombre, layer_order=capa))
 
     us = sorted({0.0, Wu} | {round(b[x], 3) for b in bl.bolsillos for x in ("u0", "u1")})
