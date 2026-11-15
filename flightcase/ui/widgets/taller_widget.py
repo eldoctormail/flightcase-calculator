@@ -331,6 +331,10 @@ class TallerWidget(QWidget):
         self.vista_3d.setMinimumHeight(260)
         l3d.addWidget(self.vista_3d, 1)
         self.tabs.addTab(pagina_3d, "Vista 3D")
+        from .herrajes_2d_widget import HerrajesManualesWidget
+        self.herrajes = HerrajesManualesWidget(self)
+        self.herrajes.cambiado.connect(self._herrajes_cambiados)
+        self.tabs.addTab(self.herrajes, "Herrajes a mano")
         self.tabla_paneles = self._tabla(["Pieza", "Ancho", "Alto", "Calados"])
         self.tabla_perfiles = self._tabla(["Perfil", "Descripción", "Largo", "Cant.", "Corte"])
         self.tabla_herrajes = self._tabla(["Herraje", "Cant.", "Detalle", "Ref."])
@@ -383,9 +387,14 @@ class TallerWidget(QWidget):
                 ok = False
         return ok
 
+    def _herrajes_cambiados(self, filas: List[Any]) -> None:
+        self.params["herrajes_manuales"] = filas
+        self.recalcular()
+
     def set_params(self, params: Dict[str, Any], ruta: Optional[str] = None) -> None:
         self.params = dict(self.defectos)
         self.params.update(params)
+        self.params["_carpeta"] = os.path.dirname(os.path.abspath(ruta)) if ruta else ""
         self.ruta = ruta
         self.lbl_archivo.setText(os.path.basename(ruta) if ruta else "Proyecto nuevo")
         self._cargar_en_editores()
@@ -434,6 +443,7 @@ class TallerWidget(QWidget):
                                       "en las secciones «Interior» de la izquierda.")
             self._llenar(self.tabla_interior, [])
         self._habia_interior = interior is not None
+        self.herrajes.set_resultado(res, self.params.get("herrajes_manuales", []), self.params.get("_carpeta", ""))
         self._actualizar_3d()
 
     def _actualizar_3d(self, *_args) -> None:
@@ -487,10 +497,30 @@ class TallerWidget(QWidget):
             return
         if not ruta.lower().endswith(".scad"):
             ruta += ".scad"
+        self._mudar_logos(os.path.dirname(os.path.abspath(ruta)))
+        self.herrajes.carpeta = self.params["_carpeta"]
         with open(ruta, "w", encoding="utf-8") as f:
             f.write(self.texto_proyecto())
         self.ruta = ruta
         self.lbl_archivo.setText(os.path.basename(ruta))
+
+    def _mudar_logos(self, carpeta: str) -> None:
+        """Al guardar en otra carpeta, los logos con ruta relativa siguen apuntando al mismo archivo."""
+        vieja = self.params.get("_carpeta", "")
+        filas = []
+        for e in self.params.get("herrajes_manuales") or []:
+            if isinstance(e, list) and len(e) > 8 and isinstance(e[8], str) and e[8]:
+                absoluta = e[8] if os.path.isabs(e[8]) else os.path.abspath(os.path.join(vieja or carpeta, e[8]))
+                try:
+                    rel = os.path.relpath(absoluta, carpeta)
+                except ValueError:
+                    rel = absoluta
+                e = list(e)
+                e[8] = absoluta if rel.startswith("..") else rel.replace(os.sep, "/")
+            filas.append(e)
+        if filas:
+            self.params["herrajes_manuales"] = filas
+        self.params["_carpeta"] = carpeta
 
     def exportar(self, carpeta: Optional[str] = None):
         from ...taller.produccion import exportar

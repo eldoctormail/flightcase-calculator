@@ -347,4 +347,7 @@ class ExportTallerPackFromScadUseCase:
         from ..taller.produccion import exportar
         from ..taller.scad import leer_proyecto
 
-        return exportar(calcular(leer_proyecto(scad_path)), folder, rotar=rotar, pdf=pdf)
+        import os
+        params = leer_proyecto(scad_path)
+        params["_carpeta"] = os.path.dirname(os.path.abspath(scad_path))   # logos con ruta relativa
+        return exportar(calcular(params), folder, rotar=rotar, pdf=pdf)

@@ -147,7 +147,15 @@ En las secciones **Interior** de la pestaña Taller se carga lo que va adentro, 
 - **Rack 19"** (frontal: rieles verticales; vertical: rack de tapa superior): rieles, suplementos si el interior es más ancho, equipos por U, carátulas ciegas para las unidades libres, tuercas enjauladas y tornillos.
 - **Chequeos**: piezas que se salen del interior o del cuerpo, choques entre equipos, bandejas, cajones, rieles y espuma, fondo del rack con lugar para cables, perillas contra la tapa, equipos pesados sin soporte trasero, paredes y fondo mínimos de la espuma.
 
+En el paquete, `planos.pdf` suma hojas del interior (vista 3D con las tapas abiertas, la espuma capa por capa con calados y rebajes, el rack de frente con sus U y los frentes de los cajones) y el instructivo suma los pasos de montaje del rack, cada cajón y la espuma.
+
 La pestaña **Interior** resume el espacio útil y el peso, y en la **Vista 3D** la casilla *Ver el interior* abre las tapas. Los parámetros se guardan en el mismo `.scad` (OpenSCAD los ignora).
+
+### Herrajes a mano
+
+La pestaña **Herrajes a mano** muestra cada cara del case en 2D, vista desde afuera y derecha (como queda parado en uso), con los paneles, el aluminio (ángulos, perfiles de cierre, esquineros), la junta de cierre de la tapa y los herrajes automáticos en gris. Ahí se agregan herrajes del catálogo (manijas, cierres, bisagras, topes, pies, ruedas, platos, extras), piezas propias con nombre y medida, y **placas de logo** a partir de un dibujo `.svg` o `.dxf` (remachadas o grabadas). Cada herraje se arrastra con el mouse o se ubica exacto con X/Y (centro, desde el borde izquierdo y desde abajo); se gira, se voltea, se copia, se espeja a la cara opuesta o se reemplaza por otro del catálogo. Al arrastrar, el imán lo pega a la junta de cierre, al borde del aluminio, a los ejes de la cara y a los otros herrajes (Alt lo suelta); las flechas lo mueven de a 1 mm (Mayús: 10 mm). Los cierres y bisagras se centran solos sobre la junta y se marcan en el cuerpo y en la tapa.
+
+Lo que se pone a mano sale en los calados de los paneles y sus DXF (marcas en la capa `MARCA`, logos grabados en `GRABADO`), la lista de herrajes y materiales (con sus remaches), la vista 3D, `planos.pdf` (en azul, con el centro acotado) y un paso del instructivo. Se guarda en el `.scad` como `herrajes_manuales = [[ref, cara, x, y, giro, espejo, ancho, alto, archivo, modo], ...]`; la app avisa si un herraje pisa el aluminio, se sale del panel o choca con otro calado.
 
 Los tests comparan el resultado con OpenSCAD: los datos de 18 proyectos y variantes (`tests/golden/taller`) y las listas y DXF de 3 proyectos (`tests/golden/taller_paquete`). Para regenerarlos: `python tools/generar_golden.py ruta/a/flightcase-generador`.
 

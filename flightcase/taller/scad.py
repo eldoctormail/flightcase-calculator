@@ -132,7 +132,7 @@ def escribir_proyecto(params: Dict[str, Any], por_defecto: Optional[Dict[str, An
     lineas += ["// Proyecto guardado desde Flightcase Calculator.", "",
                "include <flightcase_gen/flightcase.scad>", ""]
     cambios = {k: v for k, v in params.items()
-               if por_defecto is None or k not in por_defecto or por_defecto[k] != v}
+               if not k.startswith("_") and (por_defecto is None or k not in por_defecto or por_defecto[k] != v)}
     ancho = max((len(k) for k in cambios), default=0)
     for k, v in cambios.items():
         lineas.append(f"{k.ljust(ancho)} = {literal(v)};")

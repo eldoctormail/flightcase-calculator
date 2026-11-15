@@ -334,6 +334,7 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
     color_tapa = color_seguro(colores_case[1])
     COTA = "#1f4e9c"
     MARCA = "#c0392b"
+    MANUAL = "#1f5fbf"   # herrajes puestos a mano
 
     def fmt(v):
         return f"{v:.1f}".rstrip("0").rstrip(".")
@@ -506,13 +507,16 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
         # si un tipo de calado se repite, se acota solo el de abajo a la izquierda
         acotar = {}
         for c in pz["calados"]:
-            if c["tipo"] != "agujero":
+            if c["tipo"] != "agujero" and not c["tipo"].endswith(" a mano"):
                 prev = acotar.get(c["tipo"])
                 if prev is None or c["cx"] + c["cy"] < prev["cx"] + prev["cy"]:
                     acotar[c["tipo"]] = c
         repetidos = {t: sum(1 for c in pz["calados"] if c["tipo"] == t) for t in acotar}
         for c in pz["calados"]:
             if c["tipo"] == "agujero":
+                continue
+            if c["tipo"] == "agujero a mano":
+                ax.add_patch(patches.Circle((c["cx"], c["cy"]), c["w"] / 2, fc="white", ec=MANUAL, lw=0.9))
                 continue
             x0, y0 = c["cx"] - c["w"] / 2, c["cy"] - c["h"] / 2
             ax.add_patch(patches.FancyBboxPatch(
@@ -522,7 +526,7 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
             rb = d["info"].get("rebaje", ["3"])
             ax.text(c["cx"], c["cy"], (f"REBAJE\n{fmt(c['w'])} x {fmt(c['h'])}\nprof. {fmt(float(rb[0]))}\ncara sup."
                                        if c["tipo"] == "rebaje" else
-                                       f"CALADO {c['tipo'].upper()}\n{fmt(c['w'])} x {fmt(c['h'])}"
+                                       f"CALADO {c['tipo'].upper().replace(' A MANO', '')}\n{fmt(c['w'])} x {fmt(c['h'])}"
                                        f"\nR{fmt(c['r'])}"), ha="center", va="center", fontsize=7 if c["tipo"] == "rebaje" else 8,
                     bbox=dict(fc="white", ec="none", pad=1))
             if acotar.get(c["tipo"]) is c:
@@ -609,6 +613,26 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
                 cota_v(ax, ys[0], ys[1], xs[-1] + paso * 0.4, xs[-1])
             notas.append(f"{len(agujeros)} agujeros Ø{fmt(a0['w'])} pasantes, mismo patrón "
                          f"en las 4 ruedas (simétrico).")
+
+        man = d.get("manuales", {}).get(pz["ids"][0], [])
+        for hm in man:
+            x0, y0 = hm["x"] - hm["w"] / 2, hm["y"] - hm["h"] / 2
+            if hm["forma"] == "pie":
+                ax.add_patch(patches.Circle((hm["x"], hm["y"]), hm["w"] / 2, fc="none", ec=MANUAL, lw=0.9, ls="--"))
+            elif hm["forma"] != "calado":
+                ax.add_patch(patches.Rectangle((x0, y0), hm["w"], hm["h"], fc="none", ec=MANUAL, lw=0.9, ls="--"))
+            for ln in hm.get("lineas", []):
+                ax.plot([q[0] for q in ln], [q[1] for q in ln], color=MANUAL, lw=0.6)
+            ax.plot(hm["x"], hm["y"], marker="+", color=MANUAL, ms=10, mew=1.0)
+            cota_h(ax, 0, hm["x"], hm["y"], hm["y"], col=MANUAL)
+            cota_v(ax, 0, hm["y"], hm["x"], hm["x"], col=MANUAL)
+            if hm["forma"] != "calado":
+                ax.text(hm["x"], y0 + hm["h"] + paso * 0.15, hm["nombre"] if len(hm["nombre"]) <= 34 else hm["nombre"][:33] + "…",
+                        ha="center", va="bottom", fontsize=6.5, color=MANUAL)
+        if man:
+            notas.append("Herrajes a mano (azul): centro acotado desde el borde izquierdo y desde el de abajo: "
+                         + "; ".join(f"{hm['nombre']} ({fmt(hm['x'])}, {fmt(hm['y'])})" for hm in man)
+                         + (". Logo grabado: el dibujo está en la capa GRABADO del DXF." if any(hm["modo"] == "grabado" for hm in man) else "."))
 
         n_niveles = len(xs_c) + len(bis)
         ax.set_xlim(-paso * 2.6, w + paso * (1.0 + 0.9 * len(acc)))

@@ -243,3 +243,45 @@ def test_tablas_del_editor(qapp):
 def qapp():
     from PySide6.QtWidgets import QApplication
     return QApplication.instance() or QApplication([])
+
+
+def test_hojas_del_interior_para_planos(tmp_path, qapp):
+    from flightcase.taller.planos import interior as pl
+    res = calcular(dict(RACK, rack_u=12, rack_desde=420, rack_equipos=[["Consola", 3, 420, 8]],
+                        cajones=[[200, 0], [200, 200]], equipos=[["Micro", 200, 60, 60, 0.4, "c", 640, 500]],
+                        espumas=[[0, 120, 0]]))
+    piezas = [dict(nombre="Cajón 1 frente", num=8, extra=True), dict(nombre="Cajón 1 lateral", num=9, extra=True)]
+    vistas = pl.vistas_planos(res, str(tmp_path), piezas)
+    titulos = [v[0] for v in vistas]
+    assert titulos == ["Interior: espuma 1 por capas", "Interior: rack 19\"", "Interior: cajones"]
+    assert all(os.path.getsize(v[1]) > 1000 for v in vistas)
+    assert "Suplemento de 15,9 mm" in vistas[1][2] and "420 mm del piso interior" in vistas[1][2]
+    assert "(P8, P9)" in vistas[2][2]
+    assert "rebaje" in vistas[0][2]
+
+
+def test_pasos_del_interior_en_el_instructivo():
+    from flightcase.taller.planos import interior as pl
+    res = calcular(dict(RACK, rack_u=12, rack_traseros=True, rack_equipos=[["Consola", 3, 420], ["Potencia", 2, 480]],
+                        cajones=[[200, 0]], equipos=[["Micro", 200, 60, 60]], espumas=[[0, 120, 0]]))
+    pasos = pl.pasos_instructivo(res, [dict(nombre="Cajón 1 frente", num=8, extra=True)])
+    assert [p["titulo"] for p in pasos] == ["Interior: rack 19\"", "Interior: cajón 1", "Interior: espuma"]
+    rack = " ".join(pasos[0]["texto"])
+    assert "Consola en U1–3, Potencia en U4–5" in rack and "rieles traseros" in rack and "533,4" in rack
+    assert "frente P8" in pasos[1]["texto"][0]
+    assert all(p["defs"]["paso"] == 99 and p["defs"]["abrir_tapa"] > 0 for p in pasos)
+    assert pl.pasos_instructivo(calcular(), []) == []
+
+
+def test_lamina_resalta_el_interior():
+    from flightcase.taller.geometria import Opciones3D, malla_3d
+    res = calcular(dict(RACK, rack_u=6))
+    m = malla_3d(res, Opciones3D.desde_defs({"paso": 99, "abrir_tapa": 800, "resaltar_interior": "riel"}))
+    assert any(f.color_group == "resalte" and f.label.startswith("Riel") for f in m.faces)
+
+
+def test_paquete_con_interior_suma_hojas(tmp_path):
+    res = calcular(dict(RACK, rack_u=8, rack_equipos=[["Consola", 3, 420]]))
+    paq = exportar(res, str(tmp_path), instructivo=False)
+    assert str(tmp_path / "interior_rack.png") in paq.archivos
+    assert str(tmp_path / "interior.png") in paq.archivos

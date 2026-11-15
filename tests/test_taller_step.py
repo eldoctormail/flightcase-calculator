@@ -44,6 +44,7 @@ def test_todos_los_cuerpos_son_solidos_cerrados(params):
     avisos = []
     lista = cuerpos(malla, avisos)
     assert len(lista) == len(malla.solidos)
+    assert sum(s.hasta - s.desde for s in malla.solidos) == len(malla.faces)   # nada queda afuera
     assert all(c.cerrado for c in lista), [c.nombre for c in lista if not c.cerrado]
     assert all(c.volumen() > 0 for c in lista)
     assert not avisos
@@ -147,3 +148,24 @@ def test_lo_abre_opencascade(tmp_path):
         n += 1
         ex.Next()
     assert n == st.cuerpos
+
+
+def test_herrajes_a_mano_y_logos(tmp_path):
+    """Herrajes puestos a mano (manijas giradas, ruedas con bulones, pies, logos) también cierran."""
+    (tmp_path / "logo.svg").write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><path d="M10 10 L70 10 L70 90 Z"/>'
+        '<circle cx="150" cy="50" r="30"/></svg>', encoding="utf-8")
+    res = calcular({"_carpeta": str(tmp_path), "manijas": False, "herrajes_manuales": [
+        ["08-34082", "izq", 200, 120], ["08-17373S", "frente", 150, 0], ["08-4907", "abajo", 300, 200],
+        ["08-34331", "der", 200, 120, 90], ["08-372151", "abajo", 120, 120],
+        ["Chapa", "trasera", 300, 120, 0, 0, 80, 40],
+        ["logo", "frente", 300, 120, 0, 1, 160, 0, "logo.svg"],
+        ["logo", "izq", 200, 120, 90, 0, 100, 0, "logo.svg", "grabado"]]})
+    malla = malla_3d(res)
+    avisos = []
+    lista = cuerpos(malla, avisos)
+    assert all(c.cerrado and c.volumen() > 0 for c in lista)
+    assert any(c.nombre.startswith("Placa de logo") for c in lista)
+    # todas las caras de la vista 3D salen en algún sólido (nada queda afuera del STEP)
+    assert sum(s.hasta - s.desde for s in malla.solidos) == len(malla.faces)
+    assert not avisos
