@@ -1,787 +1,195 @@
-"""Main PySide6 Application Window for Flightcase Calculator."""
+"""Ventana principal: el Taller, para armar cases a medida con las reglas propias."""
 
 from __future__ import annotations
-import sys
-import os
-from typing import Optional, List
-from PySide6.QtCore import Qt, QSettings, QObject, QEvent
-from PySide6.QtGui import QIcon, QAction, QCloseEvent, QSurfaceFormat
-from PySide6.QtWidgets import (
-    QApplication,
-    QMainWindow,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QSplitter,
-    QTabWidget,
-    QStatusBar,
-    QMessageBox,
-    QFileDialog,
-    QScrollArea,
-    QFrame,
-    QMenu,
-)
 
-from ..domain.exceptions import FlightCaseDomainError
-from ..application import (
-    CaseInputDTO,
-    UISettingsDTO,
-    CalculateFlightCaseUseCase,
-    GenerateSchema3DUseCase,
-    GenerateWoodPanelsSvgUseCase,
-    SaveProjectUseCase,
-    LoadProjectUseCase,
-    CalculationResultDTO,
-)
-from ..i18n import tr
-from .theme import DARK_THEME_QSS
+import os
+import sys
+from typing import List, Optional
+
+from PySide6.QtCore import QEvent, QObject, QSettings, Qt
+from PySide6.QtGui import QAction, QCloseEvent, QIcon, QSurfaceFormat
+from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMenu, QMessageBox, QStatusBar, QWidget
+
 from ..paths import bundled_resource
 from ..taller.scad import leer_proyecto
-from .widgets import (
-    CaseInputPanel,
-    InsideWallsWidget,
-    Schema3DWidget,
-    CutListTableWidget,
-    AluProfilesWidget,
-    WoodPanelsSvgWidget,
-    WoodTypesWidget,
-    CostsWidget,
-    CatalogWidget,
-    TallerWidget,
-)
-from ..application import CalculateQuoteUseCase, ExportProductionPackUseCase, ExportTallerPackFromScadUseCase
-from ..production.catalog import Catalog
-from ..production.pack import full_report_csv
+from .theme import DARK_THEME_QSS
+from .widgets import TallerWidget
+
+TITULO = "LBD Flightcase Maker"
+MAX_RECIENTES = 8
+
+
+def _settings() -> QSettings:
+    return QSettings("FlightcaseCalculator", "FlightcaseCalculator")
 
 
 class FlightCaseMainWindow(QMainWindow):
-    """Main window coordinating inputs, domain calculations, 3D schema, and cut lists."""
+    """El Taller ocupa toda la ventana; el menú Archivo maneja los proyectos .scad."""
 
-    def __init__(
-        self,
-        parent: Optional[QWidget] = None,
-        restore_settings: bool = True,
-        load_last_project: bool = True,
-    ):
+    def __init__(self, parent: Optional[QWidget] = None, restore_settings: bool = True,
+                 load_last_project: bool = True):
         super().__init__(parent)
-        self.setWindowTitle("Calculadora de Flightcases — Sin título")
         self.setWindowIcon(icono_app())
-        self._current_result: Optional[CalculationResultDTO] = None
-        self._current_project_path: Optional[str] = None
-
-        self._init_ui()
-        self._init_menus()
-        self._connect_signals()
-
-        # Restore window geometry and splitter state
-        if restore_settings:
-            self._restore_settings()
-
-        # Load last project or perform initial calculation
-        if load_last_project:
-            self._load_startup_project()
-        else:
-            self.recalculate()
-            self._update_window_title()
-
-    def _init_ui(self) -> None:
-        central_widget = QWidget(self)
-        self.setCentralWidget(central_widget)
-        main_layout = QHBoxLayout(central_widget)
-        main_layout.setContentsMargins(8, 8, 8, 8)
-
-        # Main horizontal layout:
-        # [ Left/Center: Splitter with Output Tables & 3D/2D Schema | Right: Fixed Configuration Panel ]
-        self.main_splitter = QSplitter(Qt.Horizontal, self)
-
-        # 1. Left Pane: Tabs containing dimensions / cutlist output tables
-        self.tabs = QTabWidget(self)
-        self.cutlist_widget = CutListTableWidget(self)
-        self.alu_widget = AluProfilesWidget(self)
-        self.wood_types_widget = WoodTypesWidget(self)
-        self.catalog = Catalog()
-        self._current_quote = None
-        self.costs_widget = CostsWidget(self)
-        self.catalog_widget = CatalogWidget(self.catalog, self)
-
-        self.tabs.addTab(self.cutlist_widget, "Lista de cortes")
-        self.tabs.addTab(self.alu_widget, "Perfiles de aluminio")
-        self.tabs.addTab(self.costs_widget, "Presupuesto y herrajes")
-        self.tabs.addTab(self.wood_types_widget, "Tipos de madera")
-        self.tabs.addTab(self.catalog_widget, "Catálogo de herrajes y perfiles")
-        self.main_splitter.addWidget(self.tabs)
-
-        # 2. Center Pane: Central tabs containing 3D Schema and 2D Wood Panels Diagram
-        self.center_tabs = QTabWidget(self)
-        self.schema_widget = Schema3DWidget(self)
-        self.svg_widget = WoodPanelsSvgWidget(self)
-
-        # El Taller (las reglas de construcción propias) es la parte principal: va primero.
-        # El modelo simple queda como «Cálculo rápido».
+        self.resize(1400, 900)
         self.taller_widget = TallerWidget(self)
-        self.center_tabs.addTab(self.taller_widget, "Taller")
-        self.center_tabs.addTab(self.schema_widget, "Cálculo rápido: 3D")
-        self.center_tabs.addTab(self.svg_widget, "Cálculo rápido: paneles 2D")
-        self.center_tabs.setTabToolTip(0, "Cases con las reglas de construcción del taller (proyectos .scad)")
-        self.center_tabs.setTabToolTip(1, "Cálculo simple de una caja (proyectos .fcproj)")
-        self.center_tabs.setTabToolTip(2, "Cálculo simple de una caja (proyectos .fcproj)")
-        self.center_tabs.currentChanged.connect(self._on_center_tab_changed)
-        self.taller_widget.resultado_cambiado.connect(self._estado_taller)
-        self.main_splitter.addWidget(self.center_tabs)
-
-        # Set splitter proportions (40% left output tables, 60% center 3D schema)
-        self.main_splitter.setStretchFactor(0, 40)
-        self.main_splitter.setStretchFactor(1, 60)
-
-        # 3. Right Pane: Permanent Configuration Panel (Dimensions & Specs + Inside Walls)
-        self.input_panel = CaseInputPanel(self)
-        self.walls_widget = InsideWallsWidget(self)
-
-        self.config_container = QWidget(self)
-        config_layout = QVBoxLayout(self.config_container)
-        config_layout.setContentsMargins(0, 0, 0, 0)
-        config_layout.setSpacing(12)
-        config_layout.addWidget(self.input_panel)
-        config_layout.addWidget(self.walls_widget)
-        config_layout.addStretch(1)
-
-        main_layout.addWidget(self.main_splitter, stretch=1)
-        main_layout.addWidget(self.config_container, stretch=0)
-        self._on_center_tab_changed(self.center_tabs.currentIndex())
-
-        # Status Bar
+        self.setCentralWidget(self.taller_widget)
         self.status_bar = QStatusBar(self)
         self.setStatusBar(self.status_bar)
-        self.status_bar.showMessage("Listo. Todas las validaciones del modelo son correctas.")
+        self.taller_widget.resultado_cambiado.connect(self._estado_taller)
+        self._init_menus()
+        if restore_settings:
+            self._restore_settings(load_last_project)
+        self._actualizar()
+
+    # ------------------------------------------------------------------ menús
+    def _accion(self, menu: QMenu, texto: str, atajo: Optional[str], funcion, ayuda: str = "") -> QAction:
+        a = QAction(texto, self)
+        if atajo:
+            a.setShortcut(atajo)
+        if ayuda:
+            a.setStatusTip(ayuda)
+        a.triggered.connect(funcion)
+        menu.addAction(a)
+        return a
 
     def _init_menus(self) -> None:
-        menu_bar = self.menuBar()
-
-        # File Menu
-        self.file_menu = menu_bar.addMenu("&Archivo")
-
-        # --- Taller: la parte principal, con los atajos de siempre ---
-        self.file_menu.addSection("Taller")
-        for texto, atajo, slot, ayuda in (
-                ("&Nuevo case", "Ctrl+N", self._taller_nuevo, "Case nuevo con las reglas del taller"),
-                ("&Abrir case (.scad)...", "Ctrl+O", self._open_taller_project, "Abrir un proyecto del taller"),
-                ("&Guardar case", "Ctrl+S", self._taller_guardar, "Guardar el proyecto del taller"),
-                ("Guardar case &como...", "Ctrl+Shift+S", self._taller_guardar_como, "Guardar en otro archivo"),
-                ("Exportar &paquete del taller (planos, DXF, instructivo)...", "Ctrl+P", self._taller_exportar,
-                 "Planos, DXF por pieza y de la espuma, listas e instructivo de montaje")):
-            act = QAction(texto, self)
-            act.setShortcut(atajo)
-            act.setStatusTip(ayuda)
-            act.triggered.connect(slot)
-            self.file_menu.addAction(act)
-
-        # --- Cálculo rápido (modelo simple, proyectos .fcproj) ---
-        self.quick_menu = QMenu("Cálculo &rápido (.fcproj)", self)
-        new_action = QAction("&Nuevo proyecto", self)
-        new_action.setStatusTip("Crear un proyecto de cálculo rápido nuevo")
-        new_action.triggered.connect(self._new_project)
-        self.quick_menu.addAction(new_action)
-
-        open_action = QAction("A&brir proyecto...", self)
-        open_action.setStatusTip("Abrir un archivo de proyecto existente")
-        open_action.triggered.connect(self._open_project)
-        self.quick_menu.addAction(open_action)
-
-        save_action = QAction("&Guardar proyecto", self)
-        save_action.setStatusTip("Guardar el proyecto actual")
-        save_action.triggered.connect(self._save_project)
-        self.quick_menu.addAction(save_action)
-
-        save_as_action = QAction("Guardar proyecto &como...", self)
-        save_as_action.setStatusTip("Guardar el proyecto en un archivo nuevo")
-        save_as_action.triggered.connect(self._save_project_as)
-        self.quick_menu.addAction(save_as_action)
-
-        # Open Recent Section (up to 5 recent files, directly in the menu, no submenu)
-        self.recent_section_action = self.quick_menu.addSection("Recientes")
-        self.recent_file_actions: List[QAction] = []
-        for _ in range(5):
-            act = QAction(self)
-            act.setVisible(False)
-            self.quick_menu.addAction(act)
-            self.recent_file_actions.append(act)
-
+        barra = self.menuBar()
+        self.file_menu = barra.addMenu("&Archivo")
+        m = self.file_menu
+        self._accion(m, "&Nuevo case", "Ctrl+N", self._taller_nuevo, "Case nuevo con las reglas del taller")
+        self._accion(m, "&Abrir case (.scad)...", "Ctrl+O", self._taller_abrir, "Abrir un proyecto del taller")
+        self.recent_menu = m.addMenu("Abrir &reciente")
+        m.addSeparator()
+        self._accion(m, "&Guardar case", "Ctrl+S", self._taller_guardar, "Guardar el proyecto del taller")
+        self._accion(m, "Guardar case &como...", "Ctrl+Shift+S", self._taller_guardar_como, "Guardar en otro archivo")
+        m.addSeparator()
+        self._accion(m, "Exportar &paquete del taller (planos, DXF, instructivo)...", "Ctrl+P", self._taller_exportar,
+                     "DXF por pieza, listas de corte y materiales, planos.pdf e instructivo de montaje")
+        self._accion(m, "Exportar a &STEP (3D para CAD)...", "Ctrl+Alt+S", self._taller_step,
+                     "El case armado para abrir en Fusion, SolidWorks o FreeCAD")
+        self._accion(m, "Paquete del &taller desde un .scad sin abrirlo...", "Ctrl+T", self._export_taller_pack)
+        m.addSeparator()
+        self._accion(m, "&Salir", "Ctrl+Q", self.close)
         self._update_recent_files_menu()
 
-        self.quick_menu.addSeparator()
-
-        export_action = QAction("&Exportar lista de cortes completa...", self)
-        export_action.setStatusTip("Exportar el listado completo de materiales a CSV")
-        export_action.triggered.connect(self._export_full_report)
-        self.quick_menu.addAction(export_action)
-
-        export_svg_action = QAction("Exportar &paneles de madera a SVG...", self)
-        export_svg_action.setStatusTip("Exportar el plano de todos los paneles de madera a un archivo SVG")
-        export_svg_action.triggered.connect(self._export_wood_panels_svg)
-        self.quick_menu.addAction(export_svg_action)
-
-        export_pack_action = QAction("Exportar paquete de &producción (PDF, DXF, CSV, SVG)...", self)
-        export_pack_action.triggered.connect(self._export_production_pack)
-        self.quick_menu.addAction(export_pack_action)
-
-        taller_pack_action = QAction("Paquete del &taller desde un .scad sin abrirlo...", self)
-        taller_pack_action.setShortcut("Ctrl+T")
-        taller_pack_action.triggered.connect(self._export_taller_pack)
-        self.file_menu.addAction(taller_pack_action)
-
-        taller_step_action = QAction("Exportar case del taller a STEP (3D para CAD)...", self)
-        taller_step_action.setShortcut("Ctrl+Alt+S")
-        taller_step_action.triggered.connect(self._export_taller_step)
-        self.file_menu.addAction(taller_step_action)
-        self.file_menu.addSeparator()
-        self.file_menu.addMenu(self.quick_menu)
-
-        self.file_menu.addSeparator()
-
-        exit_action = QAction("&Salir", self)
-        exit_action.setShortcut("Ctrl+Q")
-        exit_action.setStatusTip("Salir de la Calculadora de Flightcases")
-        exit_action.triggered.connect(self.close)
-        self.file_menu.addAction(exit_action)
-
-        # View Menu
-        view_menu = menu_bar.addMenu("&Ver")
-
-        view_taller_action = QAction("&Taller", self)
-        view_taller_action.setShortcut("Ctrl+1")
-        view_taller_action.triggered.connect(lambda: self.center_tabs.setCurrentWidget(self.taller_widget))
-        view_menu.addAction(view_taller_action)
-
-        view_3d_action = QAction("Cálculo rápido: vista &3D", self)
-        view_3d_action.setShortcut("Ctrl+2")
-        view_3d_action.setStatusTip("Cambiar a la vista 3D interactiva")
-        view_3d_action.triggered.connect(lambda: self.center_tabs.setCurrentWidget(self.schema_widget))
-        view_menu.addAction(view_3d_action)
-
-        reset_view_action = QAction("&Restablecer vista 3D", self)
-        reset_view_action.setShortcut("Ctrl+R")
-        reset_view_action.setStatusTip("Volver la cámara 3D a la vista isométrica predeterminada")
-        reset_view_action.triggered.connect(self._reset_3d_view)
-        view_menu.addAction(reset_view_action)
-
-        view_menu.addSeparator()
-
-        view_wood_types_action = QAction("Editar &tipos de madera", self)
-        view_wood_types_action.setStatusTip("Ir a la pestaña de gestión de tipos de madera")
-        view_wood_types_action.triggered.connect(lambda: self.tabs.setCurrentWidget(self.wood_types_widget))
-        view_menu.addAction(view_wood_types_action)
-
-        view_menu.addSeparator()
-
-        view_svg_action = QAction("Ver plano 2D de &paneles (SVG)", self)
-        view_svg_action.setShortcut("Ctrl+3")
-        view_svg_action.setStatusTip("Cambiar al plano técnico 2D de los paneles de madera")
-        view_svg_action.triggered.connect(lambda: self.center_tabs.setCurrentWidget(self.svg_widget))
-        view_menu.addAction(view_svg_action)
-
-        fit_svg_action = QAction("&Ajustar plano 2D a la ventana", self)
-        fit_svg_action.setShortcut("Ctrl+D")
-        fit_svg_action.setStatusTip("Ajustar el plano 2D de paneles a la ventana")
-        fit_svg_action.triggered.connect(self._fit_svg_view)
-        view_menu.addAction(fit_svg_action)
-
+    # ------------------------------------------------------------- recientes
     def _get_recent_files(self) -> List[str]:
-        """Returns the list of up to 5 recently opened/saved project file paths."""
-        settings = QSettings("FlightcaseCalculator", "FlightcaseCalculator")
-        raw = settings.value("recentProjects", [])
-        if isinstance(raw, str):
-            raw = [raw] if raw else []
-        elif not isinstance(raw, list):
-            raw = []
+        v = _settings().value("recientesScad")
+        lista = [v] if isinstance(v, str) else list(v or [])
+        return [r for r in lista if isinstance(r, str) and os.path.isfile(r)][:MAX_RECIENTES]
 
-        seen = set()
-        valid: List[str] = []
-        for p in raw:
-            if isinstance(p, str) and p and p not in seen:
-                seen.add(p)
-                if os.path.isfile(p):
-                    valid.append(p)
-        return valid[:5]
-
-    def _add_recent_file(self, file_path: str) -> None:
-        """Adds a project file path to the recent files list and refreshes the menu."""
-        if not file_path:
+    def _add_recent_file(self, ruta: Optional[str]) -> None:
+        if not ruta:
             return
-        abs_path = os.path.abspath(file_path)
-        recent = self._get_recent_files()
-        if abs_path in recent:
-            recent.remove(abs_path)
-        recent.insert(0, abs_path)
-        recent = recent[:5]
-
-        settings = QSettings("FlightcaseCalculator", "FlightcaseCalculator")
-        settings.setValue("recentProjects", recent)
+        ruta = os.path.abspath(ruta)
+        lista = [ruta] + [r for r in self._get_recent_files() if os.path.abspath(r) != ruta]
+        _settings().setValue("recientesScad", lista[:MAX_RECIENTES])
         self._update_recent_files_menu()
 
     def _update_recent_files_menu(self) -> None:
-        """Updates the 5 recent file actions directly in the File menu (no submenu)."""
-        if not hasattr(self, "recent_file_actions"):
-            return
+        self.recent_menu.clear()
+        recientes = self._get_recent_files()
+        for i, ruta in enumerate(recientes, 1):
+            a = QAction(f"&{i} {os.path.basename(ruta)}", self)
+            a.setStatusTip(ruta)
+            a.triggered.connect(lambda _=False, r=ruta: self.abrir(r))
+            self.recent_menu.addAction(a)
+        self.recent_menu.setEnabled(bool(recientes))
 
-        recent_files = self._get_recent_files()
-        if not recent_files:
-            if hasattr(self, "recent_section_action"):
-                self.recent_section_action.setVisible(False)
-            for act in self.recent_file_actions:
-                act.setVisible(False)
-            return
-
-        if hasattr(self, "recent_section_action"):
-            self.recent_section_action.setVisible(True)
-
-        for i in range(5):
-            act = self.recent_file_actions[i]
-            if i < len(recent_files):
-                file_path = recent_files[i]
-                file_name = os.path.basename(file_path)
-                act.setText(f"&{i + 1} {file_name}")
-                act.setStatusTip(file_path)
-                act.setToolTip(file_path)
-                try:
-                    act.triggered.disconnect()
-                except Exception:
-                    pass
-                act.triggered.connect(lambda checked=False, p=file_path: self._load_project_file(p))
-                act.setEnabled(True)
-                act.setVisible(True)
-            else:
-                act.setVisible(False)
-
-    def _reset_3d_view(self) -> None:
-        """Switches to 3D schema tab and resets camera view angles."""
-        if hasattr(self, "center_tabs"):
-            self.center_tabs.setCurrentWidget(self.schema_widget)
-        self.schema_widget.canvas.reset_view(45.0, 30.0)
-
-    def _fit_svg_view(self) -> None:
-        """Switches to 2D SVG tab and fits diagram into viewport."""
-        if hasattr(self, "center_tabs"):
-            self.center_tabs.setCurrentWidget(self.svg_widget)
-        self.svg_widget.fit_to_view()
-
-    def _get_current_ui_settings(self) -> UISettingsDTO:
-        """Gathers active UI settings including 3D camera transform, toggles, active tab, and compartment settings."""
-        ui_dto = self.schema_widget.get_ui_settings()
-        ui_dto.active_tab_index = self.tabs.currentIndex()
-        if hasattr(self, "center_tabs"):
-            ui_dto.active_center_tab_index = self.center_tabs.currentIndex()
-        ui_dto.compartment_orientation = self.walls_widget.get_compartment_orientation()
-        ui_dto.auto_equalize_flags = self.walls_widget.get_auto_equalize_flags()
-        return ui_dto
-
-    def _apply_ui_settings(self, settings: UISettingsDTO) -> None:
-        """Applies UI settings into 3D schema widget, active tab, and inside walls controls."""
-        self.schema_widget.set_ui_settings(settings)
-        if 0 <= settings.active_tab_index < self.tabs.count():
-            self.tabs.setCurrentIndex(settings.active_tab_index)
-        if hasattr(settings, "active_center_tab_index") and hasattr(self, "center_tabs"):
-            if 0 <= settings.active_center_tab_index < self.center_tabs.count():
-                self.center_tabs.setCurrentIndex(settings.active_center_tab_index)
-        if hasattr(settings, "compartment_orientation") and settings.compartment_orientation:
-            self.walls_widget.set_compartment_orientation(settings.compartment_orientation)
-        if hasattr(settings, "auto_equalize_flags") and settings.auto_equalize_flags:
-            self.walls_widget.set_auto_equalize_flags(settings.auto_equalize_flags)
-
-    def _save_settings(self) -> None:
-        """Saves window geometry, splitter sizes, tabs, and project state to QSettings."""
-        settings = QSettings("FlightcaseCalculator", "FlightcaseCalculator")
-        settings.setValue("geometry", self.saveGeometry())
-        settings.setValue("windowState", self.saveState())
-        if hasattr(self, "main_splitter"):
-            settings.setValue("mainSplitter", self.main_splitter.saveState())
-        if hasattr(self, "tabs"):
-            settings.setValue("currentTab", self.tabs.currentIndex())
-        if hasattr(self, "center_tabs"):
-            settings.setValue("pestanaCentral", ("taller", "3d", "2d")[max(self.center_tabs.currentIndex(), 0)])
-        settings.setValue("ultimoScad", getattr(self.taller_widget, "ruta", None) or "")
-        if self._current_project_path:
-            settings.setValue("lastProjectPath", self._current_project_path)
-        try:
-            input_dto = self._collect_input_dto()
-            input_dto.ui_settings = self._get_current_ui_settings()
-            settings.setValue("lastProjectSnapshot", input_dto.to_json())
-        except Exception:
-            pass
-
-    def _restore_settings(self) -> None:
-        """Restores window geometry, state, and splitter states from QSettings."""
-        settings = QSettings("FlightcaseCalculator", "FlightcaseCalculator")
-        geom = settings.value("geometry")
-        if geom:
-            self.restoreGeometry(geom)
-
-        state = settings.value("windowState")
-        if state:
-            self.restoreState(state)
-
-        splitter_state = settings.value("mainSplitter")
-        if splitter_state and hasattr(self, "main_splitter"):
-            self.main_splitter.restoreState(splitter_state)
-
-        tab_idx = settings.value("currentTab")
-        if tab_idx is not None and hasattr(self, "tabs"):
-            try:
-                self.tabs.setCurrentIndex(int(tab_idx))
-            except (ValueError, TypeError):
-                pass
-
-        pestana = settings.value("pestanaCentral")   # por nombre: el orden de las pestañas cambió
-        if pestana in ("taller", "3d", "2d") and hasattr(self, "center_tabs"):
-            self.center_tabs.setCurrentIndex(("taller", "3d", "2d").index(pestana))
-        ultimo = settings.value("ultimoScad")
-        if isinstance(ultimo, str) and ultimo and os.path.isfile(ultimo):
-            try:
-                self.taller_widget.set_params(leer_proyecto(ultimo), ultimo)
-            except Exception:
-                pass
-
-    def _load_startup_project(self) -> None:
-        """Loads last project from file or snapshot at startup."""
-        settings = QSettings("FlightcaseCalculator", "FlightcaseCalculator")
-        last_path = settings.value("lastProjectPath")
-        if last_path and isinstance(last_path, str) and os.path.isfile(last_path):
-            try:
-                self._load_project_file(last_path, update_settings=False)
-                return
-            except Exception:
-                pass
-
-        last_snapshot = settings.value("lastProjectSnapshot")
-        if last_snapshot and isinstance(last_snapshot, str):
-            try:
-                dto = CaseInputDTO.from_json(last_snapshot)
-                self._apply_project_dto(dto)
-                self._update_window_title()
-                return
-            except Exception:
-                pass
-
-        self.recalculate()
-        self._update_window_title()
-
-    def _update_window_title(self) -> None:
-        title = self.input_panel.edit_title.text().strip() if hasattr(self, "input_panel") else ""
-        if title:
-            if self._current_project_path:
-                file_name = os.path.basename(self._current_project_path)
-                self.setWindowTitle(f"Calculadora de Flightcases — {title} ({file_name})")
-            else:
-                self.setWindowTitle(f"Calculadora de Flightcases — {title}")
-        elif self._current_project_path:
-            name = os.path.basename(self._current_project_path)
-            self.setWindowTitle(f"Calculadora de Flightcases — {name}")
-        else:
-            self.setWindowTitle("Calculadora de Flightcases — Sin título")
-
-    def _apply_project_dto(self, dto: CaseInputDTO) -> None:
-        self.input_panel.set_input_dto(dto)
-        self.walls_widget.set_walls(dto.walls)
-        self.costs_widget.set_settings(dto.production)
-        if dto.ui_settings:
-            self._apply_ui_settings(dto.ui_settings)
-        self.recalculate()
-
-    def _new_project(self) -> None:
-        default_dto = CaseInputDTO()
-        self._current_project_path = None
-        self._apply_project_dto(default_dto)
-        self.schema_widget.canvas.reset_view(45.0, 30.0)
-        self._update_window_title()
-        self.status_bar.showMessage("Proyecto nuevo creado con las medidas predeterminadas.")
-
-    def _open_project(self) -> None:
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Abrir proyecto de flightcase",
-            "",
-            "Proyecto de flightcase (*.fcproj *.json);;Todos los archivos (*)",
-        )
-        if file_path:
-            self._load_project_file(file_path)
-
-    def _load_project_file(self, file_path: str, update_settings: bool = True) -> None:
-        try:
-            dto = LoadProjectUseCase.execute(file_path)
-            self._current_project_path = file_path
-            self._apply_project_dto(dto)
-            self._update_window_title()
-            if update_settings:
-                settings = QSettings("FlightcaseCalculator", "FlightcaseCalculator")
-                settings.setValue("lastProjectPath", file_path)
-            self._add_recent_file(file_path)
-            self.status_bar.showMessage(f"Proyecto cargado desde {os.path.basename(file_path)}")
-        except Exception as e:
-            QMessageBox.critical(self, "Error al abrir el proyecto", f"No se pudo abrir el proyecto {file_path}:\n{tr(str(e))}")
-
-    def _save_project(self) -> None:
-        if self._current_project_path:
-            self._save_project_file(self._current_project_path)
-        else:
-            self._save_project_as()
-
-    def _save_project_as(self) -> None:
-        title = self.input_panel.edit_title.text().strip()
-        if self._current_project_path:
-            default_name = os.path.basename(self._current_project_path)
-        elif title:
-            import re
-            slug = re.sub(r"[^\w\s-]", "", title).strip().replace(" ", "_").lower()
-            default_name = f"{slug}.fcproj" if slug else "mi_flightcase.fcproj"
-        else:
-            default_name = "mi_flightcase.fcproj"
-
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Guardar proyecto de flightcase como",
-            default_name,
-            "Proyecto de flightcase (*.fcproj *.json);;Todos los archivos (*)",
-        )
-        if file_path:
-            self._save_project_file(file_path)
-
-    def _save_project_file(self, file_path: str) -> None:
-        try:
-            input_dto = self._collect_input_dto()
-            input_dto.ui_settings = self._get_current_ui_settings()
-            SaveProjectUseCase.execute(input_dto, file_path)
-            self._current_project_path = file_path
-            self._update_window_title()
-            settings = QSettings("FlightcaseCalculator", "FlightcaseCalculator")
-            settings.setValue("lastProjectPath", file_path)
-            self._add_recent_file(file_path)
-            self.status_bar.showMessage(f"Proyecto guardado en {os.path.basename(file_path)}")
-        except Exception as e:
-            QMessageBox.critical(self, "Error al guardar el proyecto", f"No se pudo guardar el proyecto en {file_path}:\n{str(e)}")
-
-    def closeEvent(self, event: QCloseEvent) -> None:
-        self._save_settings()
-        super().closeEvent(event)
-
-    def _connect_signals(self) -> None:
-        self.input_panel.input_changed.connect(self.recalculate)
-        self.walls_widget.walls_changed.connect(self.recalculate)
-        self.schema_widget.lid_exploded_changed.connect(self._update_schema_geometry)
-        self.schema_widget.explode_changed.connect(self._update_schema_geometry)
-        self.schema_widget.lid_rotation_changed.connect(self._update_schema_geometry)
-        self.schema_widget.toggles_changed.connect(self._update_schema_geometry)
-        self.cutlist_widget.export_svg_requested.connect(self._export_wood_panels_svg)
-        self.wood_types_widget.materials_changed.connect(self._on_wood_materials_changed)
-        self.costs_widget.settings_changed.connect(self.recalculate)
-        self.catalog_widget.catalog_changed.connect(self.recalculate)
-
-        # Highlight synchronization across dimension tables and 3D schema
-        self.walls_widget.wall_selection_changed.connect(self._on_wall_selection_changed)
-        self.cutlist_widget.piece_selection_changed.connect(self._on_piece_selection_changed)
-        self.alu_widget.profile_selection_changed.connect(self._on_profile_selection_changed)
-        self.tabs.currentChanged.connect(self._on_tab_changed)
-
-    def _on_wood_materials_changed(self, materials: List[WoodMaterial]) -> None:
-        """Handles wood materials update from the Wood Types tab."""
-        self.input_panel.set_wood_materials(materials)
-        self.recalculate()
-
-    def _on_wall_selection_changed(self, indices: List[int], labels: List[str]) -> None:
-        self.schema_widget.set_highlights(wall_indices=indices, labels=labels)
-
-    def _on_piece_selection_changed(self, names: List[str]) -> None:
-        self.schema_widget.set_highlights(labels=names)
-
-    def _on_profile_selection_changed(self, names: List[str]) -> None:
-        self.schema_widget.set_highlights(labels=names)
-
-    def _on_tab_changed(self, index: int) -> None:
-        current_widget = self.tabs.widget(index)
-        if current_widget == self.walls_widget:
-            self.walls_widget.emit_current_selection()
-        elif current_widget == self.cutlist_widget:
-            self.cutlist_widget.emit_current_selection()
-        elif current_widget == self.alu_widget:
-            self.alu_widget.emit_current_selection()
-        else:
-            self.schema_widget.clear_highlights()
-
-    def _collect_input_dto(self) -> CaseInputDTO:
-        input_dto = self.input_panel.get_input_dto()
-        input_dto.walls = self.walls_widget.get_walls()
-        input_dto.production = self.costs_widget.get_settings()
-        return input_dto
-
-    def recalculate(self) -> None:
-        """Executes application use cases to update all outputs live."""
-        input_dto = self.input_panel.get_input_dto()
-        input_dto.production = self.costs_widget.get_settings()
-        self.walls_widget.set_case_dimensions(
-            inner_length=input_dto.inner_length,
-            inner_width=input_dto.inner_width,
-            wood_thickness=input_dto.wood_thickness,
-        )
-        input_dto.walls = self.walls_widget.get_walls()
-
-        try:
-            # 1. Calculate flightcase
-            result = CalculateFlightCaseUseCase.execute(input_dto)
-            self._current_result = result
-
-            # 2. Update UI widgets
-            self.cutlist_widget.set_calculation_result(result)
-            self.alu_widget.set_calculation_result(result)
-            self._current_quote = CalculateQuoteUseCase.execute(input_dto, self.catalog)
-            self.costs_widget.set_quote(self._current_quote)
-
-            # Generate and update wood panels SVG diagram
-            svg_data = GenerateWoodPanelsSvgUseCase.execute(input_dto)
-            self.svg_widget.set_svg(svg_data, project_title=input_dto.title)
-
-            self._update_schema_geometry()
-            self._update_window_title()
-
-            # 3. Status Bar
-            lid_m = result.total_lid_mating_profile_length_mm / 1000.0
-            self._msg_rapido = (
-                f"✓ Interior: {input_dto.inner_length:.0f}×{input_dto.inner_width:.0f}×{input_dto.inner_total_height:.0f} mm | "
-                f"Exterior: {input_dto.outer_length:.0f}×{input_dto.outer_width:.0f}×{input_dto.total_height:.0f} mm | "
-                f"Perfil de cierre necesario: {result.total_lid_mating_profile_length_mm:.1f} mm ({lid_m:.2f} m) | "
-                f"Paneles de madera: {len(result.wood_cut_list)} piezas ({result.total_wood_area_m2:.2f} m²) | "
-                f"Precio: {self._current_quote.total_price:.2f} € | Peso: {self._current_quote.total_weight_kg:.1f} kg"
-            )
-            if not self._en_taller():   # en el Taller la barra muestra el case del taller
-                self.status_bar.showMessage(self._msg_rapido)
-        except FlightCaseDomainError as e:
-            self.status_bar.showMessage(f"⚠ Error de validación: {str(e)}")
-        except Exception as e:
-            self.status_bar.showMessage(f"⚠ Error: {str(e)}")
-
-    def _update_schema_geometry(self) -> None:
-        input_dto = self.input_panel.get_input_dto()
-        input_dto.walls = self.walls_widget.get_walls()
-
-        try:
-            mesh = GenerateSchema3DUseCase.execute(
-                input_dto=input_dto,
-                lid_exploded_gap_mm=self.schema_widget.exploded_gap_mm,
-                explode_gap_mm=self.schema_widget.explode_gap_mm,
-                lid_rotation_angle_deg=self.schema_widget.rotation_angle_deg,
-                lid_hinge_side=self.schema_widget.hinge_side,
-                show_inside_walls=self.schema_widget.show_inside_walls,
-                show_dimensions=self.schema_widget.show_dimensions,
-            )
-            self.schema_widget.set_mesh(mesh)
-        except FlightCaseDomainError:
-            pass
-
-    def _export_wood_panels_svg(self) -> None:
-        self.svg_widget.export_svg()
-
-    def _export_full_report(self) -> None:
-        if not self._current_result:
-            return
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "Exportar listado de materiales", "flightcase_listado_materiales.csv", "Archivos CSV (*.csv)"
-        )
-        if file_path:
-            try:
-                with open(file_path, "w", encoding="utf-8") as f:
-                    f.write(full_report_csv(self._current_result, self._current_quote))
-
-                QMessageBox.information(self, "Exportación correcta", f"Informe completo exportado a:\n{file_path}")
-            except Exception as e:
-                QMessageBox.critical(self, "Error de exportación", f"No se pudo guardar el archivo CSV:\n{str(e)}")
-
-    def _export_production_pack(self) -> None:
-        folder = QFileDialog.getExistingDirectory(self, "Carpeta para el paquete de producción")
-        if not folder:
-            return
-        input_dto = self._collect_input_dto()
-        title = input_dto.title.strip() or "flightcase"
-        import re
-        sub = re.sub(r"[^\w\-]+", "_", title).strip("_") or "flightcase"
-        target = os.path.join(folder, f"{sub}_produccion")
-        try:
-            files = ExportProductionPackUseCase.execute(input_dto, target, self.catalog)
-            QMessageBox.information(
-                self, "Paquete de producción",
-                f"Se generaron {len(files)} archivos en:\n{target}\n\n" + "\n".join(os.path.basename(f) for f in files),
-            )
-        except Exception as e:
-            QMessageBox.critical(self, "Paquete de producción", f"No se pudo generar el paquete:\n{e}")
-
-    def _on_center_tab_changed(self, index: int) -> None:
-        """En la pestaña Taller se ocultan los paneles del modelo simple (no aplican)."""
-        en_taller = self.center_tabs.widget(index) is self.taller_widget
-        self.tabs.setVisible(not en_taller)
-        self.config_container.setVisible(not en_taller)
-        if en_taller:
-            self._estado_taller(self.taller_widget.resultado)
-        elif getattr(self, "_msg_rapido", ""):
-            self.status_bar.showMessage(self._msg_rapido)
-
-    def _en_taller(self) -> bool:
-        return hasattr(self, "center_tabs") and self.center_tabs.currentWidget() is self.taller_widget
-
-    def _estado_taller(self, res) -> None:
-        if res is None or not hasattr(self, "status_bar") or not self._en_taller():
-            return
-        v = res.valores
-        nombre = os.path.basename(self.taller_widget.ruta) if self.taller_widget.ruta else "case nuevo"
-        avisos = f" | ⚠ {len(res.avisos)} aviso{'s' if len(res.avisos) != 1 else ''}" if res.avisos else ""
-        self.status_bar.showMessage(
-            f"Taller: {nombre} | Exterior: {v['ext_ancho']:.0f}×{v['ext_prof']:.0f}×{v['ext_alto']:.0f} mm | "
-            f"{len(res.paneles)} paneles | {v['placa_material']}{avisos}")
+    # -------------------------------------------------------------- acciones
+    def abrir(self, ruta: Optional[str] = None) -> None:
+        self.taller_widget.abrir(ruta)
+        if self.taller_widget.ruta:
+            self._add_recent_file(self.taller_widget.ruta)
+        self._actualizar()
 
     def _taller_nuevo(self) -> None:
-        self.center_tabs.setCurrentWidget(self.taller_widget)
         self.taller_widget.nuevo()
+        self._actualizar()
+
+    def _taller_abrir(self) -> None:
+        self.abrir()
 
     def _taller_guardar(self) -> None:
-        self.center_tabs.setCurrentWidget(self.taller_widget)
         self.taller_widget.guardar(self.taller_widget.ruta)
+        self._add_recent_file(self.taller_widget.ruta)
+        self._actualizar()
 
     def _taller_guardar_como(self) -> None:
-        self.center_tabs.setCurrentWidget(self.taller_widget)
         self.taller_widget.guardar()
+        self._add_recent_file(self.taller_widget.ruta)
+        self._actualizar()
 
     def _taller_exportar(self) -> None:
-        self.center_tabs.setCurrentWidget(self.taller_widget)
         self.taller_widget.exportar()
 
-    def _open_taller_project(self) -> None:
-        self.center_tabs.setCurrentWidget(self.taller_widget)
-        self.taller_widget.abrir()
-
-    def _export_taller_step(self) -> None:
-        """El case de la pestaña Taller como modelo 3D STEP (Fusion, SolidWorks, FreeCAD)."""
-        self.center_tabs.setCurrentWidget(self.taller_widget)
+    def _taller_step(self) -> None:
         self.taller_widget.exportar_step()
 
     def _export_taller_pack(self) -> None:
-        """Arma DXF, listas y planos.pdf de un proyecto .scad con las reglas del taller."""
-        scad, _ = QFileDialog.getOpenFileName(
-            self, "Proyecto del taller (OpenSCAD)", "", "Proyecto OpenSCAD (*.scad)")
+        """DXF, listas y planos.pdf de un proyecto .scad, sin abrirlo en la ventana."""
+        from ..taller.produccion import exportar_scad
+        scad, _ = QFileDialog.getOpenFileName(self, "Proyecto del taller (OpenSCAD)", "", "Proyecto OpenSCAD (*.scad)")
         if not scad:
             return
         folder = QFileDialog.getExistingDirectory(self, "Carpeta para el paquete del taller")
         if not folder:
             return
-        base = os.path.splitext(os.path.basename(scad))[0]
-        target = os.path.join(folder, f"salida_{base}")
+        target = os.path.join(folder, f"salida_{os.path.splitext(os.path.basename(scad))[0]}")
         try:
             QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
             try:
-                paq = ExportTallerPackFromScadUseCase.execute(scad, target)
+                paq = exportar_scad(scad, target)
             finally:
                 QApplication.restoreOverrideCursor()
             avisos = ("\n\nAvisos:\n" + "\n".join(f"• {a}" for a in paq.avisos)) if paq.avisos else ""
-            QMessageBox.information(
-                self, "Paquete del taller",
-                f"Se generaron {len(paq.archivos)} archivos en:\n{target}{avisos}",
-            )
+            QMessageBox.information(self, "Paquete del taller",
+                                    f"Se generaron {len(paq.archivos)} archivos en:\n{target}{avisos}")
         except Exception as e:
             QMessageBox.critical(self, "Paquete del taller", f"No se pudo generar el paquete:\n{e}")
+
+    # --------------------------------------------------------- título/estado
+    def _nombre(self) -> str:
+        return os.path.basename(self.taller_widget.ruta) if self.taller_widget.ruta else "case nuevo"
+
+    def _actualizar(self) -> None:
+        self.setWindowTitle(f"{TITULO} — {self._nombre()}")
+        self._estado_taller(self.taller_widget.resultado)
+
+    def _estado_taller(self, res) -> None:
+        if res is None:
+            return
+        v = res.valores
+        avisos = f" | ⚠ {len(res.avisos)} aviso{'s' if len(res.avisos) != 1 else ''}" if res.avisos else ""
+        self.status_bar.showMessage(
+            f"{self._nombre()} | Exterior: {v['ext_ancho']:.0f}×{v['ext_prof']:.0f}×{v['ext_alto']:.0f} mm | "
+            f"{len(res.paneles)} paneles | {v['placa_material']}{avisos}")
+
+    # ----------------------------------------------------------- settings
+    def _save_settings(self) -> None:
+        s = _settings()
+        s.setValue("geometry", self.saveGeometry())
+        s.setValue("windowState", self.saveState())
+        s.setValue("ultimoScad", self.taller_widget.ruta or "")
+
+    def _restore_settings(self, load_last_project: bool = True) -> None:
+        s = _settings()
+        geom = s.value("geometry")
+        if geom:
+            self.restoreGeometry(geom)
+        state = s.value("windowState")
+        if state:
+            self.restoreState(state)
+        ultimo = s.value("ultimoScad")
+        if load_last_project and isinstance(ultimo, str) and ultimo and os.path.isfile(ultimo):
+            try:
+                self.taller_widget.set_params(leer_proyecto(ultimo), ultimo)
+            except Exception:
+                pass
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        self._save_settings()
+        super().closeEvent(event)
 
 
 def icono_app() -> QIcon:
@@ -790,19 +198,15 @@ def icono_app() -> QIcon:
 
 
 def run_app() -> int:
-    """Entry point to start the PySide6 Qt Application."""
-    # Configure surface format for hardware antialiasing (4x MSAA)
-    gl_format = QSurfaceFormat()
+    """Arranca la aplicación."""
+    gl_format = QSurfaceFormat()        # antialiasing 4x en la vista 3D
     gl_format.setSamples(4)
     gl_format.setDepthBufferSize(24)
     QSurfaceFormat.setDefaultFormat(gl_format)
 
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication(sys.argv)
-
+    app = QApplication.instance() or QApplication(sys.argv)
     app.setStyleSheet(DARK_THEME_QSS)
-    app.setApplicationName("Flightcase Calculator")
+    app.setApplicationName(TITULO)
     app.setWindowIcon(icono_app())
     if sys.platform == "win32":   # que la barra de tareas muestre nuestro ícono y no el de Python
         try:
@@ -812,27 +216,19 @@ def run_app() -> int:
             pass
     window = FlightCaseMainWindow()
 
-    # Abrir un proyecto pasado al ejecutar (doble clic en un .fcproj o un .scad)
-    for arg in sys.argv[1:]:
-        if arg.lower().endswith((".fcproj", ".json")) and os.path.isfile(arg):
-            window._load_project_file(arg)
-            window.center_tabs.setCurrentWidget(window.schema_widget)
-            break
+    for arg in sys.argv[1:]:            # doble clic en un .scad
         if arg.lower().endswith(".scad") and os.path.isfile(arg):
-            window.center_tabs.setCurrentWidget(window.taller_widget)
-            window.taller_widget.abrir(arg)
+            window.abrir(arg)
             break
 
-    # macOS entrega los archivos abiertos desde el Finder como QFileOpenEvent
-    class _FileOpenFilter(QObject):
+    class _FileOpenFilter(QObject):     # macOS entrega los archivos del Finder como QFileOpenEvent
         def eventFilter(self, obj, event):
-            if event.type() == QEvent.FileOpen and event.file():
-                window._load_project_file(event.file())
+            if event.type() == QEvent.FileOpen and event.file().lower().endswith(".scad"):
+                window.abrir(event.file())
                 return True
             return False
 
     file_filter = _FileOpenFilter(app)
     app.installEventFilter(file_filter)
-
     window.show()
     return app.exec()

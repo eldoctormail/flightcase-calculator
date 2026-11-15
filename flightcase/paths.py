@@ -1,8 +1,8 @@
 """Rutas de recursos incluidos y de datos editables del usuario.
 
 En la app instalada la carpeta de recursos es de solo lectura (dentro del .app o de
-Archivos de programa), así que los catálogos que el usuario edita se guardan en su
-carpeta de datos y, si existen ahí, tienen prioridad sobre los incluidos.
+Archivos de programa), así que lo que el usuario guarda va a su
+carpeta de datos (por ejemplo, los estilos de case propios).
 """
 
 from __future__ import annotations
@@ -35,9 +35,3 @@ def bundled_resource(name: str) -> Path:
 
 def user_resource(name: str) -> Path:
     return user_data_dir() / name
-
-
-def editable_resource(name: str) -> Path:
-    """Ruta para leer: la copia del usuario si existe, si no la incluida en la app."""
-    user = user_resource(name)
-    return user if user.is_file() else bundled_resource(name)

@@ -10,9 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from flightcase.application import ExportTallerPackFromScadUseCase
 from flightcase.taller.modelo import calcular
-from flightcase.taller.produccion import exportar, largo_contornos, panel_dxf
+from flightcase.taller.produccion import exportar, exportar_scad, largo_contornos, panel_dxf
 
 GOLDEN = Path(__file__).parent / "golden"
 CASOS = sorted(p.name for p in (GOLDEN / "taller_paquete").iterdir() if p.is_dir())
@@ -55,7 +54,7 @@ def test_planos_pdf_desde_scad(tmp_path):
         'include <flightcase_gen/flightcase.scad>\n'
         'int_ancho = 500;\nint_prof = 300;\nint_alto_cuerpo = 200; // cuerpo\nint_alto_tapa = 60;\n'
         'flightcase();\n', encoding="utf-8")
-    paq = ExportTallerPackFromScadUseCase.execute(str(scad), str(tmp_path / "salida"))
+    paq = exportar_scad(str(scad), str(tmp_path / "salida"))
     pdf = tmp_path / "salida" / "planos.pdf"
     assert pdf.read_bytes()[:4] == b"%PDF"
     assert any(a.endswith(".dxf") for a in paq.archivos)

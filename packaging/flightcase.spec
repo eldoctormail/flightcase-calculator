@@ -6,7 +6,7 @@ import sys
 from PyInstaller.utils.hooks import collect_submodules
 
 ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))
-APP_NAME = "Flightcase Calculator"
+APP_NAME = "LBD Flightcase Maker"
 VERSION = os.environ.get("APP_VERSION", "0.1.0")
 ICONO = os.path.join(ROOT, "packaging", "icono")   # se regeneran con tools/generar_icono.py
 
@@ -39,7 +39,7 @@ if sys.platform == "darwin":
         coll,
         name=f"{APP_NAME}.app",
         icon=os.path.join(ICONO, "icono.icns"),
-        bundle_identifier="com.eldoctormail.flightcasecalculator",
+        bundle_identifier="com.eldoctormail.lbdflightcasemaker",
         version=VERSION,
         info_plist={
             "CFBundleShortVersionString": VERSION,
@@ -47,9 +47,10 @@ if sys.platform == "darwin":
             "NSHighResolutionCapable": True,
             "LSMinimumSystemVersion": "12.0",
             "CFBundleDocumentTypes": [{
-                "CFBundleTypeName": "Proyecto de flightcase",
-                "CFBundleTypeExtensions": ["fcproj"],
+                "CFBundleTypeName": "Proyecto del taller (OpenSCAD)",
+                "CFBundleTypeExtensions": ["scad"],
                 "CFBundleTypeRole": "Editor",
+                "LSHandlerRank": "Alternate",   # aparece en "Abrir con", OpenSCAD sigue siendo el de siempre
             }],
         },
     )

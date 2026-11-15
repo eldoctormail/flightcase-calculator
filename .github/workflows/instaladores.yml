@@ -57,14 +57,14 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           mkdir -p dmg
-          cp -R "dist/Flightcase Calculator.app" dmg/
+          cp -R "dist/LBD Flightcase Maker.app" dmg/
           ln -s /Applications dmg/Aplicaciones
-          hdiutil create -volname "Flightcase Calculator" -srcfolder dmg -ov -format UDZO \
-            "dist/FlightcaseCalculator-${APP_VERSION}-${{ matrix.name }}.dmg"
+          hdiutil create -volname "LBD Flightcase Maker" -srcfolder dmg -ov -format UDZO \
+            "dist/LBDFlightcaseMaker-${APP_VERSION}-${{ matrix.name }}.dmg"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: FlightcaseCalculator-${{ matrix.name }}
+          name: LBDFlightcaseMaker-${{ matrix.name }}
           path: |
             dist/*.exe
             dist/*.dmg

@@ -1,4 +1,4 @@
-"""Main entry point for Flightcase Calculator application."""
+"""Main entry point for LBD Flightcase Maker application."""
 
 import sys
 from PySide6.QtGui import QSurfaceFormat
@@ -6,7 +6,7 @@ from flightcase.ui import run_app
 
 
 def main() -> int:
-    """Launch the Flightcase Calculator PySide6 application."""
+    """Launch the LBD Flightcase Maker PySide6 application."""
     fmt = QSurfaceFormat()
     fmt.setSamples(4)
     fmt.setDepthBufferSize(24)

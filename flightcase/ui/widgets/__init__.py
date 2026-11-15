@@ -1,25 +1,6 @@
-"""UI Widgets package."""
+"""Widgets de la interfaz."""
 
-from .schema_3d_widget import Schema3DWidget, Schema3DCanvas
-from .input_panel import CaseInputPanel
-from .walls_widget import InsideWallsWidget
-from .cutlist_table import CutListTableWidget
-from .alu_profiles_widget import AluProfilesWidget
-from .svg_diagram_widget import WoodPanelsSvgWidget
-from .wood_types_widget import WoodTypesWidget
-from .costs_widget import CostsWidget, CatalogWidget
+from .schema_3d_widget import Schema3DCanvas
 from .taller_widget import TallerWidget
 
-__all__ = [
-    "Schema3DWidget",
-    "Schema3DCanvas",
-    "CaseInputPanel",
-    "InsideWallsWidget",
-    "CutListTableWidget",
-    "AluProfilesWidget",
-    "WoodPanelsSvgWidget",
-    "WoodTypesWidget",
-    "CostsWidget",
-    "CatalogWidget",
-    "TallerWidget",
-]
+__all__ = ["Schema3DCanvas", "TallerWidget"]

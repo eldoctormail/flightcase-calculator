@@ -396,3 +396,12 @@ def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool =
             ins.generar_instructivo(ruta, d, piezas, laminas, render_png, pasos)
             paq.archivos.append(ruta)
     return paq
+
+
+def exportar_scad(scad: str, carpeta: str, rotar: bool = True, pdf: bool = True) -> PaqueteTaller:
+    """El paquete de un proyecto .scad del generador del taller, sin OpenSCAD."""
+    from .modelo import calcular
+    from .scad import leer_proyecto
+    params = leer_proyecto(scad)
+    params["_carpeta"] = os.path.dirname(os.path.abspath(scad))   # logos y contornos con ruta relativa
+    return exportar(calcular(params), carpeta, rotar=rotar, pdf=pdf)

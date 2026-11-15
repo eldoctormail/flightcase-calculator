@@ -438,3 +438,60 @@ QMenuBar::item:selected {
 QMenuBar::item:pressed {
     background: rgb(140, 140, 140);
 }
+/* Secciones del Taller (QToolBox): planas, sin el corte en diagonal del estilo por defecto */
+QToolBox {
+  background-color: transparent;
+}
+
+QToolBox::tab {
+  background-color: rgba(255, 255, 255, 22);
+  border: none;
+  border-left: 3px solid transparent;
+  border-radius: 4px;
+  padding: 0px 10px;
+  min-height: 20px;
+  margin: 0px 0px 1px 0px;
+  color: rgb(230, 230, 230);
+}
+
+QToolBox::tab:hover {
+  background-color: rgba(255, 255, 255, 45);
+}
+
+QToolBox::tab:selected {
+  background-color: rgba(84, 165, 211, 70);
+  border-left: 3px solid rgb(84, 165, 211);
+  color: rgb(255, 255, 255);
+  font-weight: bold;
+}
+
+QToolBox > QScrollArea, QToolBox QScrollArea > QWidget > QWidget {
+  background-color: rgb(70, 70, 70);
+  border: none;
+}
+
+/* Barra de la vista 3D */
+QFrame#barra3d {
+  background-color: rgba(0, 0, 0, 60);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+QFrame#barra3d QToolButton {
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 3px;
+  min-width: 26px;
+  min-height: 26px;
+}
+
+QFrame#barra3d QToolButton:hover {
+  background-color: rgba(255, 255, 255, 40);
+}
+
+QFrame#barra3d QToolButton:checked {
+  background-color: rgba(84, 165, 211, 110);
+  border: 1px solid rgb(84, 165, 211);
+  color: rgb(255, 255, 255);
+}

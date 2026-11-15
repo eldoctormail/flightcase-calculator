@@ -1,4 +1,4 @@
-"""Interactive 3D Hardware-Accelerated OpenGL Schema Widget with Projection Toggle."""
+"""Vista 3D (OpenGL) del Taller."""
 
 from __future__ import annotations
 import math
@@ -32,15 +32,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from OpenGL import GL, GLU
 
-from ...domain import (
-    Point3D,
-    PolygonFace3D,
-    DimensionCallout3D,
-    WireframeMesh3D,
-)
-from ...application import UISettingsDTO
+from ...taller.malla import DimensionCallout3D, Point3D, PolygonFace3D, WireframeMesh3D
 from ..theme import COLORS
-from ...i18n import tr, HINGE_SIDES
 
 
 class Schema3DCanvas(QOpenGLWidget):
@@ -87,6 +80,9 @@ class Schema3DCanvas(QOpenGLWidget):
         # Mouse interaction state
         self._last_mouse_pos: Optional[QPoint] = None
         self._mouse_button_down: Optional[Qt.MouseButton] = None
+        self.modo_raton: str = "orbitar"      # qué hace el botón izquierdo: orbitar, mover o zoom
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self._poner_cursor()
 
     def set_mesh(self, mesh: WireframeMesh3D) -> None:
         """Sets flightcase 3D mesh and triggers a redraw."""
@@ -263,42 +259,141 @@ class Schema3DCanvas(QOpenGLWidget):
 
         return False
 
+
+    # --- Navegación (botones, teclado y mouse) ---
+
+    ZOOM_MIN, ZOOM_MAX = 0.05, 40.0
+    VISTAS = {   # nombre: (azimut, elevación). Azimut 0 mira el frente (y = 0), 90 el lado derecho.
+        "iso": (45.0, 30.0), "frente": (0.0, 0.0), "atras": (180.0, 0.0), "izquierda": (270.0, 0.0),
+        "derecha": (90.0, 0.0), "arriba": (0.0, 89.9), "abajo": (0.0, -89.9),
+    }
+
+    def _cambio(self) -> None:
+        self.update()
+        self.view_changed.emit()
+
+    def set_modo_raton(self, modo: str) -> None:
+        if modo in ("orbitar", "mover", "zoom") and modo != self.modo_raton:
+            self.modo_raton = modo
+            self._poner_cursor()
+            self.view_changed.emit()
+
+    def _poner_cursor(self, arrastrando: bool = False) -> None:
+        if self.modo_raton == "mover":
+            forma = Qt.CursorShape.ClosedHandCursor if arrastrando else Qt.CursorShape.OpenHandCursor
+        elif self.modo_raton == "zoom":
+            forma = Qt.CursorShape.SizeVerCursor
+        else:
+            forma = Qt.CursorShape.SizeAllCursor if arrastrando else Qt.CursorShape.ArrowCursor
+        self.setCursor(forma)
+
+    def zoom(self, factor: float, centro: Optional[QPointF] = None) -> None:
+        """Acerca (factor > 1) o aleja, manteniendo quieto el punto de la pantalla `centro`."""
+        nuevo = max(self.ZOOM_MIN, min(self.ZOOM_MAX, self.zoom_factor * factor))
+        f = nuevo / self.zoom_factor
+        if centro is not None:
+            sx = centro.x() - self.width() / 2.0
+            sy = centro.y() - self.height() / 2.0
+            self.pan_offset_x = sx - (sx - self.pan_offset_x) * f
+            self.pan_offset_y = sy - (sy - self.pan_offset_y) * f
+        else:
+            self.pan_offset_x *= f
+            self.pan_offset_y *= f
+        self.zoom_factor = nuevo
+        self._cambio()
+
+    def acercar(self) -> None:
+        self.zoom(1.25)
+
+    def alejar(self) -> None:
+        self.zoom(1 / 1.25)
+
+    def mover(self, dx: float, dy: float) -> None:
+        self.pan_offset_x += dx
+        self.pan_offset_y += dy
+        self._cambio()
+
+    def girar(self, d_azimut: float, d_elevacion: float = 0.0) -> None:
+        self.azimuth_deg = (self.azimuth_deg + d_azimut) % 360.0
+        self.elevation_deg = max(-89.9, min(89.9, self.elevation_deg + d_elevacion))
+        self._cambio()
+
+    def encuadrar(self) -> None:
+        """Todo el case centrado y entero en la ventana, sin cambiar el ángulo."""
+        self.zoom_factor = 1.0
+        self.pan_offset_x = self.pan_offset_y = 0.0
+        self._cambio()
+
+    def set_vista(self, nombre: str) -> None:
+        self.azimuth_deg, self.elevation_deg = self.VISTAS[nombre]
+        self.encuadrar()
+
+    def set_mostrar_cotas(self, si: bool) -> None:
+        self.show_dimensions = bool(si)
+        self._cambio()
+
+    def set_mostrar_ejes(self, si: bool) -> None:
+        self.show_axes = bool(si)
+        self._cambio()
+
+    def keyPressEvent(self, event) -> None:
+        k, mods = event.key(), event.modifiers()
+        paso = 40.0 if mods & Qt.KeyboardModifier.ShiftModifier else 0.0
+        flechas = {Qt.Key.Key_Left: (-1, 0), Qt.Key.Key_Right: (1, 0), Qt.Key.Key_Up: (0, -1), Qt.Key.Key_Down: (0, 1)}
+        if k in flechas:
+            dx, dy = flechas[k]
+            if paso:
+                self.mover(dx * paso, dy * paso)          # Mayús + flechas: mover
+            else:
+                self.girar(-dx * 5.0, -dy * 5.0)          # flechas: girar de a 5°
+        elif k in (Qt.Key.Key_Plus, Qt.Key.Key_Equal):
+            self.acercar()
+        elif k in (Qt.Key.Key_Minus, Qt.Key.Key_Underscore):
+            self.alejar()
+        elif k in (Qt.Key.Key_Home, Qt.Key.Key_F):
+            self.encuadrar()
+        else:
+            super().keyPressEvent(event)
+
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
+        self.encuadrar()
+
     # --- Mouse Event Handlers ---
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         self._last_mouse_pos = event.position().toPoint()
         self._mouse_button_down = event.button()
+        self._poner_cursor(arrastrando=True)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         curr_pos = event.position().toPoint()
-        if self._last_mouse_pos is not None and self._mouse_button_down is not None:
-            delta = curr_pos - self._last_mouse_pos
-            self._last_mouse_pos = curr_pos
-
-            if self._mouse_button_down == Qt.MouseButton.LeftButton:
-                # Orbit rotation
-                self.azimuth_deg = (self.azimuth_deg - delta.x() * 0.5) % 360.0
-                self.elevation_deg = max(-89.0, min(89.0, self.elevation_deg + delta.y() * 0.5))
-                self.update()
-                self.view_changed.emit()
-            elif self._mouse_button_down in (Qt.MouseButton.RightButton, Qt.MouseButton.MiddleButton):
-                # Pan translation
-                self.pan_offset_x += delta.x()
-                self.pan_offset_y += delta.y()
-                self.update()
-                self.view_changed.emit()
+        if self._last_mouse_pos is None or self._mouse_button_down is None:
+            return
+        delta = curr_pos - self._last_mouse_pos
+        self._last_mouse_pos = curr_pos
+        boton = self._mouse_button_down
+        if boton == Qt.MouseButton.LeftButton:
+            accion = self.modo_raton
+        elif boton in (Qt.MouseButton.RightButton, Qt.MouseButton.MiddleButton):
+            accion = "mover"          # botón derecho o rueda apretada: mover siempre
+        else:
+            return
+        if accion == "orbitar":
+            self.girar(-delta.x() * 0.5, delta.y() * 0.5)
+        elif accion == "mover":
+            self.mover(delta.x(), delta.y())
+        else:
+            self.zoom(1.01 ** (-delta.y()))
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         self._last_mouse_pos = None
         self._mouse_button_down = None
+        self._poner_cursor()
 
     def wheelEvent(self, event: QWheelEvent) -> None:
-        num_degrees = event.angleDelta().y() / 8.0
-        num_steps = num_degrees / 15.0
-        scale = 1.15 ** num_steps
-        self.zoom_factor = max(0.2, min(5.0, self.zoom_factor * scale))
-        self.update()
-        self.view_changed.emit()
+        pasos = event.angleDelta().y() / 120.0
+        if pasos:
+            self.zoom(1.15 ** pasos, event.position())   # acerca hacia donde está el mouse
 
     # --- OpenGL Pipeline Implementation ---
 
@@ -319,7 +414,8 @@ class Schema3DCanvas(QOpenGLWidget):
 
     def resizeGL(self, w: int, h: int) -> None:
         """Updates OpenGL viewport when widget is resized."""
-        GL.glViewport(0, 0, max(1, w), max(1, h))
+        dpr = self.devicePixelRatioF()      # pantallas Retina / con escala: el buffer tiene más píxeles
+        GL.glViewport(0, 0, max(1, round(w * dpr)), max(1, round(h * dpr)))
 
     def paintGL(self) -> None:
         """Executes full 3D OpenGL pass with depth testing and 2D QPainter overlay."""
@@ -329,7 +425,8 @@ class Schema3DCanvas(QOpenGLWidget):
         # 1. Clear color and depth buffers
         bg = QColor(COLORS.get("bg_schema", "#141419"))
         GL.glClearColor(bg.redF(), bg.greenF(), bg.blueF(), 1.0)
-        GL.glViewport(0, 0, w, h)
+        dpr = self.devicePixelRatioF()      # en Retina el buffer es 2x: si no, el 3D ocupa un cuarto
+        GL.glViewport(0, 0, max(1, round(w * dpr)), max(1, round(h * dpr)))
         GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
 
         if not self.mesh:
@@ -403,7 +500,7 @@ class Schema3DCanvas(QOpenGLWidget):
         # 6. Capture GL Transformation Matrices for 2D Coordinate Unprojecting
         mv_matrix = GL.glGetDoublev(GL.GL_MODELVIEW_MATRIX)
         proj_matrix = GL.glGetDoublev(GL.GL_PROJECTION_MATRIX)
-        viewport = GL.glGetIntegerv(GL.GL_VIEWPORT)
+        viewport = (0, 0, w, h)       # las cotas y los ejes se dibujan en píxeles lógicos (QPainter)
 
         def project_3d_to_screen(p: Point3D) -> QPointF:
             wx, wy, wz = GLU.gluProject(p.x, p.y, p.z, mv_matrix, proj_matrix, viewport)
@@ -636,7 +733,7 @@ class Schema3DCanvas(QOpenGLWidget):
         font = QFont("Segoe UI", 10, QFont.Weight.Bold)
         painter.setFont(font)
         fm = QFontMetrics(font)
-        dim_text = tr(dim.label)
+        dim_text = dim.label
         text_rect = fm.boundingRect(dim_text)
 
         padding_x = 6
@@ -726,325 +823,11 @@ class Schema3DCanvas(QOpenGLWidget):
         painter.setFont(QFont("Segoe UI", 9))
         painter.setPen(QColor("#9e9eb4"))
         proj_name = "Perspectiva" if self.is_perspective else "Paralela (orto)"
-        info = f"OpenGL {proj_name} | Azimut: {self.azimuth_deg:.0f}° | Elevación: {self.elevation_deg:.0f}° | Zoom: {self.zoom_factor:.2f}x"
+        info = f"{proj_name} | Azimut {self.azimuth_deg:.0f}° | Elevación {self.elevation_deg:.0f}° | Zoom {self.zoom_factor:.2f}x"
         painter.drawText(12, 20, info)
 
         if self.highlighted_labels or self.highlighted_wall_indices:
-            sel_text = ", ".join(sorted(tr(lbl) for lbl in self.highlighted_labels)) if self.highlighted_labels else f"Divisor #{list(self.highlighted_wall_indices)[0] + 1}"
+            sel_text = ", ".join(sorted(lbl for lbl in self.highlighted_labels)) if self.highlighted_labels else f"Divisor #{list(self.highlighted_wall_indices)[0] + 1}"
             painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
             painter.setPen(QColor(COLORS.get("highlight_edge", "#fde047")))
             painter.drawText(12, 38, f"★ Resaltado: {sel_text}")
-
-
-class Schema3DWidget(QWidget):
-    """Complete 3D Schema panel with interactive toolbar and hardware-accelerated OpenGL canvas."""
-
-    lid_exploded_changed = Signal(float)
-    explode_changed = Signal(float)
-    lid_rotation_changed = Signal(float, str)
-    toggles_changed = Signal()
-    projection_changed = Signal(bool)
-
-    def __init__(self, parent: Optional[QWidget] = None):
-        super().__init__(parent)
-        self.canvas = Schema3DCanvas(self)
-        self.canvas.projection_changed.connect(self._on_canvas_projection_changed)
-        self._init_ui()
-
-    def _init_ui(self) -> None:
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(6)
-
-        # Vertical Toolbar Scroll Area (Left)
-        toolbar_scroll = QScrollArea(self)
-        toolbar_scroll.setWidgetResizable(True)
-        toolbar_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        toolbar_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        toolbar_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        toolbar_scroll.setFixedWidth(200)
-
-        toolbar = QFrame(toolbar_scroll)
-        t_layout = QVBoxLayout(toolbar)
-        t_layout.setContentsMargins(6, 6, 6, 6)
-        t_layout.setSpacing(8)
-
-        # View Preset Buttons
-        t_layout.addWidget(QLabel("<b>Vistas:</b>"))
-
-        btn_iso = QPushButton("Isométrica", self)
-        btn_iso.setObjectName("secondaryButton")
-        btn_iso.clicked.connect(lambda: self.canvas.reset_view(45.0, 30.0))
-
-        btn_front = QPushButton("Frente", self)
-        btn_front.setObjectName("secondaryButton")
-        btn_front.clicked.connect(lambda: self.canvas.reset_view(0.0, 0.0))
-
-        btn_side = QPushButton("Lateral", self)
-        btn_side.setObjectName("secondaryButton")
-        btn_side.clicked.connect(lambda: self.canvas.reset_view(90.0, 0.0))
-
-        btn_top = QPushButton("Superior", self)
-        btn_top.setObjectName("secondaryButton")
-        btn_top.clicked.connect(lambda: self.canvas.reset_view(0.0, 89.0))
-
-        presets_grid = QGridLayout()
-        presets_grid.setSpacing(4)
-        presets_grid.addWidget(btn_iso, 0, 0, 1, 2)
-        presets_grid.addWidget(btn_front, 1, 0)
-        presets_grid.addWidget(btn_side, 1, 1)
-        presets_grid.addWidget(btn_top, 2, 0, 1, 2)
-        t_layout.addLayout(presets_grid)
-
-        t_layout.addSpacing(6)
-
-        # Projection Mode Toggle Button
-        t_layout.addWidget(QLabel("<b>Proyección:</b>"))
-        self.btn_proj_toggle = QPushButton("Paralela (orto)", self)
-        self.btn_proj_toggle.setObjectName("secondaryButton")
-        self.btn_proj_toggle.setCheckable(True)
-        self.btn_proj_toggle.setChecked(False)
-        self.btn_proj_toggle.setToolTip("Alternar entre proyección paralela (ortográfica) y en perspectiva")
-        self.btn_proj_toggle.clicked.connect(self._on_toggle_projection_clicked)
-        t_layout.addWidget(self.btn_proj_toggle)
-
-        # Exploded Lid Slider
-        gap_header = QHBoxLayout()
-        gap_header.addWidget(QLabel("<b>Separar tapa:</b>"))
-        self.lbl_gap = QLabel("0 mm")
-        self.lbl_gap.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        gap_header.addWidget(self.lbl_gap)
-        t_layout.addLayout(gap_header)
-
-        self.slider_gap = QSlider(Qt.Orientation.Horizontal, self)
-        self.slider_gap.setRange(0, 200)
-        self.slider_gap.setValue(0)
-        self.slider_gap.setToolTip("Separación de la tapa en la vista explotada, en mm")
-        self.slider_gap.valueChanged.connect(self._on_gap_changed)
-        t_layout.addWidget(self.slider_gap)
-
-        # Lid Rotation Angle Slider & Hinge Side Selector
-        angle_header = QHBoxLayout()
-        angle_header.addWidget(QLabel("<b>Abrir tapa:</b>"))
-        self.lbl_angle = QLabel("0°")
-        self.lbl_angle.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        angle_header.addWidget(self.lbl_angle)
-        t_layout.addLayout(angle_header)
-
-        self.slider_angle = QSlider(Qt.Orientation.Horizontal, self)
-        self.slider_angle.setRange(0, 180)
-        self.slider_angle.setValue(0)
-        self.slider_angle.setToolTip("Abrir la tapa girando sobre el lado de bisagra elegido (0° a 180°)")
-        self.slider_angle.valueChanged.connect(self._on_angle_changed)
-        t_layout.addWidget(self.slider_angle)
-
-        t_layout.addWidget(QLabel("<b>Lado de bisagra:</b>"))
-        self.combo_hinge = QComboBox(self)
-        for side_value, side_label in HINGE_SIDES:
-            self.combo_hinge.addItem(side_label, side_value)
-        self.combo_hinge.setCurrentIndex(0)
-        self.combo_hinge.setToolTip("Elegir el lado de la bisagra para abrir la tapa")
-        self.combo_hinge.currentIndexChanged.connect(lambda _: self._on_hinge_side_changed(self.hinge_side))
-        t_layout.addWidget(self.combo_hinge)
-
-        # Explode View Slider (Explode all panels)
-        explode_header = QHBoxLayout()
-        explode_header.addWidget(QLabel("<b>Explotar:</b>"))
-        self.lbl_explode = QLabel("0 mm")
-        self.lbl_explode.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        explode_header.addWidget(self.lbl_explode)
-        t_layout.addLayout(explode_header)
-
-        self.slider_explode = QSlider(Qt.Orientation.Horizontal, self)
-        self.slider_explode.setRange(0, 250)
-        self.slider_explode.setValue(0)
-        self.slider_explode.setToolTip("Separar todos los paneles para verlos por separado con sus medidas")
-        self.slider_explode.valueChanged.connect(self._on_explode_changed)
-        t_layout.addWidget(self.slider_explode)
-
-        # Checkboxes
-        t_layout.addWidget(QLabel("<b>Mostrar:</b>"))
-        self.chk_dims = QCheckBox("Cotas", self)
-        self.chk_dims.setChecked(True)
-        self.chk_dims.toggled.connect(self._on_toggles_changed)
-
-        self.chk_walls = QCheckBox("Divisores", self)
-        self.chk_walls.setChecked(True)
-        self.chk_walls.toggled.connect(self._on_toggles_changed)
-
-        t_layout.addWidget(self.chk_dims)
-        t_layout.addWidget(self.chk_walls)
-        t_layout.addStretch()
-
-        toolbar_scroll.setWidget(toolbar)
-        layout.addWidget(toolbar_scroll)
-        layout.addWidget(self.canvas, 1)
-
-    def _on_toggle_projection_clicked(self) -> None:
-        is_perspective = self.btn_proj_toggle.isChecked()
-        self.canvas.set_perspective(is_perspective)
-
-    def _on_canvas_projection_changed(self, is_perspective: bool) -> None:
-        self.btn_proj_toggle.setChecked(is_perspective)
-        if is_perspective:
-            self.btn_proj_toggle.setText("Perspectiva")
-        else:
-            self.btn_proj_toggle.setText("Paralela (orto)")
-        self.projection_changed.emit(is_perspective)
-
-    def _on_gap_changed(self, val: int) -> None:
-        self.lbl_gap.setText(f"{val} mm")
-        self.lid_exploded_changed.emit(float(val))
-
-    def _on_explode_changed(self, val: int) -> None:
-        self.lbl_explode.setText(f"{val} mm")
-        self.explode_changed.emit(float(val))
-
-    def _on_angle_changed(self, val: int) -> None:
-        self.lbl_angle.setText(f"{val}°")
-        self.lid_rotation_changed.emit(float(val), self.hinge_side)
-
-    def _on_hinge_side_changed(self, side: str) -> None:
-        self.lid_rotation_changed.emit(float(self.slider_angle.value()), side)
-
-    def _on_toggles_changed(self) -> None:
-        self.canvas.show_dimensions = self.chk_dims.isChecked()
-        self.canvas.show_inside_walls = self.chk_walls.isChecked()
-        self.toggles_changed.emit()
-        self.canvas.update()
-
-    def set_mesh(self, mesh: WireframeMesh3D) -> None:
-        self.canvas.set_mesh(mesh)
-
-    def set_perspective(self, is_perspective: bool) -> None:
-        self.canvas.set_perspective(is_perspective)
-
-    @property
-    def is_perspective(self) -> bool:
-        return self.canvas.is_perspective
-
-    @property
-    def exploded_gap_mm(self) -> float:
-        return float(self.slider_gap.value())
-
-    @property
-    def explode_gap_mm(self) -> float:
-        return float(self.slider_explode.value())
-
-    def set_explode_gap(self, val: float) -> None:
-        """Sets exploded view distance in mm (0-250 mm)."""
-        v = max(0, min(250, int(round(val))))
-        self.slider_explode.blockSignals(True)
-        self.slider_explode.setValue(v)
-        self.slider_explode.blockSignals(False)
-        self.lbl_explode.setText(f"{v} mm")
-
-    @property
-    def rotation_angle_deg(self) -> float:
-        return float(self.slider_angle.value())
-
-    @property
-    def hinge_side(self) -> str:
-        return self.combo_hinge.currentData() or "Back"
-
-    def set_lid_rotation(self, angle_deg: float, hinge_side: str = "Back") -> None:
-        """Sets lid rotation angle (0-180 deg) and hinge side."""
-        angle_val = max(0, min(180, int(round(angle_deg))))
-        self.slider_angle.blockSignals(True)
-        self.slider_angle.setValue(angle_val)
-        self.slider_angle.blockSignals(False)
-        self.lbl_angle.setText(f"{angle_val}°")
-
-        self.combo_hinge.blockSignals(True)
-        side_norm = hinge_side.capitalize()
-        idx = self.combo_hinge.findData(side_norm)
-        if idx >= 0:
-            self.combo_hinge.setCurrentIndex(idx)
-        self.combo_hinge.blockSignals(False)
-
-    @property
-    def show_dimensions(self) -> bool:
-        return self.chk_dims.isChecked()
-
-    @property
-    def show_inside_walls(self) -> bool:
-        return self.chk_walls.isChecked()
-
-    def set_highlights(
-        self,
-        wall_indices: Optional[List[int]] = None,
-        labels: Optional[List[str]] = None,
-    ) -> None:
-        """Forward highlight selection to OpenGL canvas."""
-        self.canvas.set_highlights(wall_indices=wall_indices, labels=labels)
-
-    def clear_highlights(self) -> None:
-        """Clears all element highlights on OpenGL canvas."""
-        self.canvas.clear_highlights()
-
-    def get_ui_settings(self) -> UISettingsDTO:
-        """Collects current 3D viewport, camera, explosion gap, rotation angle, and toggle states."""
-        return UISettingsDTO(
-            camera_azimuth_deg=self.canvas.azimuth_deg,
-            camera_elevation_deg=self.canvas.elevation_deg,
-            camera_zoom=self.canvas.zoom_factor,
-            camera_pan_x=self.canvas.pan_offset_x,
-            camera_pan_y=self.canvas.pan_offset_y,
-            is_perspective=self.canvas.is_perspective,
-            lid_exploded_gap_mm=float(self.slider_gap.value()),
-            explode_gap_mm=float(self.slider_explode.value()),
-            lid_rotation_angle_deg=float(self.slider_angle.value()),
-            lid_hinge_side=self.hinge_side,
-            show_dimensions=self.chk_dims.isChecked(),
-            show_inside_walls=self.chk_walls.isChecked(),
-            show_axes=self.canvas.show_axes,
-        )
-
-    def set_ui_settings(self, settings: UISettingsDTO) -> None:
-        """Restores 3D viewport transform, camera, explosion gap, rotation, and toggle states."""
-        gap_val = int(round(settings.lid_exploded_gap_mm))
-        self.slider_gap.blockSignals(True)
-        self.slider_gap.setValue(gap_val)
-        self.slider_gap.blockSignals(False)
-        self.lbl_gap.setText(f"{gap_val} mm")
-
-        self.set_explode_gap(settings.explode_gap_mm)
-
-        angle_val = max(0, min(180, int(round(settings.lid_rotation_angle_deg))))
-        self.slider_angle.blockSignals(True)
-        self.slider_angle.setValue(angle_val)
-        self.slider_angle.blockSignals(False)
-        self.lbl_angle.setText(f"{angle_val}°")
-
-        self.combo_hinge.blockSignals(True)
-        side_norm = (settings.lid_hinge_side or "Back").capitalize()
-        idx = self.combo_hinge.findData(side_norm)
-        if idx >= 0:
-            self.combo_hinge.setCurrentIndex(idx)
-        self.combo_hinge.blockSignals(False)
-
-        self.chk_dims.blockSignals(True)
-        self.chk_dims.setChecked(settings.show_dimensions)
-        self.chk_dims.blockSignals(False)
-
-        self.chk_walls.blockSignals(True)
-        self.chk_walls.setChecked(settings.show_inside_walls)
-        self.chk_walls.blockSignals(False)
-
-        self.btn_proj_toggle.setChecked(settings.is_perspective)
-        if settings.is_perspective:
-            self.btn_proj_toggle.setText("Perspectiva")
-        else:
-            self.btn_proj_toggle.setText("Paralela (orto)")
-
-        self.canvas.set_view_state(
-            azimuth_deg=settings.camera_azimuth_deg,
-            elevation_deg=settings.camera_elevation_deg,
-            zoom_factor=settings.camera_zoom,
-            pan_offset_x=settings.camera_pan_x,
-            pan_offset_y=settings.camera_pan_y,
-            is_perspective=settings.is_perspective,
-            show_dimensions=settings.show_dimensions,
-            show_inside_walls=settings.show_inside_walls,
-            show_axes=settings.show_axes,
-        )
