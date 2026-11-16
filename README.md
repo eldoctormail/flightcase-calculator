@@ -15,6 +15,7 @@ Programa de escritorio (Python + PySide6 + OpenGL) para diseñar y fabricar flig
 - **Ruedas a elección**: giratorias, fijas, con freno o freno total de 75 a 150 mm (2 giratorias con freno + 2 fijas para que el case vaya derecho), **cazoletas** embutidas en el piso que bajan el case, o **base suelta** (wheel board) con marco de ángulo donde se apoya el case sin perforar el piso.
 - **Herrajes a mano** en cada cara, en 2D, con imán, y placas de logo desde `.svg` / `.dxf`.
 - **Mis cases** (`Ctrl+Shift+O` o el botón **Mis cases…**): tus proyectos guardados con miniatura, nombre, medidas exteriores y fecha. Se buscan por nombre, carpeta, medidas o material, se ordenan por fecha, nombre o tamaño, y se abren, duplican, renombran o mandan a la papelera. Lista los `.scad` de la carpeta de cases (por defecto `Documentos/LBD Flightcase Maker`, con dos niveles de subcarpetas) y los abiertos hace poco. Un case nuevo se guarda ahí por defecto.
+- **Autoguardado, recuperación y versiones**: el case abierto se guarda solo cada 3 minutos si tiene cambios (**Archivo → Autoguardado**: 1, 3, 5 o 10 minutos, o desactivado; un case nuevo empieza a autoguardarse cuando le ponés nombre). Cada 30 segundos queda además una copia de recuperación: si la app se cierra de golpe, al volver a abrirla ofrece recuperar los cambios. Cada vez que se guarda, lo que había antes queda como versión fechada en `.versiones/<nombre del case>/` junto al archivo (una cada 10 minutos como mucho; todas las de dos días, una por día hasta los dos meses y una por mes después). **Archivo → Versiones anteriores** (`Ctrl+Alt+V`) o **Versiones…** en Mis cases las lista con medidas y qué cambió, y restaura la elegida en la ventana sin tocar el archivo. Al salir con cambios sin guardar, la app pregunta.
 - **Asistente de case nuevo** (`Ctrl+Shift+N` o el botón **Asistente…**): estilo, qué va adentro (vacío, espuma con equipos o rack), medidas sugeridas a partir de los equipos (o exteriores a mano), terminaciones y un resumen antes de abrirlo en el Taller.
 - **Biblioteca de equipos** (`Ctrl+B`, menú **Editar**): tus equipos con sus medidas, peso, U de rack y forma del calado, guardados una vez para cualquier case. Se buscan, se editan en la tabla y se pasan a una planilla CSV de Excel y desde ella. Las tablas de equipos de la espuma y del rack tienen **Desde la biblioteca…** y **Guardar en la biblioteca**.
 - **Vista 3D** con las tapas abiertas o cerradas.
@@ -120,6 +121,7 @@ Las miniaturas se dibujan con la misma vista 3D del instructivo y quedan guardad
 ### Atajos del Taller
 
 - `Ctrl+Shift+O` **Mis cases** (dentro: `Ctrl+F` buscar, `F2` renombrar, `Ctrl+D` duplicar, `Supr` borrar, doble clic abre)
+- `Ctrl+Alt+V` **Versiones anteriores** del case abierto
 - `Ctrl+N` nuevo case, `Ctrl+O` abrir `.scad`, `Ctrl+S` guardar (sin preguntar si ya tiene archivo), `Ctrl+Shift+S` guardar como
 - `Ctrl+Shift+N` case nuevo con el asistente, `Ctrl+B` biblioteca de equipos
 - `Ctrl+P` exportar el paquete del taller (planos, DXF, instructivo)
