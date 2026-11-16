@@ -31,6 +31,7 @@ CAMPOS_FIJOS = ("ref", "categoria", "nombre", "datos", "verificado", "proveedor"
 
 # Categorías en el orden en que se muestran: (clave, nombre, medidas). Cada medida es
 # (clave en datos, título, tipo, ayuda). Tipos: "num", "par" (dos números, «ancho x alto»),
+# "puntos" (lista de pares «dx x dy; dx x dy»),
 # "texto" o una tupla con las opciones. Sólo son las medidas que usan las reglas del taller:
 # un artículo puede tener otras (se muestran y se exportan igual).
 CATEGORIAS: List[Tuple[str, str, List[Tuple[str, str, Any, str]]]] = [
@@ -54,15 +55,18 @@ CATEGORIAS: List[Tuple[str, str, List[Tuple[str, str, Any, str]]]] = [
         ("ala_corta", "Ala corta", "num", "mm"),
         ("ala_larga", "Ala larga", "num", "mm"),
         ("pared", "Pared", "num", "Espesor de pared del aluminio (mm)."),
+        ("pata_int", "Pata interior", "num", "Espesor del perfil por dentro de la placa (mm), para medir el interior de metal a metal."),
         ("peso_m", "Peso (g/m)", "num", "Gramos por metro de perfil, para el peso total del case (vacío = se estima)."),
     ]),
     ("tapa_m", "Perfil de tapa macho", [
         ("placa", "Para placa", "num", "Espesor de placa para el que está hecho (mm)."),
         ("canal", "Canal", "num", "Profundidad del canal (mm)."),
+        ("pata_int", "Pata interior", "num", "Espesor de la pata del perfil por dentro de la placa (mm), para medir el interior de metal a metal."),
         ("peso_m", "Peso (g/m)", "num", "Gramos por metro de perfil, para el peso total del case (vacío = se estima)."),
     ]),
     ("tapa_h", "Perfil de tapa hembra", [
         ("placa", "Para placa", "num", "Espesor de placa para el que está hecho (mm)."),
+        ("pata_int", "Pata interior", "num", "Espesor de la pata del perfil por dentro de la placa (mm), para medir el interior de metal a metal."),
         ("peso_m", "Peso (g/m)", "num", "Gramos por metro de perfil, para el peso total del case (vacío = se estima)."),
     ]),
     ("esquinero", "Esquineros", [
@@ -161,6 +165,31 @@ for _c, _n, _m in CATEGORIAS:
              "(vacío = +Z). Si la pieza aparece de costado o al revés, probá con otro."),
             ("modelo_adentro", "Entra en la placa", "num", "Cuántos mm del modelo quedan metidos en la placa "
              "(cierres embutidos, conectores). 0 = apoya sobre la cara."),
+        ]
+# Calado y agujeros de cada herraje para la CNC (perforaciones.py y produccion.py)
+CON_CALADO = ("cierre", "manija", "cazoleta", "plato", "conector", "extra")
+CON_AGUJEROS = ("cierre", "bisagra", "tope", "manija", "cazoleta", "plato", "conector", "extra", "escuadra")
+FORMAS_CORTE = ("rectangular", "redondo", "dibujo")
+for _c, _n, _m in CATEGORIAS:
+    if _c in CON_CALADO and _c != "conector":
+        _m.append(("forma_corte", "Forma del calado", FORMAS_CORTE, "Rectangular (con el radio de las esquinas), "
+                   "redondo u ovalado, o el contorno de un dibujo (.dxf o .svg) encajado en el calado."))
+    if _c in CON_CALADO:
+        _m += [
+            ("corte_dibujo", "Dibujo del calado", "texto", "Archivo .dxf o .svg con el contorno del calado (con la "
+             "forma «dibujo»). Se encaja en el ancho x alto del calado sin deformarlo."),
+            ("capa_calado", "Capa DXF del calado", "texto", "Capa del DXF donde va el calado de este herraje "
+             "(vacío = 0, con el contorno de las piezas). Por ejemplo FRESADO_6MM para que el CAM lo haga con otra fresa."),
+        ]
+    if _c in CON_AGUJEROS:
+        _m += [
+            ("perforaciones", "Agujeros", "puntos", "Posición de cada agujero en mm desde el centro del herraje, "
+             "«dx x dy; dx x dy; …». En cierres y bisagras dy se mide desde la línea de cierre (negativo del lado "
+             "del cuerpo). Vacío = se reparten solos según la cantidad de remaches."),
+            ("perforacion_d", "Ø agujeros", "num", "Diámetro de los agujeros de este herraje (mm). Vacío = el del "
+             "remache + 0,1."),
+            ("capa_agujeros", "Capa DXF de los agujeros", "texto", "Capa del DXF de los agujeros de este herraje "
+             "(vacío = PERFORACIONES)."),
         ]
 NOMBRES = {c: n for c, n, _ in CATEGORIAS}
 MEDIDAS = {c: m for c, _, m in CATEGORIAS}
@@ -346,6 +375,8 @@ def texto_valor(v: Any) -> str:
         t = f"{v:.3f}".rstrip("0").rstrip(".")
         return t.replace(".", ",")
     if isinstance(v, (list, tuple)):
+        if v and all(isinstance(x, (list, tuple)) for x in v):     # puntos: «dx x dy; dx x dy»
+            return "; ".join(texto_valor(x) for x in v)
         return " x ".join(texto_valor(x) for x in v)
     return "" if v is None else str(v)
 
@@ -365,6 +396,19 @@ def valor_texto(t: str, tipo: Any = None) -> Any:
         return t.lower()
     if tipo == "texto":
         return t
+    if tipo == "puntos":
+        if t.startswith("[["):
+            try:
+                return [[float(q[0]), float(q[1])] for q in json.loads(t)]
+            except (ValueError, TypeError, IndexError):
+                pass
+        puntos = []
+        for parte in [q for q in re.split(r"\s*;\s*", t.strip("[]() ")) if q.strip()]:
+            par = valor_texto(parte, "par")
+            puntos.append(par)
+        if not puntos:
+            raise ValueError(f"«{t}» no son agujeros (escribí por ejemplo -20 x 15; 20 x 15)")
+        return puntos
     s_ = t.strip("[]() ")
     partes = [p for p in _SEP_PAR.split(s_) if p]
     if tipo == "par" and len(partes) == 1 and s_.count(",") == 1:     # «100,85» en una lista

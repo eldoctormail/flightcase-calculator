@@ -131,6 +131,16 @@ La pestaña **Placas** del Taller acomoda todas las piezas del pedido (todos los
 
 **Perforaciones.** Los agujeros de remaches salen como círculos con el diámetro de la mecha (remache + 0,1 mm) en la capa `PERFORACIONES`, para taladrarlos en la CNC o apagarlos si se perforan a mano: las filas de los ángulos de las aristas (en el medio del ala) y de los aros de cierre, con la misma cantidad que la lista de materiales (`remache_paso`); las patas de los esquineros; y alrededor de cierres, bisagras (también la de piano), manijas, cazoletas, platos y placas de logo, incluidos los herrajes puestos a mano. Los remaches del perfil que tapa un herraje no se perforan. Los tornillos del marco de la base suelta van en `TORNILLOS`; los bulones de las ruedas siguen en la capa 0. Si un artículo del catálogo trae `perforaciones` (`[[dx, dy], ...]` en mm desde el centro del herraje; en cierres y bisagras `dy` se mide desde la línea de cierre, negativo del lado del cuerpo), se usan esas posiciones en lugar de las estimadas.
 
+**Calado, agujeros y capas de cada herraje.** En el catálogo (Editar → Catálogo), cada manija, cierre, cazoleta, plato, conector o accesorio puede llevar:
+
+- **Forma del calado**: rectangular (con su radio), redondo/ovalado, o el contorno de un dibujo `.dxf`/`.svg`. El botón **Dibujo del calado…** lo copia a tu carpeta de datos y lo encaja en el calado sin deformarlo; si el calado está parado y el dibujo acostado, lo gira.
+- **Capa DXF del calado**: por ejemplo `FRESADO_6MM`, para que el CAM lo haga con otra fresa.
+- **Agujeros** propios (`-20 x 15; 20 x 15`, en mm desde el centro), con su **Ø** y su **capa DXF**.
+
+Los perfiles de tapa y los híbridos llevan además su **pata interior**, la que usa la medida de metal a metal.
+
+En la sección **DXF para la CNC** del Taller, la tabla **Capas del DXF** cambia el nombre y el color (número de color de AutoCAD) de cualquier capa, para que coincidan con las de tu CAM: por ejemplo `PERFORACIONES → DRILL` en cian. Se aplica a los DXF por pieza y por placa.
+
 ### Mis cases
 
 ![Mis cases](captura-mis-cases.png)

@@ -196,6 +196,7 @@ class PlacasWidget(QWidget):
             self.piezas = piezas
             self.trazos = {pz["num"]: PR.trazos_manuales(d["manuales"].get(pz["ids"][0], []))
                            for pz in piezas if not pz.get("extra")}
+            self.capas = PR.mapa_capas(d.get("dxf_capas"))
             self.agujeros = {pz["num"]: d["perforaciones"].get(pz["ids"][0], [])
                              for pz in piezas if not pz.get("extra")}
             n_cases = gen.cantidad_cases(d)
@@ -229,7 +230,7 @@ class PlacasWidget(QWidget):
             if not carpeta:
                 return []
         rutas = P.escribir_dxf_placas(self.placas, self.piezas, os.path.join(carpeta, "placas"), self.trazos,
-                                     self.agujeros)
+                                     self.agujeros, getattr(self, "capas", {}))
         ruta_csv = os.path.join(carpeta, "placas.csv")
         with open(ruta_csv, "w", newline="", encoding="utf-8-sig") as f:
             csv.writer(f, delimiter=";").writerows(P.filas_csv(self.placas))
