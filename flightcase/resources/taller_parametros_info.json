@@ -21,6 +21,11 @@
     "nombre": "int_alto_tapa",
     "ayuda": "del plano de cierre al techo interior",
     "etiqueta": "Alto de tapa"
+   },
+   {
+    "nombre": "medida_interior",
+    "etiqueta": "Medir el interior",
+    "ayuda": "placa = de placa a placa (como siempre: la pata de los perfiles de cierre se come un poco de la boca); metal = entre las patas de aluminio: el case crece lo necesario para que lo que entra justo pase por la boca. Las posiciones de los equipos se siguen midiendo desde la placa."
    }
   ]
  },
@@ -276,6 +281,11 @@
     "nombre": "hibrido_pared",
     "ayuda": "pared del perfil por fuera del panel",
     "etiqueta": "Pared del perfil híbrido"
+   },
+   {
+    "nombre": "hibrido_pata_int",
+    "etiqueta": "Pata interior del perfil híbrido",
+    "ayuda": "espesor del perfil híbrido por dentro de la placa, en todas las aristas (mm). Si el perfil del catálogo tiene el dato pata_int, se usa ese"
    }
   ]
  },
@@ -326,6 +336,11 @@
     "nombre": "cierre_hibrido",
     "ayuda": "true: el mismo perfil de cierre en cuerpo y tapa (hermafrodita); usa las medidas del macho",
     "etiqueta": "Perfil de cierre hermafrodita"
+   },
+   {
+    "nombre": "cierre_pata_int",
+    "etiqueta": "Pata interior del perfil de cierre",
+    "ayuda": "espesor de la pata del perfil que queda por dentro de la placa, en la boca (mm). Si el perfil del catálogo tiene el dato pata_int, se usa ese"
    }
   ]
  },
