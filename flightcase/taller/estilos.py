@@ -14,6 +14,10 @@ Claves especiales de un estilo (empiezan con "_", no son parámetros del .scad):
   no tiene equipos ni espumas.
 - ``_cajones: mm``: llena el alto interior con cajones (bandejas con correderas) de ese paso,
   si el proyecto todavía no tiene cajones.
+- ``_medidas: {...}``: medidas propias del estilo (interior, tapa de acceso, base de ruedas,
+  bandejas...). Se usan sólo al empezar un proyecto nuevo con el estilo (pantalla de inicio y
+  miniatura); elegido en el Taller, el estilo se arma sobre las medidas del proyecto. Lo que
+  trae ``_medidas`` gana sobre ``_acceso`` y ``_base_ruedas``.
 """
 
 from __future__ import annotations
@@ -129,14 +133,19 @@ def _guitarras(p: Dict[str, Any], n: int) -> Tuple[List[list], List[list]]:
     return equipos, espumas
 
 
-def aplicar(params: Dict[str, Any], estilo: Estilo, defectos: Dict[str, Any]) -> Dict[str, Any]:
-    """Devuelve los parámetros con el estilo aplicado (no modifica los recibidos)."""
+def aplicar(params: Dict[str, Any], estilo: Estilo, defectos: Dict[str, Any],
+            con_medidas: bool = False) -> Dict[str, Any]:
+    """Devuelve los parámetros con el estilo aplicado (no modifica los recibidos).
+
+    Con ``con_medidas`` (proyecto nuevo) también pone las medidas propias del estilo (``_medidas``)."""
     nuevo = dict(params)
     claves = [k for k in defectos if k not in NO_GUARDAR] if estilo.propio else CLAVES_ESTILO
     for k in claves:
         if k in defectos:
             nuevo[k] = defectos[k]
     nuevo.update({k: v for k, v in estilo.params.items() if not k.startswith("_")})
+    medidas = dict(estilo.params.get("_medidas") or {}) if con_medidas else {}
+    nuevo.update(medidas)
 
     if estilo.params.get("_mitades"):
         total = float(nuevo["int_alto_cuerpo"]) + float(nuevo["int_alto_tapa"])
@@ -155,9 +164,9 @@ def aplicar(params: Dict[str, Any], estilo: Estilo, defectos: Dict[str, Any]) ->
     if n_g and not nuevo.get("equipos") and not nuevo.get("espumas"):
         nuevo["equipos"], nuevo["espumas"] = _guitarras(nuevo, n_g)
     frac = estilo.params.get("_acceso")
-    if frac:
+    if frac and "acceso_lateral" not in medidas:
         nuevo["acceso_lateral"] = round(float(frac) * _alto_case(nuevo))
-    if estilo.params.get("_base_ruedas") == "auto":
+    if estilo.params.get("_base_ruedas") == "auto" and "base_ruedas" not in medidas:
         nuevo["base_ruedas"] = base_ruedas_auto(nuevo)
     return nuevo
 
