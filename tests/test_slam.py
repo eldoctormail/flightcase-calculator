@@ -102,3 +102,14 @@ def test_piso_basemaker_encastrado_en_su_marco():
     assert any(p.descripcion.startswith("Marco del piso") for p in res.perfiles)
     assert not any(p.descripcion.startswith("Aristas") and "piso" in p.descripcion.lower() for p in res.perfiles)
     assert res.info["slam"][5] == "1" and t > 0
+
+
+def test_case_partido_lleva_dos_hojas_en_cada_lado():
+    res = calcular(_con("case_partido"))
+    tapas = {p.id for p in res.paneles if p.grupo == "tapa"}
+    assert tapas == {"tapa_frente_1", "tapa_frente_2", "tapa_trasera_1", "tapa_trasera_2"}
+    nombres = {h.nombre: h.cantidad for h in res.herrajes}
+    assert nombres["Pasador embutido (falleba) para puerta doble"] == 4
+    # la tapa de arriba de "puertas dobles y tapa" sigue siendo de una hoja
+    res = calcular(_con("puertas_dobles_y_tapa"))
+    assert "tapa_techo" in {p.id for p in res.paneles}

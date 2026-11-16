@@ -230,5 +230,29 @@
   "nombre": "Tapa adelante y arriba",
   "descripcion": "Case parado con una puerta plana adelante y una tapa plana arriba, en marco de perfil slam con bisagras de piano y cierres slam. Ruedas abajo.",
   "params": {"forma": "slam", "orientacion": "frontal", "slam_caras": "arriba_frente", "slam_hojas": 1, "puerta_lado": "izq", "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "case_partido",
+  "nombre": "Case partido con tapas partidas",
+  "descripcion": "Case parado que se abre adelante y atrás, con cada lado cerrado por dos hojas planas que abren hacia los costados (marco slam, bisagra de piano, pasadores y cierres slam). Se llega a todo el equipo desde los dos lados sin sacar tapas.",
+  "params": {"forma": "slam", "orientacion": "frontal", "slam_caras": "frente_trasera", "slam_hojas": 2, "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "rack_mezcladora_2",
+  "nombre": "Rack para mezcladora 2",
+  "descripcion": "Rack para consola con el cuerpo en cuña y, abajo adelante, un rack de 19\" de 3 U con boca en el frente para procesadores o la potencia. La tapa cierra sobre la pendiente.",
+  "params": {"forma": "inclinado", "orientacion": "vertical", "incl_rieles": true, "incl_alto_frente": 200, "incl_rack_frente": 3, "tapas": 1, "ruedas": 0, "pies": 4, "manijas": true}
+ },
+ {
+  "id": "base_ruedas_suelta",
+  "nombre": "Base de ruedas suelta",
+  "descripcion": "Tabla gruesa con cuatro ruedas y un borde de ángulo alrededor, sin case: arriba se apoya uno o más cases (o una pila) y viajan juntos. Las medidas interiores son la planta de lo que apoya.",
+  "params": {"forma": "tabla", "orientacion": "vertical", "ruedas": 4, "rueda_frenos": 2, "tabla_borde": 40, "manijas": false}
+ },
+ {
+  "id": "baul_guitarras",
+  "nombre": "Baúl chico para guitarras",
+  "descripcion": "Case parado con la tapa adelante para cuatro guitarras de pie, una al lado de la otra, separadas por tabiques de espuma de todo el alto y el fondo. Poné de alto interior el de la guitarra más alta más 60 mm y ajustá cada guitarra en la tabla de equipos.",
+  "params": {"orientacion": "frontal", "tapas": 1, "extremos_cubren": true, "bisagras": 3, "puerta_lado": "izq", "ruedas": 4, "manijas": true, "_guitarras": 4}
  }
 ]

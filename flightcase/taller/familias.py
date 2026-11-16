@@ -39,7 +39,9 @@ FAMILIAS = (
       "rack_slam", "funda_rack")),
     ("slam", "Tapas slam", "Tapas y puertas planas en marco de perfil slam, con bisagra de piano y cierres que "
      "traban solos al cerrar.", ("baul_slam_hd", "tapa_slam_doble", "tapa_slam_adelante", "tapas_slam_adelante_atras")),
-    ("especiales", "Especiales", "Armados para un uso puntual.", ()),
+    ("especiales", "Especiales", "Armados para un uso puntual: case partido, rack para mezcladora con rack abajo, "
+     "base de ruedas suelta y baúl para guitarras.",
+     ("case_partido", "rack_mezcladora_2", "base_ruedas_suelta", "baul_guitarras")),
 )
 
 # Nombre corto de cada estilo en los chips de su familia (sin repetir lo que ya dice la familia)
@@ -61,6 +63,8 @@ CORTOS = {
     "tapa_lidmaker": "Lidmaker", "piso_basemaker": "Basemaker", "lidmaker_basemaker": "Lid + base",
     "apertura_frontal_puerta_doble": "Puerta doble", "puertas_dobles_y_tapa": "Puertas y tapa",
     "tapa_adelante_y_arriba": "Adelante y arriba",
+    "case_partido": "Partido", "rack_mezcladora_2": "Mezcladora 2", "base_ruedas_suelta": "Castor board",
+    "baul_guitarras": "Guitarras",
 }
 
 

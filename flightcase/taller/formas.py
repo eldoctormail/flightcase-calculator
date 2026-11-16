@@ -37,12 +37,14 @@ from . import materiales as _mat
 from .modelo import (TRAMO_MINIMO, CatalogoTaller, Calado, Herraje, Marca, Panel, Perfil, ResultadoTaller,
                      _pos_n, fmt, round_os, s)
 
-FORMAS = ("inclinado", "funda", "plegable", "slam")
+FORMAS = ("inclinado", "funda", "plegable", "slam", "tabla")
 NOMBRES = {"inclinado": "Rack inclinado para consola (cuerpo en cuña, tapa sobre el plano inclinado)",
            "funda": "Funda de rack: abierta adelante y atrás, sin tapas",
            "plegable": "Baúl plegable: paredes con bisagra de piano que se pliegan sobre la base",
            "slam": "Tapas slam: tapas o puertas planas en un marco de perfil slam, con bisagra de piano y "
-                   "cierres slam embutidos"}
+                   "cierres slam embutidos",
+           "tabla": "Base de ruedas suelta (castor board): una tabla con ruedas y un borde de ángulo donde "
+                    "apoyan uno o más cases"}
 
 # pasos de la vista 3D y del instructivo de estas formas
 F_CUERPO, F_AROS, F_ARISTAS, F_ESQ, F_TAPA, F_CIERRES, F_MANIJAS, F_RUEDAS = 1, 2, 3, 4, 5, 6, 7, 8
@@ -336,7 +338,8 @@ class _Armado:
         P, E, cat = self.P, self.E, self.cat
         nom = lambda ref, d: cat.nombre(ref) if cat.existe(ref) else d
         ref_e = P.get("ref_esquinero", "")
-        self.H.insert(0, [nom(ref_e, "Esquinero bola"), n_esq, s("pata ", E.pata, " mm"), ref_e])
+        if n_esq:
+            self.H.insert(0, [nom(ref_e, "Esquinero bola"), n_esq, s("pata ", E.pata, " mm"), ref_e])
         self.remaches += n_esq * E.esq_rem
         if n_cierres_:
             self.H.insert(1, [nom(E.ref_cierre, "Cierre mariposa"), n_cierres_,
@@ -670,6 +673,27 @@ def _rack_inclinado(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
     ar.manijas_en(["cuerpo_izq", "cuerpo_der"], {"cuerpo_izq": (xm, zc_m), "cuerpo_der": (xm, zc_m)})
     if P.get("manijas") and zc_m - E.man_h / 2 < E.ala + 10:
         ar.A.append("La manija queda muy cerca del piso: el frente del rack inclinado es bajo para esa manija.")
+    # ---- rack de 19" adelante, bajo la pendiente (rack para mezcladora 2) ----
+    u_fr = int(P.get("incl_rack_frente", 0) or 0)
+    if u_fr > 0:
+        alto_r = u_fr * 44.45
+        z0 = t + 5.0                                  # boca del rack: 5 mm sobre el piso
+        tope = min(h_fr_out, h_fr_in) - (E.m_alto - E.m_sup) - 10
+        if z0 + alto_r > tope:
+            ar.A.append(s("Los ", u_fr, " U del rack de adelante no entran bajo la pendiente: el frente da lugar para ",
+                          max(0, math.floor((tope - z0) / 44.45)), " U. Subí incl_alto_frente o bajá incl_rack_frente."))
+        if W < 483:
+            ar.A.append(s("El rack de adelante necesita ", 483, " mm de ancho interior (orejas de 19\"): hay ", W, " mm."))
+        ar.calados.append(Calado("cuerpo_frente", "conector", X / 2, z0 + alto_r / 2, 450.0, alto_r, 3.0))
+        for xr in (X / 2 - 241.5, X / 2 + 225.0):     # rieles detrás del frente, a los costados de la boca
+            ar.bloque((xr, t, z0), (1, 0, 0), (0, 0, 1), (0, 1, 0), 16.5, alto_r, 15.0, "profile", "Riel de rack",
+                      "cuerpo", F_AROS)
+        ref_riel = str(P.get("ref_riel") or "")
+        nom_riel = cat.nombre(ref_riel) if cat.existe(ref_riel) else "Perfil de rack 19\" 45U"
+        ar.H.append([nom_riel, 1, s("cortar 2 tramos de ", u_fr, " U (", round(alto_r, 2), " mm) para el rack de adelante"),
+                     ref_riel])
+        ar.H.append(["Tornillo para fijar el riel al frente", 2 * (int(alto_r // 100) + 2),
+                     "cada 100 mm, por fuera del frente, que no atraviese el riel", ""])
     # ---- ruedas y pies bajo el piso ----
     ar.ruedas_abajo("piso", X - 2 * t, Y - 2 * t, (t, t, 0.0), (1, 0, 0), (0, 1, 0), E.pata + P.get("rueda_margen", 10) - t)
     ar.pies_abajo("piso", X - 2 * t, Y - 2 * t, (t, t, 0.0), (1, 0, 0), (0, 1, 0), E.pata + P.get("rueda_margen", 10) - t)
@@ -706,7 +730,7 @@ def _rack_inclinado(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
     pts = [(0, 0, 0), (X, Y, zr), Q(0, 0, tp["alto"]), Q(X, S, tp["alto"]), Q(0, -E.sal, 0)]
     mundo = (X, max(p[1] for p in pts) - min(p[1] for p in pts), max(p[2] for p in pts))
     info_extra = {"inclinado": [fmt(grados), fmt(round(S, 2)), fmt(round(zf, 2)), fmt(round(zr, 2)),
-                                fmt(round(fondo_frente, 1))]}
+                                fmt(round(fondo_frente, 1)), fmt(max(0, u_fr))]}
     geo = dict(mover={"tapa": Q.e3}, marco_interior=marco_int, plano=dict(p0=Q.p0, e2=Q.e2, e3=Q.e3, S=S))
     valores = {"ext_ancho": X, "ext_prof": Y, "ext_alto": max(p[2] for p in pts), "incl_grados": grados,
                "incl_largo": S}
@@ -1052,7 +1076,7 @@ def _slam(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
         # la tapa (una o dos hojas), a ras del marco
         ancho_l = A - 2 * c - 2 * gap
         alto_l = B - 2 * c - 2 * gap
-        n_h = hojas if i == 0 else 1
+        n_h = hojas if (i == 0 or cara != "techo") else 1
         w_h = (ancho_l - gap * (n_h - 1)) / n_h
         # bisagra: en la trasera de la tapa de arriba; en las puertas, del lado elegido (dos hojas: en los dos)
         if lm:
@@ -1222,6 +1246,53 @@ def _slam(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
     return res
 
 
+# ---------------------------------------------------------------------------
+# Base de ruedas suelta (castor board)
+# ---------------------------------------------------------------------------
+
+def _tabla(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
+    """Una tabla gruesa con cuatro ruedas abajo y un borde de ángulo alrededor, con el ala hacia arriba: los
+    cases (o una pila) apoyan adentro del borde y viajan juntos. int_ancho x int_prof es la planta de lo que
+    apoya; la tabla lleva 2 mm de luz por lado."""
+    ar = _Armado(P, cat)
+    E = ar.E
+    g = P.get
+    W, D = float(P["int_ancho"]), float(P["int_prof"])
+    tb = float(g("tabla_esp", 18) or 18)
+    borde = float(g("tabla_borde", 40) or 0)
+    luz = 2.0
+    X, Y = W + 2 * luz, D + 2 * luz
+    mat = g("tabla_material") or s("Placa ", tb, " mm")
+    ar.panel("tabla", "Tabla (con las ruedas)", "cuerpo", X, Y, (0.0, 0.0, 0.0), (1, 0, 0), (0, 1, 0), (0, 0, 1),
+             esp=tb)
+    ar.panelmat.append(["tabla", mat, tb])
+    # el borde: ángulo con un ala sobre el canto de la tabla y la otra hacia arriba (sobresale `borde`)
+    alto_ala = tb + borde
+    e_ang = 1.5
+    for (o, u, n, L) in (((0.0, 0.0, 0.0), (1, 0, 0), (0, 1, 0), X), ((X, Y, 0.0), (-1, 0, 0), (0, -1, 0), X),
+                         ((0.0, Y, 0.0), (0, -1, 0), (1, 0, 0), Y), ((X, 0.0, 0.0), (0, 1, 0), (-1, 0, 0), Y)):
+        ar.bloque(_sum(o, _mul(n, -e_ang)), u, (0, 0, 1), n, L, alto_ala, e_ang, "profile", "Borde de ángulo",
+                  "cuerpo", F_ARISTAS)
+    A_ = E.perfil_arista
+    ar.tramo(A_, "Borde a lo ancho (ala hacia arriba)", X + 2 * e_ang, 2, "45/45", E.ref_arista)
+    ar.tramo(A_, "Borde a lo profundo (ala hacia arriba)", Y + 2 * e_ang, 2, "45/45", E.ref_arista)
+    if borde < 20:
+        ar.A.append("Con menos de 20 mm de borde los cases se pueden correr de la tabla en una frenada.")
+    if E.ala > alto_ala:
+        ar.A.append(s("El ala del ángulo (", E.ala, " mm) es más alta que la tabla más el borde: subí tabla_borde."))
+    if int(g("ruedas", 0) or 0) != 4:
+        ar.A.append("La base de ruedas sin ruedas es sólo una tabla: poné ruedas = 4.")
+    ar.ruedas_abajo("tabla", X, Y, (0.0, 0.0, 0.0), (1, 0, 0), (0, 1, 0), float(g("rueda_margen", 10) or 0))
+    if g("manijas"):
+        ar.A.append("La base de ruedas no lleva manijas: se empuja del case que va arriba.")
+    Z = alto_ala
+    mundo = (X + 2 * e_ang, Y + 2 * e_ang, Z)
+    valores = {"ext_ancho": X + 2 * e_ang, "ext_prof": Y + 2 * e_ang, "ext_alto": Z}
+    info_extra = {"tabla": [fmt(tb), fmt(borde), mat]}
+    return ar.resultado("tabla", info_extra, (X, Y, Z, 0), (W, D, borde, 0), mundo, valores, dict(mover={}), None,
+                        "", n_esq=0)
+
+
 def calcular(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
     forma = P.get("forma")
     if forma == "inclinado":
@@ -1230,6 +1301,8 @@ def calcular(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
         res = _funda(P, cat)
     elif forma == "slam":
         res = _slam(P, cat)
+    elif forma == "tabla":
+        res = _tabla(P, cat)
     else:
         res = _plegable(P, cat)
     from . import peso as _peso
@@ -1272,6 +1345,21 @@ def pasos_instructivo(d: Dict[str, Any], piezas: List[Dict[str, Any]]) -> List[D
         "Cortá todos los perfiles antes de empezar, siguiendo la hoja de barras del PDF de planos."])]
     if forma == "slam":
         return pasos + _pasos_slam(d, info, nom, per, tramos, her, camara)
+    if forma == "tabla":
+        tb, borde, mat = info["tabla"]
+        return pasos + [
+            dict(titulo="Cortar la tabla", vista="f_cuerpo", camara=camara, defs={"paso": F_CUERPO},
+                 texto=[f"Tabla: {nom('tabla')}, de {mat} ({_f(float(tb))} mm). Lijá los cantos y marcá la cara de "
+                        "arriba."]),
+            dict(titulo="Borde de ángulo", vista="f_esq", camara=camara, defs={"paso": F_ARISTAS},
+                 texto=[f"Ángulo alrededor, a inglete 45° ({tramos(per('Borde'))}), con un ala sobre el canto de la "
+                        f"tabla y la otra hacia arriba: sobresale {_f(float(borde))} mm y sujeta los cases.",
+                        "Remachá el ala del canto a la tabla (o atornillala si la tabla es gruesa)."]),
+            dict(titulo="Ruedas", vista="f_ruedas", camara="0,0,0,110,0,32,0", defs={"paso": F_RUEDAS},
+                 texto=["Ruedas abajo, en las cuatro esquinas: bulones pasantes con arandela y tuerca autofrenante, "
+                        "las ruedas con freno del mismo lado."]),
+            dict(titulo="Base terminada", vista="final", texto=[
+                "Apoyá el case arriba y probá que entre en el borde sin forzar y que no se mueva al empujar."])]
     if forma == "inclinado":
         g = info["inclinado"][0]
         pasos.append(dict(titulo="Armar el cuerpo en cuña", vista="f_cuerpo", camara=camara, defs={"paso": F_CUERPO},
@@ -1283,7 +1371,11 @@ def pasos_instructivo(d: Dict[str, Any], piezas: List[Dict[str, Any]]) -> List[D
                                  "con su DXF o marcando los dos altos de los cantos.",
                                  f"Presentá {nom('piso')} entre las cuatro paredes, frente y trasera enteros y los "
                                  "laterales entre ellos. Controlá las diagonales del piso y que el canto inclinado de "
-                                 "los laterales quede a ras con el bisel del frente y de la trasera."]))
+                                 "los laterales quede a ras con el bisel del frente y de la trasera."]
+                          + ([f"Rack de adelante: calá en {nom('cuerpo_frente')} la boca de {info['inclinado'][5]} U "
+                              "con su DXF y atornillá los dos rieles detrás del frente, a los costados de la boca, "
+                              "antes de cerrar la caja."] if len(info["inclinado"]) > 5 and info["inclinado"][5] != "0"
+                             else [])))
         pasos.append(dict(titulo="Colocar el aro macho sobre la pendiente", vista="f_aro", camara=camara,
                           defs={"paso": F_AROS},
                           texto=[f"El aro es un rectángulo en el plano inclinado: perfil macho a inglete 45° "
