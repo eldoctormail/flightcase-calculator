@@ -1108,18 +1108,25 @@ class TallerWidget(QWidget):
         self._leer_editores()
         return self._foto() != getattr(self, "_foto_guardada", None)
 
+    def confirmar_cambios(self, titulo: str, antes_de: str) -> bool:
+        """Si hay cambios sin guardar pregunta Guardar/Descartar/Cancelar. False = canceló."""
+        if not self.hay_cambios():
+            return True
+        r = QMessageBox.question(
+            self, titulo, f"«{self.lbl_archivo.text()}» tiene cambios sin guardar.\n¿Guardarlos antes de {antes_de}?",
+            QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Save)
+        if r == QMessageBox.Cancel:
+            return False
+        if r == QMessageBox.Save:
+            self.guardar(self.ruta)
+            if self.hay_cambios():      # canceló el diálogo de guardar
+                return False
+        return True
+
     def nuevo(self, preguntar: bool = True) -> bool:
         """Empieza un case con las medidas por defecto; si hay cambios sin guardar, pregunta antes."""
-        if preguntar and self.hay_cambios():
-            r = QMessageBox.question(
-                self, "Case nuevo", f"«{self.lbl_archivo.text()}» tiene cambios sin guardar.\n¿Guardarlos antes de empezar uno nuevo?",
-                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Save)
-            if r == QMessageBox.Cancel:
-                return False
-            if r == QMessageBox.Save:
-                self.guardar(self.ruta)
-                if self.hay_cambios():      # canceló el diálogo de guardar
-                    return False
+        if preguntar and not self.confirmar_cambios("Case nuevo", "empezar uno nuevo"):
+            return False
         self.set_params({})
         self.case_nuevo.emit()
         return True
