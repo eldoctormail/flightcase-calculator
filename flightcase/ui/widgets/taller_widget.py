@@ -71,10 +71,12 @@ TABLAS: Dict[str, List[tuple]] = {
     "rack_equipos": [("Nombre", "texto", ""), ("U", "num", None), ("Fondo", "num", None), ("Peso kg", "num", 0),
                      ("Desde U", "num", 0), ("Sobresale adelante", "num", 0)],
     "extras": [("Artículo del catálogo", "ref", None), ("Cantidad", "num", 1)],
+    "paneles_material": [("Panel o grupo", "panel", None), ("Placa del catálogo", "placa", ""),
+                         ("Espesor", "num", 0), ("Material", "texto", "")],
 }
 
 # Tablas cuyas filas se completan con los valores por defecto de las columnas vacías
-COMPLETAR = {"extras"}
+COMPLETAR = {"extras", "paneles_material"}
 
 # Herrajes que se eligen del catálogo: categorías que se ofrecen en la lista (None = todas)
 REF_CATEGORIAS: Dict[str, Optional[tuple]] = {
@@ -243,11 +245,15 @@ def _a_numero(texto: str) -> float:
 class _DelegadoArticulo(QStyledItemDelegate):
     """Celda que se edita eligiendo un artículo del catálogo (con búsqueda por texto)."""
 
+    def __init__(self, parent=None, categorias: Optional[tuple] = None) -> None:
+        super().__init__(parent)
+        self.categorias = categorias
+
     def createEditor(self, parent, option, index):  # noqa: N802 (nombre de Qt)
         w = QComboBox(parent)
         w.setEditable(True)
         w.setMaxVisibleItems(20)
-        _llenar_combo_catalogo(w, None, vacio=False)
+        _llenar_combo_catalogo(w, self.categorias, vacio=self.categorias is not None)
         return w
 
     def setEditorData(self, editor, index):  # noqa: N802
@@ -260,6 +266,39 @@ class _DelegadoArticulo(QStyledItemDelegate):
 
     def setModelData(self, editor, model, index):  # noqa: N802
         model.setData(index, etiqueta_ref(ref_de_texto(editor.currentText())))
+
+
+def etiqueta_panel(clave: str, opciones: List[tuple]) -> str:
+    """«id — nombre» de un panel o grupo del case; la clave sola si no está en el case."""
+    nombre = dict(opciones).get(clave)
+    return f"{clave}{SEPARADOR_REF}{nombre}" if nombre else clave
+
+
+class _DelegadoPanel(QStyledItemDelegate):
+    """Celda que se edita eligiendo un panel (o un grupo de paneles) del case calculado."""
+
+    def __init__(self, parent, opciones) -> None:
+        super().__init__(parent)
+        self.opciones = opciones          # función: [(clave, nombre)] del último cálculo
+
+    def createEditor(self, parent, option, index):  # noqa: N802 (nombre de Qt)
+        w = QComboBox(parent)
+        w.setEditable(True)
+        w.setMaxVisibleItems(24)
+        for clave, nombre in self.opciones():
+            w.addItem(f"{clave}{SEPARADOR_REF}{nombre}", clave)
+        return w
+
+    def setEditorData(self, editor, index):  # noqa: N802
+        clave = ref_de_texto(index.data() or "")
+        i = editor.findData(clave)
+        if i >= 0:
+            editor.setCurrentIndex(i)
+        else:
+            editor.setEditText(clave)
+
+    def setModelData(self, editor, model, index):  # noqa: N802
+        model.setData(index, etiqueta_panel(ref_de_texto(editor.currentText()), self.opciones()))
 
 
 class _DelegadoForma(QStyledItemDelegate):
@@ -289,9 +328,10 @@ class _DelegadoForma(QStyledItemDelegate):
 class _EditorTabla:
     """Editor de una lista de listas (bandejas, equipos, cajones...) como tabla con filas."""
 
-    def __init__(self, nombre: str, defecto: Any, al_cambiar) -> None:
+    def __init__(self, nombre: str, defecto: Any, al_cambiar, opciones_panel=None) -> None:
         self.nombre, self.defecto = nombre, defecto
         self.columnas = TABLAS[nombre]
+        self.opciones_panel = opciones_panel or (lambda: [])
         self._al_cambiar = al_cambiar
         w = QWidget()
         lay = QVBoxLayout(w)
@@ -303,9 +343,14 @@ class _EditorTabla:
         self.tabla.horizontalHeader().setStretchLastSection(True)
         self.tabla.setMinimumHeight(140)
         for c, (_, tipo, _r) in enumerate(self.columnas):
-            if tipo in ("ref", "forma"):
-                self._delegado = _DelegadoArticulo(self.tabla) if tipo == "ref" else _DelegadoForma(self.tabla)
-                self.tabla.setItemDelegateForColumn(c, self._delegado)
+            delegado = {"ref": lambda: _DelegadoArticulo(self.tabla),
+                        "placa": lambda: _DelegadoArticulo(self.tabla, ("placa",)),
+                        "forma": lambda: _DelegadoForma(self.tabla),
+                        "panel": lambda: _DelegadoPanel(self.tabla, self.opciones_panel)}.get(tipo)
+            if delegado:
+                d = delegado()
+                self._delegados = getattr(self, "_delegados", []) + [d]   # Qt no se queda con la referencia
+                self.tabla.setItemDelegateForColumn(c, d)
             if tipo == "forma":   # una ruta larga no tapa las columnas de al lado
                 self.tabla.horizontalHeader().setSectionResizeMode(c, QHeaderView.Interactive)
                 self.tabla.setColumnWidth(c, 150)
@@ -400,8 +445,10 @@ class _EditorTabla:
         for c, v in enumerate(celdas[:len(self.columnas)]):
             vacio = v == "c" or (v == -1 and self.columnas[c][2] == -1)   # relleno que se muestra vacío
             texto = "" if vacio else (fmt(v) if isinstance(v, (int, float)) else str(v))
-            if self.columnas[c][1] == "ref":
+            if self.columnas[c][1] in ("ref", "placa"):
                 texto = etiqueta_ref(texto)
+            elif self.columnas[c][1] == "panel":
+                texto = etiqueta_panel(texto, self.opciones_panel())
             self.tabla.setItem(r, c, QTableWidgetItem(texto))
 
     def valor(self) -> Any:
@@ -424,7 +471,7 @@ class _EditorTabla:
                             item.setBackground(QColor("#ffd6d6"))
                             error = True
                             celdas.append(None)
-                    elif tipo == "ref":
+                    elif tipo in ("ref", "placa", "panel"):
                         celdas.append(ref_de_texto(texto))
                     else:
                         celdas.append(texto)
@@ -553,7 +600,7 @@ class TallerWidget(QWidget):
                 etiqueta = QLabel(p.get("etiqueta") or nombre)
                 etiqueta.setToolTip(_ayuda(_con_codigo(p["ayuda"], nombre)))
                 if nombre in TABLAS:
-                    ed = _EditorTabla(nombre, self.defectos[nombre], self._programar)
+                    ed = _EditorTabla(nombre, self.defectos[nombre], self._programar, self._opciones_panel)
                     ed.widget.setToolTip(_ayuda(_con_codigo(p["ayuda"], nombre)))
                     form.addRow(etiqueta)
                     form.addRow(ed.widget)
@@ -599,7 +646,7 @@ class TallerWidget(QWidget):
         self.herrajes = HerrajesManualesWidget(self)
         self.herrajes.cambiado.connect(self._herrajes_cambiados)
         self.tabs.addTab(self.herrajes, "Herrajes a mano")
-        self.tabla_paneles = self._tabla(["Pieza", "Ancho", "Alto", "Calados"])
+        self.tabla_paneles = self._tabla(["Pieza", "Ancho", "Alto", "Placa", "Calados"])
         self.tabla_perfiles = self._tabla(["Perfil", "Descripción", "Largo", "Cant.", "Corte"])
         self.tabla_herrajes = self._tabla(["Herraje", "Cant.", "Detalle", "Ref."])
         self.tabs.addTab(self.tabla_paneles, "Paneles")
@@ -771,6 +818,10 @@ class TallerWidget(QWidget):
         self.lbl_exterior_nota.setWordWrap(True)
         form.addRow(self.lbl_exterior_nota)
         self._alto_total = None
+
+    def _opciones_panel(self) -> List[tuple]:
+        from ...taller.materiales import opciones_panel
+        return opciones_panel(self.resultado.paneles) if self.resultado is not None else []
 
     def _alto_tapas(self) -> float:
         """Alto interior de la tapa, más el de la segunda tapa si el case tiene dos."""
@@ -971,12 +1022,23 @@ class TallerWidget(QWidget):
             f"<b>Exterior:</b> {fmt(v['ext_ancho'])} × {fmt(v['ext_prof'])} × {fmt(v['ext_alto'])} mm"
             f" &nbsp;·&nbsp; <b>Sistema:</b> {res.info['sistema'][0]}"
             f" &nbsp;·&nbsp; <b>Placa:</b> {v['placa_material']}"
+            + (f" (+ {len(otros)} paneles en otra placa)" if (otros := v.get("materiales_paneles") or {}) else "") +
             f" &nbsp;·&nbsp; {n_paneles} paneles, {sum(p.cantidad for p in res.perfiles)} tramos de perfil")
         calados: Dict[str, int] = {}
         for c in res.calados:
             calados[c.panel] = calados.get(c.panel, 0) + 1
-        self._llenar(self.tabla_paneles, [[p.nombre, fmt(p.ancho), fmt(p.alto), str(calados.get(p.id, ""))]
-                                          for p in res.paneles])
+        mat = {m[0]: f"{m[1]}" for m in res.panelmat}
+        self._llenar(self.tabla_paneles, [[p.nombre, fmt(p.ancho), fmt(p.alto), mat.get(p.id, v["placa_material"]),
+                                           str(calados.get(p.id, ""))] for p in res.paneles])
+        ed = self.editores.get("paneles_material")
+        if isinstance(ed, _EditorTabla):      # nombres de los paneles ya calculados
+            ops = self._opciones_panel()
+            ed.tabla.blockSignals(True)
+            for r in range(ed.tabla.rowCount()):
+                it = ed.tabla.item(r, 0)
+                if it and it.text().strip():
+                    it.setText(etiqueta_panel(ref_de_texto(it.text()), ops))
+            ed.tabla.blockSignals(False)
         self._llenar(self.tabla_perfiles, [[p.nombre, p.descripcion, fmt(p.largo), str(p.cantidad), p.corte]
                                            for p in res.perfiles])
         self._llenar(self.tabla_herrajes, [[h.nombre, str(h.cantidad), h.detalle, h.ref] for h in res.herrajes])
