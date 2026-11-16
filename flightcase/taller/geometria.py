@@ -654,6 +654,27 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
                 k.cilindro((cx, cy, lift_pie - ex * 2.2 - geo["pie_h"] / 2), (0, 0, 1), (1, 0, 0), (0, 1, 0), d / 2,
                            geo["pie_h"], k.color(P_RUEDAS, "rueda"), ComponentLayer.BASE_ALU, "Pie")
 
+    # Patines bajo el piso y patas de mesa (apoyos.py)
+    ap = geo.get("apoyos") or {}
+    if ap and k.visible(P_RUEDAS) and not (geo["horizontal"] or geo["frontal"]):
+        z_piso = lift_pie - (ex * 2.2 if ex > 0 else 0.0)
+        for x0, y0, x1, y1, h in ap.get("patines", []):
+            k.bloque(x0, x1, y0, y1, z_piso - h, z_piso, k.color(P_RUEDAS, "base_ruedas"), ComponentLayer.BASE_ALU,
+                     "Patín")
+        pt = ap.get("patas")
+        if pt:
+            so, e, la = pt["soporte"], pt["esp"], pt["lado"]
+            for cx, cy in pt["centros"]:
+                if pt["en"] == "cuerpo":
+                    k.bloque(cx - so / 2, cx + so / 2, cy - so / 2, cy + so / 2, z_piso - e, z_piso,
+                             k.color(P_RUEDAS, "herraje"), ComponentLayer.BASE_ALU, "Soporte de pata")
+                    k.bloque(cx - la / 2, cx + la / 2, cy - la / 2, cy + la / 2, z_piso - e - pt["largo"], z_piso - e,
+                             k.color(P_RUEDAS, "aluminio"), ComponentLayer.BASE_ALU, "Pata de mesa")
+                elif not op.vista_parte:      # por dentro del techo de la tapa: se mueve con la tapa
+                    z1 = Z - t + desplaz["tapa"]
+                    k.bloque(cx - so / 2, cx + so / 2, cy - so / 2, cy + so / 2, z1 - e, z1,
+                             k.color(P_TAPA, "herraje"), ComponentLayer.BASE_ALU, "Soporte de pata")
+
     # Bandejas (ya en coordenadas del mundo)
     if k.visible(P_CUERPO) and ver_fija and op.resaltar_que != "perfiles" and \
             not (op.resaltar_que == "junta" and op.vista_parte == "fija"):

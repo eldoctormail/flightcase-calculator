@@ -49,6 +49,8 @@ OPCIONES: Dict[str, List[str]] = {
     "orientacion": ["vertical", "horizontal", "frontal"],
     "forma": ["caja", "inclinado", "funda", "plegable"],
     "puerta_lado": ["izq", "der"],
+    "patin_sentido": ["auto", "ancho", "largo"],
+    "patas_en": ["tapa", "cuerpo"],
     "sistema": ["angulo", "hibrido"],
     "acceso_tipo": ["paneles", "cubierta"],
     "paredes_enteras": ["frente", "laterales"],

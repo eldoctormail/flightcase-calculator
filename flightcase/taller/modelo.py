@@ -1220,6 +1220,24 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         _hm.unir_herrajes(herrajes, manuales.herrajes, Herraje)
         A += manuales.avisos
 
+    # ---- patines y patas de mesa (apoyos.py): no están en flightcase.scad ----
+    from . import apoyos as _ap
+    _apo = _ap.calcular(P, ext_ancho, ext_prof, ext_alto, vertical=not (_hz or _fr), panel_base=_panel_base,
+                        panel_techo="techo" if any(p.id == "techo" for p in paneles) else None,
+                        ox=_piso_ox, oy=_piso_oy, margen=max(E_esq_pata, _ala_arista) + rueda_margen,
+                        placa_esp=_t, hay_ruedas=ruedas == 4, hay_pies=pies == 4, hay_base=_base)
+    calados += _apo.calados
+    marcas += _apo.marcas
+    herrajes += [Herraje(*h) for h in _apo.herrajes]
+    extras_p += _apo.extras
+    info.update(_apo.info)
+    A += _apo.avisos
+    if _apo.remaches:
+        h_rem = herrajes[_i_remache]
+        h_rem.cantidad += math.ceil(_apo.remaches * 1.1)
+        h_rem.detalle = s(h_rem.detalle, " (incluye soportes de patas)")
+    geo["apoyos"] = _apo.geo or None
+
     def _datos_ref(ref):
         return dict(cat.fila(ref)["datos"]) if ce(ref) else {}
 
