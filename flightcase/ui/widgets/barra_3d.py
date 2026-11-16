@@ -9,7 +9,7 @@ import math
 from typing import Callable, Dict, Optional
 
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt
-from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap, QPolygonF
+from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap, QPolygonF, QTransform
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QMenu, QToolButton, QWidget
 
 from .schema_3d_widget import Schema3DCanvas
@@ -92,10 +92,25 @@ def _arco_flecha(p: QPainter, cx: float, cy: float, rx: float, ry: float, desde:
 
 
 def _mano(p: QPainter) -> None:
-    """Mover (paneo): la cruz de cuatro flechas de los programas de CAD."""
-    for dx, dy in ((0, -1), (0, 1), (-1, 0), (1, 0)):
-        _recta_flecha(p, QPointF(11 + dx * 1.5, 11 + dy * 1.5), QPointF(11 + dx * 9.2, 11 + dy * 9.2), 4.6)
-    p.drawEllipse(QPointF(11, 11), 1.4, 1.4)
+    """Mover (paneo): la mano abierta de los programas de CAD, con los dedos separados.
+    Un solo contorno: dedos de meñique a índice, el pulgar abierto y la palma."""
+    r, union = 1.2, 10.4                                    # radio de las puntas, altura entre dedos
+    dedos = ((16.4, 6.0), (13.45, 3.4), (10.5, 2.4), (7.55, 4.4))   # (centro, punta) de meñique a índice
+    c = QPainterPath()
+    c.moveTo(dedos[0][0] + r, 14.0)
+    for k, (x, arriba) in enumerate(dedos):
+        c.lineTo(x + r, arriba + r)
+        c.arcTo(QRectF(x - r, arriba, 2 * r, 2 * r), 0, 180)
+        c.lineTo(x - r, union if k < len(dedos) - 1 else 12.6)
+        if k < len(dedos) - 1:
+            c.lineTo(dedos[k + 1][0] + r, union)
+    c.lineTo(3.9, 9.9)                                      # pulgar abierto
+    c.cubicTo(2.9, 8.9, 1.3, 9.9, 2.1, 11.2)
+    c.lineTo(5.4, 16.4)
+    c.cubicTo(6.6, 19.0, 8.6, 20.2, 11.2, 20.2)             # palma
+    c.cubicTo(15.2, 20.2, 17.6, 18.0, 17.6, 14.0)
+    c.closeSubpath()
+    p.drawPath(c)
 
 
 def _orbitar(p: QPainter) -> None:
