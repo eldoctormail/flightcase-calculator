@@ -90,6 +90,8 @@ class FlightCaseMainWindow(QMainWindow):
         self.edit_menu.addSeparator()
         self._accion(self.edit_menu, "&Biblioteca de equipos...", "Ctrl+B", self.taller_widget.biblioteca,
                      "Tus equipos con sus medidas, para usarlos en la espuma o el rack de cualquier case")
+        self._accion(self.edit_menu, "&Catálogo de herrajes y placas...", "Ctrl+K", lambda: self.taller_widget.editar_catalogo(),
+                     "Las medidas reales de tus herrajes, perfiles y placas, con importar y exportar planilla CSV")
         self.taller_widget.historial_cambiado.connect(self._actualizar_historial)
         self._actualizar_historial()
 

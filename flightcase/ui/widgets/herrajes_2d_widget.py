@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...taller import herrajes_manuales as hm
-from ...taller.modelo import CatalogoTaller, ResultadoTaller, fmt
+from ...taller.modelo import ResultadoTaller, catalogo_actual, fmt
 
 NOMBRE_CATEGORIA = {"manija": "Manija", "cierre": "Cierre", "bisagra": "Bisagra", "tope": "Tope", "pie": "Pie",
                     "rueda": "Rueda", "rueda_otra": "Rueda", "plato": "Plato de apilado", "escuadra": "Escuadra",
@@ -408,13 +408,30 @@ class HerrajesManualesWidget(QWidget):
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self.cat = CatalogoTaller()
+        self.cat = catalogo_actual()
         self.filas: List[hm.Fila] = []
         self.res: Optional[ResultadoTaller] = None
         self.caras: Dict[str, hm.Cara] = {}
         self.sel = -1
         self.carpeta = ""          # carpeta del .scad (para guardar el logo con ruta relativa)
         self._init_ui()
+
+    def _llenar_refs(self) -> None:
+        elegido = self.cmb_ref.currentData()
+        self.cmb_ref.blockSignals(True)
+        self.cmb_ref.clear()
+        for fila in hm.catalogo_colocable(self.cat):
+            self.cmb_ref.addItem(f"{NOMBRE_CATEGORIA.get(fila['categoria'], fila['categoria'])} · {fila['nombre']} "
+                                 f"({fila['ref']})", fila["ref"])
+        self.cmb_ref.addItem("Pieza propia (nombre y medida)…", PIEZA_PROPIA)
+        i = self.cmb_ref.findData(elegido) if elegido is not None else -1
+        self.cmb_ref.setCurrentIndex(max(i, 0))
+        self.cmb_ref.blockSignals(False)
+
+    def catalogo_cambiado(self) -> None:
+        """Se editó el catálogo: la lista de herrajes y sus medidas, al día."""
+        self.cat = catalogo_actual()
+        self._llenar_refs()
 
     # ------------------------------------------------------------------ UI
     def _init_ui(self) -> None:
@@ -430,10 +447,7 @@ class HerrajesManualesWidget(QWidget):
         self.cmb_ref = QComboBox()
         self.cmb_ref.setMinimumContentsLength(14)
         self.cmb_ref.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
-        for fila in hm.catalogo_colocable(self.cat):
-            self.cmb_ref.addItem(f"{NOMBRE_CATEGORIA.get(fila['categoria'], fila['categoria'])} · {fila['nombre']} "
-                                 f"({fila['ref']})", fila["ref"])
-        self.cmb_ref.addItem("Pieza propia (nombre y medida)…", PIEZA_PROPIA)
+        self._llenar_refs()
         f1.addWidget(self.cmb_ref, 1)
         self.btn_agregar = QPushButton("Agregar")
         self.btn_agregar.setToolTip("Agrega el herraje elegido en el centro de la cara (o hacé doble clic en la cara)")
