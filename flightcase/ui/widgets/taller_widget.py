@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QLabel,
     QLineEdit,
+    QMenu,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -40,7 +41,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...paths import bundled_resource
-from ...taller import estilos
+from ...taller import configuraciones, estilos
 from ...taller.modelo import ENTEROS, CatalogoTaller, ResultadoTaller, calcular, catalogo_actual, fmt, parametros_por_defecto
 from ...taller.scad import escribir_proyecto, leer_proyecto, literal, valor_literal
 
@@ -568,6 +569,7 @@ class TallerWidget(QWidget):
     pantalla_inicio = None                 # la ventana pone acá su pantalla de inicio (botón «Nuevo…»)
     case_nuevo = Signal()                  # se empezó un case nuevo (botón o menú «Nuevo»)
     guardado = Signal(bool)                # se escribió el .scad (True = autoguardado)
+    mensaje = Signal(str)                  # aviso corto para la barra de estado de la ventana
 
     MAX_HISTORIAL = 200
 
@@ -754,6 +756,8 @@ class TallerWidget(QWidget):
 
         paginas: Dict[str, QVBoxLayout] = {}
         self._paginas: Dict[str, int] = {}
+        self._secciones_guardables = configuraciones.secciones()
+        self.botones_config: Dict[str, QToolButton] = {}
         self.secciones_de_grupo: Dict[str, List[str]] = {c: [] for c, _, _ in self.GRUPOS_LATERAL}
         for clave, _, _ in self.GRUPOS_LATERAL:
             pagina = QWidget()
@@ -775,7 +779,16 @@ class TallerWidget(QWidget):
                 cab = QLabel(titulo)
                 cab.setObjectName("tituloSeccion")
                 cab.setWordWrap(True)
-                paginas[grupo].addWidget(cab)
+                if titulo in self._secciones_guardables:
+                    fila_cab = QWidget()
+                    fc = QHBoxLayout(fila_cab)
+                    fc.setContentsMargins(0, 0, 0, 0)
+                    fc.setSpacing(4)
+                    fc.addWidget(cab, 1)
+                    fc.addWidget(self._boton_configuraciones(titulo), 0, Qt.AlignBottom)
+                    paginas[grupo].addWidget(fila_cab)
+                else:
+                    paginas[grupo].addWidget(cab)
             caja = QWidget()
             form = QFormLayout(caja)
             form.setContentsMargins(0, 0, 0, 6)
@@ -1044,6 +1057,85 @@ class TallerWidget(QWidget):
             return
         estilos.borrar_propio(e.id)
         self._cargar_estilos()
+
+    # ------------------------------------------------ configuraciones por sección
+    def _boton_configuraciones(self, seccion: str) -> QToolButton:
+        b = QToolButton()
+        b.setObjectName("botonConfig")
+        b.setText("Guardar / cargar ▾")
+        b.setToolTip("Guarda los valores de esta sección con un nombre, o carga una configuración "
+                     "guardada antes (sólo cambia esta sección del case).")
+        b.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        menu = QMenu(b)
+        menu.aboutToShow.connect(lambda m=menu, s=seccion: self._llenar_menu_config(m, s))
+        b.setMenu(menu)
+        self.botones_config[seccion] = b
+        return b
+
+    def _llenar_menu_config(self, menu: QMenu, seccion: str) -> None:
+        menu.clear()
+        menu.addAction("Guardar esta sección…", lambda: self.guardar_configuracion(seccion))
+        menu.addSeparator()
+        lista = configuraciones.de_seccion(seccion)
+        if not lista:
+            menu.addAction("No hay configuraciones guardadas").setEnabled(False)
+            return
+        for c in lista:
+            a = menu.addAction(f"Cargar «{c.nombre}»", lambda i=c.id: self.cargar_configuracion(i))
+            a.setToolTip(", ".join(self._etiquetas.get(k, k) for k in c.params))
+        menu.setToolTipsVisible(True)
+        borrar = menu.addMenu("Borrar")
+        for c in lista:
+            borrar.addAction(c.nombre, lambda i=c.id: self.borrar_configuracion(i))
+
+    def guardar_configuracion(self, seccion: str, nombre: Optional[str] = None,
+                              con_contenido: Optional[bool] = None) -> Optional[str]:
+        """Guarda los valores de una sección con un nombre (pregunta lo que no se pasa)."""
+        self._leer_editores()
+        interactivo = nombre is None
+        if interactivo:
+            nombre, ok = QInputDialog.getText(self, "Guardar configuración",
+                                              f"Nombre para esta configuración de «{seccion}»:")
+            if not ok:
+                return None
+        nombre = (nombre or "").strip()
+        if not nombre:
+            return None
+        if interactivo and any(c.nombre.lower() == nombre.lower() for c in configuraciones.de_seccion(seccion)):
+            if QMessageBox.question(self, "Guardar configuración",
+                                    f"Ya hay una configuración «{nombre}» en esta sección. ¿Reemplazarla?") != QMessageBox.Yes:
+                return None
+        if con_contenido is None:
+            con_contenido = False
+            if configuraciones.tiene_contenido(seccion, self.params):
+                con_contenido = QMessageBox.question(
+                    self, "Guardar configuración",
+                    "Esta sección tiene listas cargadas en este case (equipos, cajones, bandejas…).\n"
+                    "¿Guardarlas también? Si no, se guardan sólo los ajustes.") == QMessageBox.Yes
+        c = configuraciones.guardar(nombre, seccion, self.params, con_contenido)
+        self.mensaje.emit(f"Configuración «{c.nombre}» guardada en «{seccion}».")
+        return c.id
+
+    def cargar_configuracion(self, id_conf: str) -> bool:
+        """Carga una configuración guardada: cambia sólo los valores de su sección (se puede deshacer)."""
+        c = configuraciones.buscar(id_conf)
+        if c is None:
+            return False
+        self._leer_editores()
+        self.params = configuraciones.aplicar(self.params, c, self.defectos)
+        self._cargar_en_editores()
+        self.recalcular()
+        self.mensaje.emit(f"Se cargó «{c.nombre}» en «{c.seccion}» (Deshacer la saca).")
+        return True
+
+    def borrar_configuracion(self, id_conf: str, confirmar: bool = True) -> bool:
+        c = configuraciones.buscar(id_conf)
+        if c is None:
+            return False
+        if confirmar and QMessageBox.question(self, "Borrar configuración",
+                                              f"¿Borrar la configuración «{c.nombre}»?") != QMessageBox.Yes:
+            return False
+        return configuraciones.borrar(id_conf)
 
     @staticmethod
     def _tabla(columnas: List[str]) -> QTableWidget:

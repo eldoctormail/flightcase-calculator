@@ -91,6 +91,24 @@ QLabel#tituloSeccion {
   margin-bottom: 2px;
 }
 
+QToolButton#botonConfig {
+  color: #8b97b0;
+  background-color: transparent;
+  border: 1px solid #26334f;
+  border-radius: 5px;
+  padding: 2px 6px;
+  margin-bottom: 3px;
+}
+
+QToolButton#botonConfig:hover {
+  color: #e6ecf7;
+  border-color: #3b82f6;
+}
+
+QToolButton#botonConfig::menu-indicator {
+  image: none;
+}
+
 QLabel#nota {
   color: #8b97b0;
   font-style: italic;

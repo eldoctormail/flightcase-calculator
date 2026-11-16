@@ -48,6 +48,7 @@ class FlightCaseMainWindow(QMainWindow):
         self.taller_widget.case_nuevo.connect(self._case_nuevo_creado)
         self.taller_widget.pantalla_inicio = self.pantalla_inicio
         self.taller_widget.guardado.connect(self._guardado)
+        self.taller_widget.mensaje.connect(lambda texto: self.status_bar.showMessage(texto, 6000))
         self.lbl_autoguardado = QLabel()
         self.lbl_autoguardado.setStyleSheet("color:#8a93a3; padding-right:6px")
         self.status_bar.addPermanentWidget(self.lbl_autoguardado)

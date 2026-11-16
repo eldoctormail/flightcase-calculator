@@ -197,6 +197,8 @@ Sale de `packaging/icono/icono.svg`. Si lo cambiás, regenerá el `.ico` (Window
 
 Arriba de la pestaña Taller, **Estilo de case** aplica una forma de armado sobre las medidas que ya cargaste, sin tocar el interior ni los herrajes puestos a mano: baúl con tapa suelta, con tapa abisagrada o con base de ruedas, case de mano con pies, clamshell de dos mitades, bisagra de piano, tapa arriba y abajo, racks 19" (tapa adelante, adelante y atrás, con tapas de acceso o con cubierta que sale entera), case acostado con tapas a los costados y case liviano con perfil híbrido. Los estilos con base de ruedas la calculan solos (10 mm más chica que la planta del cuerpo, fenólico de 18 mm). Con **Guardar como estilo…** guardás cómo está armado tu case (todo menos medidas e interior) para usarlo en otros proyectos; los estilos propios van a tu carpeta de datos y aparecen con ★.
 
+Si querés guardar **una sola parte** del armado, cada sección del panel (Placa, Ruedas, Cierres mariposa, Interior: equipos y espuma, Herrajes del catálogo…) tiene a la derecha del título un botón **Guardar / cargar ▾**. *Guardar esta sección…* guarda con un nombre los valores de esa sección y nada más; *Cargar «…»* los pone en el case que tengas abierto sin tocar el resto (se deshace con Ctrl+Z). Las medidas nunca entran, y las listas del case (equipos, cajones, bandejas, equipos del rack, piezas extra) sólo si decís que sí al guardar. Se guardan en tu carpeta de datos (`taller_configuraciones.json`).
+
 Los tipos de case vienen en siete grupos, con nombres en español:
 
 ![Tipos de case en la pantalla de inicio](captura-tipos-de-case.png)
