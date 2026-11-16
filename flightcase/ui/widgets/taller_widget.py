@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any, Dict, List, Optional
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QApplication,
@@ -30,7 +30,10 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
-    QToolBox,
+    QButtonGroup,
+    QFrame,
+    QStackedWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -585,63 +588,187 @@ class TallerWidget(QWidget):
         self._foto_guardada = self._foto()
 
     # ------------------------------------------------------------------ UI
+    # Grupos de la barra lateral: clave, texto, y qué secciones de parámetros entran
+    # (por el comienzo del título). Las que no entran en ninguno van a «Accesorios».
+    GRUPOS_LATERAL = (
+        ("medidas", "Medidas", ()),
+        ("armado", "Armado", ("Tipo de case", "Placa", "Sistema de armado", "Corte y compra")),
+        ("herrajes", "Herrajes", ("Esquineros", "Perfil de cierre", "Manijas", "Cierres", "Encastres",
+                                  "Herrajes del catálogo")),
+        ("ruedas", "Ruedas", ("Ruedas",)),
+        ("interior", "Interior", ("Interior", "Bandejas", "Forro")),
+        ("accesorios", "Accesorios", ()),
+        ("vista", "Vista", ()),
+    )
+
+    def _grupo_de(self, n_sec: int, titulo: str) -> str:
+        if n_sec == 0:
+            return "medidas"
+        for clave, _, prefijos in self.GRUPOS_LATERAL:
+            if any(titulo.startswith(p) for p in prefijos):
+                return clave
+        return "accesorios"
+
     def _init_ui(self) -> None:
+        from .iconos import DIBUJOS, icono
+        from .panel_vista import PanelVista
         raiz = QVBoxLayout(self)
-        raiz.setContentsMargins(6, 4, 6, 4)
-        raiz.setSpacing(4)
-        barra = QHBoxLayout()
+        raiz.setContentsMargins(0, 0, 0, 0)
+        raiz.setSpacing(0)
+
+        # ---- cabecera: nombre, archivo, deshacer/rehacer y acciones
+        cabecera = QFrame()
+        cabecera.setObjectName("cabecera")
+        barra = QHBoxLayout(cabecera)
+        barra.setContentsMargins(10, 6, 10, 6)
+        barra.setSpacing(6)
+        marca = QLabel("<span style='color:#f5a524;font-weight:800'>LBD</span>&nbsp;"
+                       "<span style='font-weight:600'>Flightcase Maker</span>")
+        marca.setObjectName("marca")
+        barra.addWidget(marca)
         self.lbl_archivo = QLabel("Proyecto nuevo")
-        self.lbl_archivo.setStyleSheet("font-weight:600")
+        self.lbl_archivo.setObjectName("archivo")
         barra.addWidget(self.lbl_archivo, 1)
-        self.btn_deshacer = QPushButton("↶ Deshacer")
+        self.btn_deshacer = QPushButton("Deshacer")
+        self.btn_deshacer.setIcon(icono(DIBUJOS["deshacer"]))
         self.btn_deshacer.clicked.connect(self.deshacer)
-        self.btn_rehacer = QPushButton("↷ Rehacer")
+        self.btn_rehacer = QPushButton("Rehacer")
+        self.btn_rehacer.setIcon(icono(DIBUJOS["rehacer"]))
         self.btn_rehacer.clicked.connect(self.rehacer)
         barra.addWidget(self.btn_deshacer)
         barra.addWidget(self.btn_rehacer)
+        barra.addSpacing(12)
         for texto, slot in (("Mis cases…", self.proyectos_pedidos.emit),
                             ("Nuevo", self.nuevo), ("Asistente…", lambda: self.asistente()),
                             ("Catálogo…", lambda: self.editar_catalogo()),
                             ("Abrir .scad…", self.abrir),
                             ("Guardar .scad…", self.guardar), ("Planos PDF…", lambda: self.exportar_planos()),
-                            ("Exportar paquete…", self.exportar),
-                            ("Exportar STEP…", self.exportar_step)):
+                            ("Exportar STEP…", self.exportar_step),
+                            ("Exportar paquete…", self.exportar)):
             b = QPushButton(texto)
             b.clicked.connect(slot)
+            if texto == "Exportar paquete…":       # la acción principal, resaltada
+                b.setObjectName("principal")
+                b.setIcon(icono(DIBUJOS["exportar"], "#ffffff"))
             barra.addWidget(b)
-        raiz.addLayout(barra)
+        raiz.addWidget(cabecera)
 
+        cuerpo = QHBoxLayout()
+        cuerpo.setContentsMargins(0, 0, 0, 0)
+        cuerpo.setSpacing(0)
+        raiz.addLayout(cuerpo, 1)
 
-        fila_estilo = QHBoxLayout()
-        fila_estilo.addWidget(QLabel("Estilo de case:"))
-        self.cmb_estilo = QComboBox()
-        self.cmb_estilo.setMinimumWidth(200)
-        self.cmb_estilo.setToolTip("Aplica una forma de armado (tapas, accesos, bisagras, ruedas…) "
-                                   "sin tocar las medidas ni el interior.")
-        self.cmb_estilo.activated.connect(self._estilo_elegido)
-        self.cmb_estilo.setMaximumWidth(460)
-        fila_estilo.addWidget(self.cmb_estilo)
-        self.btn_guardar_estilo = QPushButton("Guardar como estilo…")
-        self.btn_guardar_estilo.setToolTip("Guarda cómo está armado este case (sin medidas ni interior) "
-                                           "para usarlo en otros proyectos.")
-        self.btn_guardar_estilo.clicked.connect(lambda: self.guardar_estilo())
-        fila_estilo.addWidget(self.btn_guardar_estilo)
-        self.btn_borrar_estilo = QPushButton("Borrar estilo")
-        self.btn_borrar_estilo.clicked.connect(lambda: self.borrar_estilo())
-        fila_estilo.addWidget(self.btn_borrar_estilo)
-        self.lbl_estilo = QLabel()     # descripción del estilo en la misma fila (completa en el tooltip)
-        self.lbl_estilo.setStyleSheet("font-style:italic; color:#bbbbbb")
-        self.lbl_estilo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
-        fila_estilo.addWidget(self.lbl_estilo, 1)
-        raiz.addLayout(fila_estilo)
-        self._cargar_estilos()
+        # ---- barra lateral de íconos
+        lateral = QFrame()
+        lateral.setObjectName("lateral")
+        ll = QVBoxLayout(lateral)
+        ll.setContentsMargins(4, 6, 4, 6)
+        ll.setSpacing(2)
+        self.botones_lateral: Dict[str, QToolButton] = {}
+        self.grupo_lateral = QButtonGroup(self)
+        self.grupo_lateral.setExclusive(True)
+
+        def boton_lateral(clave: str, texto: str, marcable: bool = True) -> QToolButton:
+            b = QToolButton()
+            b.setObjectName("botonLateral")
+            b.setText(texto)
+            b.setIcon(icono(DIBUJOS[clave]))
+            b.setIconSize(QSize(22, 22))
+            b.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+            b.setCheckable(marcable)
+            b.setFixedWidth(66)
+            return b
+        for clave, texto, _ in self.GRUPOS_LATERAL:
+            b = boton_lateral(clave, texto)
+            b.clicked.connect(lambda _=False, c=clave: self.mostrar_grupo(c))
+            self.grupo_lateral.addButton(b)
+            self.botones_lateral[clave] = b
+            ll.addWidget(b)
+        ll.addStretch(1)
+        self.btn_panel = boton_lateral("panel", "Panel")
+        self.btn_panel.setChecked(True)
+        self.btn_panel.setToolTip("Mostrar u ocultar el panel de la izquierda (más lugar para la vista 3D)")
+        self.btn_panel.toggled.connect(self._mostrar_panel)
+        ll.addWidget(self.btn_panel)
+        cuerpo.addWidget(lateral)
 
         divisor = QSplitter(Qt.Horizontal, self)
-        self.toolbox = QToolBox()
-        self.toolbox.setMinimumWidth(290)
-        for n_sec, sec in enumerate(secciones_parametros()):
+        divisor.setObjectName("divisorTaller")
+        divisor.setHandleWidth(3)
+        cuerpo.addWidget(divisor, 1)
+
+        # ---- panel izquierdo: una página por grupo, con sus secciones una abajo de otra
+        self.panel_izq = QFrame()
+        self.panel_izq.setObjectName("panelIzq")
+        self.panel_izq.setMinimumWidth(300)
+        pl = QVBoxLayout(self.panel_izq)
+        pl.setContentsMargins(0, 0, 0, 0)
+        pl.setSpacing(0)
+        self.lbl_grupo = QLabel()
+        self.lbl_grupo.setObjectName("tituloPanel")
+        pl.addWidget(self.lbl_grupo)
+        if True:   # estilo de case: arriba del panel, a mano en todos los grupos (menos en Vista)
+            self.caja_estilo = caja_estilo = QFrame()
+            caja_estilo.setObjectName("cajaEstilo")
+            fe = QVBoxLayout(caja_estilo)
+            fe.setContentsMargins(10, 4, 10, 6)
+            fe.setSpacing(4)
+            fila_estilo = QHBoxLayout()
+            fila_estilo.addWidget(QLabel("Estilo:"))
+            self.cmb_estilo = QComboBox()
+            self.cmb_estilo.setMinimumWidth(160)
+            self.cmb_estilo.setToolTip("Aplica una forma de armado (tapas, accesos, bisagras, ruedas…) "
+                                       "sin tocar las medidas ni el interior.")
+            self.cmb_estilo.activated.connect(self._estilo_elegido)
+            fila_estilo.addWidget(self.cmb_estilo, 1)
+            fe.addLayout(fila_estilo)
+            fila_b = QHBoxLayout()
+            self.btn_guardar_estilo = QPushButton("Guardar como estilo…")
+            self.btn_guardar_estilo.setToolTip("Guarda cómo está armado este case (sin medidas ni interior) "
+                                               "para usarlo en otros proyectos.")
+            self.btn_guardar_estilo.clicked.connect(lambda: self.guardar_estilo())
+            fila_b.addWidget(self.btn_guardar_estilo)
+            self.btn_borrar_estilo = QPushButton("Borrar estilo")
+            self.btn_borrar_estilo.clicked.connect(lambda: self.borrar_estilo())
+            fila_b.addWidget(self.btn_borrar_estilo)
+            fe.addLayout(fila_b)
+            self.lbl_estilo = QLabel()     # descripción del estilo (completa en el tooltip)
+            self.lbl_estilo.setObjectName("nota")
+            self.lbl_estilo.setWordWrap(True)
+            self.lbl_estilo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+            fe.addWidget(self.lbl_estilo)
+            pl.addWidget(caja_estilo)
+        self.toolbox = QStackedWidget()      # páginas del panel (el nombre viene del QToolBox de antes)
+        self.toolbox.setObjectName("paginas")
+        pl.addWidget(self.toolbox, 1)
+        self._cargar_estilos()
+
+        paginas: Dict[str, QVBoxLayout] = {}
+        self._paginas: Dict[str, int] = {}
+        self.secciones_de_grupo: Dict[str, List[str]] = {c: [] for c, _, _ in self.GRUPOS_LATERAL}
+        for clave, _, _ in self.GRUPOS_LATERAL:
             pagina = QWidget()
-            form = QFormLayout(pagina)
+            pagina.setObjectName("pagina")
+            lay = QVBoxLayout(pagina)
+            lay.setContentsMargins(10, 4, 10, 10)
+            lay.setSpacing(4)
+            paginas[clave] = lay
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QFrame.Shape.NoFrame)
+            scroll.setWidget(pagina)
+            self._paginas[clave] = self.toolbox.addWidget(scroll)
+        for n_sec, sec in enumerate(secciones_parametros()):
+            titulo = "Medidas (exteriores e interiores)" if n_sec == 0 else sec["seccion"]
+            grupo = self._grupo_de(n_sec, titulo)
+            self.secciones_de_grupo[grupo].append(titulo)
+            cab = QLabel(titulo)
+            cab.setObjectName("tituloSeccion")
+            cab.setWordWrap(True)
+            paginas[grupo].addWidget(cab)
+            caja = QWidget()
+            form = QFormLayout(caja)
+            form.setContentsMargins(0, 0, 0, 6)
             form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
             form.setRowWrapPolicy(QFormLayout.WrapLongRows)   # nombre largo: el campo pasa abajo
             if n_sec == 0:
@@ -663,38 +790,75 @@ class TallerWidget(QWidget):
                     ed.widget.setToolTip(_ayuda(_con_codigo(p["ayuda"], nombre)))
                     form.addRow(etiqueta, ed.widget)
                 self.editores[nombre] = ed
-            scroll = QScrollArea()
-            scroll.setWidgetResizable(True)
-            scroll.setWidget(pagina)
-            self.toolbox.addItem(scroll, "Medidas (exteriores e interiores)" if n_sec == 0 else sec["seccion"])
-        self.toolbox.layout().setSpacing(1)     # 17 secciones: que entren en la pantalla de una notebook
-        from PySide6.QtWidgets import QAbstractButton
-        for b in self.toolbox.findChildren(QAbstractButton):
-            b.setFixedHeight(22)
-        divisor.addWidget(self.toolbox)
+            paginas[grupo].addWidget(caja)
+        self.panel_vista = PanelVista()
+        paginas["vista"].setContentsMargins(0, 0, 0, 0)
+        paginas["vista"].addWidget(self.panel_vista)
+        for clave, lay in paginas.items():
+            lay.addStretch(1)
+            if not self.secciones_de_grupo[clave] and clave not in ("vista",):
+                self.botones_lateral[clave].setVisible(False)
+        divisor.addWidget(self.panel_izq)
 
+        # ---- derecha: resumen, pestañas (vista 3D, herrajes a mano, tablas) y avisos
         derecha = QWidget()
+        derecha.setObjectName("derecha")
         dl = QVBoxLayout(derecha)
-        dl.setContentsMargins(0, 0, 0, 0)
+        dl.setContentsMargins(6, 6, 6, 4)
+        dl.setSpacing(4)
         self.lbl_resumen = QLabel()
         self.lbl_resumen.setWordWrap(True)
         self.lbl_resumen.setTextFormat(Qt.RichText)
+        self.lbl_resumen.setObjectName("resumen")
         dl.addWidget(self.lbl_resumen)
         self.tabs = QTabWidget()
         from .schema_3d_widget import Schema3DCanvas
         pagina_3d = QWidget()
         l3d = QVBoxLayout(pagina_3d)
         l3d.setContentsMargins(0, 0, 0, 0)
+        l3d.setSpacing(0)
         from .barra_3d import BarraVista3D
         self.vista_3d = Schema3DCanvas(self)
         self.vista_3d.setMinimumHeight(260)
         self.barra_3d = BarraVista3D(self.vista_3d, self)
-        self.chk_interior = QCheckBox("Interior")
-        self.chk_interior.setToolTip("Ver el interior: abre las tapas")
-        self.chk_interior.toggled.connect(self._actualizar_3d)
-        self.barra_3d.layout().addWidget(self.chk_interior)
+        self.chk_interior = self.panel_vista.chk_interior
+        self.barra_tapas = QHBoxLayout()            # Abrir/Ocultar de cada tapa, a mano sobre la vista
+        self.barra_tapas.setSpacing(2)
+        self.barra_3d.layout().addLayout(self.barra_tapas)
         l3d.addWidget(self.barra_3d)
         l3d.addWidget(self.vista_3d, 1)
+        self.barra_datos = QFrame()
+        self.barra_datos.setObjectName("barraDatos")
+        bd = QHBoxLayout(self.barra_datos)
+        bd.setContentsMargins(10, 4, 10, 4)
+        bd.setSpacing(18)
+        self.datos: Dict[str, QLabel] = {}
+        for clave, titulo in (("medida", "Medida exterior"), ("paneles", "Paneles"), ("perfiles", "Perfiles"),
+                              ("herrajes", "Herrajes"), ("peso", "Peso estimado")):
+            caja = QWidget()
+            cl = QVBoxLayout(caja)
+            cl.setContentsMargins(0, 0, 0, 0)
+            cl.setSpacing(0)
+            t = QLabel(titulo)
+            t.setObjectName("datoTitulo")
+            v = QLabel("–")
+            v.setObjectName("datoValor")
+            cl.addWidget(t)
+            cl.addWidget(v)
+            self.datos[clave] = v
+            bd.addWidget(caja)
+        bd.addStretch(1)
+        self.lbl_oculto = QLabel()
+        self.lbl_oculto.setObjectName("chip")
+        bd.addWidget(self.lbl_oculto)
+        self.btn_avisos = QPushButton()
+        self.btn_avisos.setObjectName("chipAviso")
+        self.btn_avisos.setCheckable(True)
+        self.btn_avisos.setChecked(True)
+        self.btn_avisos.setToolTip("Mostrar u ocultar los avisos debajo de la vista")
+        self.btn_avisos.toggled.connect(lambda si: self.lbl_avisos.setVisible(si))
+        bd.addWidget(self.btn_avisos)
+        l3d.addWidget(self.barra_datos)
         self.tabs.addTab(pagina_3d, "Vista 3D")
         from .herrajes_2d_widget import HerrajesManualesWidget
         self.herrajes = HerrajesManualesWidget(self)
@@ -731,15 +895,74 @@ class TallerWidget(QWidget):
         dl.addWidget(self.tabs, 1)
         self.lbl_avisos = QLabel()
         self.lbl_avisos.setWordWrap(True)
-        self.lbl_avisos.setStyleSheet("color:#a15c00")
+        self.lbl_avisos.setObjectName("avisos")
         dl.addWidget(self.lbl_avisos)
         divisor.addWidget(derecha)
-        divisor.setStretchFactor(0, 40)
-        divisor.setStretchFactor(1, 60)
-        divisor.setSizes([480, 900])   # que entren los nombres de los herrajes elegidos
-        raiz.addWidget(divisor, 1)
+        divisor.setStretchFactor(0, 30)
+        divisor.setStretchFactor(1, 70)
+        divisor.setSizes([420, 980])   # que entren los nombres de los herrajes elegidos
 
-    # ------------------------------------------------------------- estilos
+        # ---- la vista: el panel maneja tapas, cajones y qué se oculta; el lienzo, el aspecto
+        self._vista_case = None
+        self.panel_vista.cambiado.connect(self._aplicar_vista)
+        self.panel_vista.tapas_cambiadas.connect(self._barra_tapas)
+        self.panel_vista.chk_realista.toggled.connect(self.vista_3d.set_realista)
+        self.panel_vista.chk_fondo.toggled.connect(self.vista_3d.set_fondo_claro)
+        self.panel_vista.chk_piso.toggled.connect(self.vista_3d.set_mostrar_piso)
+        self.panel_vista.chk_cubo.toggled.connect(lambda si: (setattr(self.vista_3d, "mostrar_cubo", si),
+                                                              self.vista_3d.update()))
+        self.mostrar_grupo("medidas")
+
+    def mostrar_grupo(self, clave: str) -> None:
+        """Muestra en el panel de la izquierda las secciones de ese grupo de la barra lateral."""
+        self.toolbox.setCurrentIndex(self._paginas[clave])
+        self.botones_lateral[clave].setChecked(True)
+        texto = dict((c, t) for c, t, _ in self.GRUPOS_LATERAL)[clave]
+        self.lbl_grupo.setText(texto)
+        self.caja_estilo.setVisible(clave != "vista")
+        if not self.btn_panel.isChecked():
+            self.btn_panel.setChecked(True)
+
+    def grupo_actual(self) -> str:
+        i = self.toolbox.currentIndex()
+        return next(c for c, n in self._paginas.items() if n == i)
+
+    def _mostrar_panel(self, si: bool) -> None:
+        self.panel_izq.setVisible(si)
+
+    def _barra_tapas(self) -> None:
+        """Botones «Abrir / Ocultar» de cada tapa arriba de la vista 3D (como en el panel Vista)."""
+        while self.barra_tapas.count():
+            w = self.barra_tapas.takeAt(0).widget()
+            if w is not None:
+                w.deleteLater()
+        pv = self.panel_vista
+        for i, nombre in enumerate(pv.nombres_tapas):
+            n = nombre.lower()
+            abierta, oculta = pv.tapa_abierta(i), pv.tapa_oculta(i)
+            a = QPushButton(("Cerrar " if abierta else "Abrir ") + n)
+            a.setObjectName("botonTapa")
+            a.setCheckable(True)
+            a.setChecked(abierta)
+            a.clicked.connect(lambda si, k=i: pv.abrir_tapa(k, si))
+            a.setEnabled(not oculta)
+            o = QPushButton(("Mostrar " if oculta else "Ocultar ") + n)
+            o.setObjectName("botonTapa")
+            o.setCheckable(True)
+            o.setChecked(oculta)
+            o.clicked.connect(lambda si, k=i: pv.ocultar_tapa(k, si))
+            self.barra_tapas.addWidget(a)
+            self.barra_tapas.addWidget(o)
+
+    def _aplicar_vista(self, *_args) -> None:
+        if self._vista_case is None:
+            return
+        estado = self.panel_vista.estado
+        self.vista_3d.set_mesh(self._vista_case.aplicar(estado))
+        ocultas = self._vista_case.ocultas(estado)
+        self.lbl_oculto.setText(("Oculto: " + ", ".join(ocultas)) if ocultas else "")
+        self.lbl_oculto.setVisible(bool(ocultas))
+
     def _cargar_estilos(self, elegir: str = "") -> None:
         self.cmb_estilo.blockSignals(True)
         self.cmb_estilo.clear()
@@ -1135,14 +1358,14 @@ class TallerWidget(QWidget):
                                       "en las secciones «Interior» de la izquierda.")
             self._llenar(self.tabla_interior, [])
         hay_interior = interior is not None or bool(txt_forro)
-        if hay_interior and not self._habia_interior:
-            self.chk_interior.blockSignals(True)
-            self.chk_interior.setChecked(True)   # recién cargado: mostrarlo
-            self.chk_interior.blockSignals(False)
+        abrir_interior = hay_interior and not self._habia_interior     # recién cargado: mostrarlo
         self._habia_interior = hay_interior
+        self._mostrar_datos(res)
         self.herrajes.set_resultado(res, self.params.get("herrajes_manuales", []), self.params.get("_carpeta", ""))
         self.vista_placas.set_resultado(res)
         self._actualizar_3d()
+        if abrir_interior:
+            self.panel_vista.ver_interior(True)
 
     def _mostrar_peso(self, pc) -> None:
         from ...taller import peso as _peso
@@ -1171,13 +1394,36 @@ class TallerWidget(QWidget):
         if res is None:
             return
         try:
-            from ...taller.geometria import Opciones3D, malla_3d
-            abrir = self.chk_interior.isChecked()
-            v = res.valores
-            op = Opciones3D(abrir_tapa=0.8 * max(v["ext_ancho"], v["ext_prof"], v["ext_alto"]) if abrir else 0.0)
-            self.vista_3d.set_mesh(malla_3d(res, op))
+            from ...taller.geometria import malla_3d
+            from ...taller.produccion import colores_placa
+            from ...taller.vista import VistaCase
+            # la malla se arma con las tapas cerradas; abrirlas o sacar cajones sólo la mueve
+            self._vista_case = VistaCase(malla_3d(res), res)
+            self.panel_vista.set_vista_case(self._vista_case)
+            try:
+                self.vista_3d.set_colores_placa(colores_placa({"info": res.info}))
+            except Exception:
+                self.vista_3d.set_colores_placa({})
+            self._aplicar_vista()
         except Exception as e:   # la vista 3D nunca debe impedir ver el resultado
             self.lbl_avisos.setText(self.lbl_avisos.text() + f"\n(No se pudo armar la vista 3D: {e})")
+
+    def _mostrar_datos(self, res: ResultadoTaller) -> None:
+        """Barra de datos debajo de la vista 3D: medida, piezas, peso y avisos."""
+        v = res.valores
+        self.datos["medida"].setText(f"{fmt(v['ext_ancho'])} × {fmt(v['ext_prof'])} × {fmt(v['ext_alto'])} mm")
+        self.datos["paneles"].setText(str(len(res.paneles)))
+        self.datos["perfiles"].setText(f"{sum(p.cantidad for p in res.perfiles)} tramos")
+        self.datos["herrajes"].setText(str(sum(h.cantidad for h in res.herrajes if isinstance(h.cantidad, (int, float)))))
+        peso = v.get("peso")              # PesoCase (cuando está el cálculo de peso real)
+        peso = getattr(peso, "total", peso)
+        self.datos["peso"].setText(f"{fmt(round(float(peso), 1))} kg" if isinstance(peso, (int, float)) and peso else "–")
+        self.datos["peso"].parentWidget().setVisible(self.datos["peso"].text() != "–")
+        n = len(res.avisos)
+        self.btn_avisos.setText(f"⚠ {n} para revisar" if n else "✓ Sin avisos")
+        self.btn_avisos.setProperty("hay", bool(n))
+        self.btn_avisos.style().unpolish(self.btn_avisos)
+        self.btn_avisos.style().polish(self.btn_avisos)
 
     @staticmethod
     def _llenar(tabla: QTableWidget, filas: List[List[str]]) -> None:

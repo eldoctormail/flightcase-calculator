@@ -69,3 +69,41 @@ COLORS = {
     "cut_line": "#f59e0b",        # Dashed cut line marking
     "grid_line": "#262633",
 }
+
+# Fondo de la vista 3D: (arriba, abajo) del degradado, y la grilla del piso
+FONDO_3D = {
+    "oscuro": ("#1b2740", "#0b111e"),
+    "claro": ("#f5f7fb", "#d6dce6"),
+    "grilla": "#2a3a58",
+    "grilla_clara": "#b7c0ce",
+}
+
+# Colores «realistas» de la vista 3D (relleno, arista): placa negra, aluminio y cromados.
+# El color de la placa del proyecto (color_placa / color_tapa) reemplaza al de base/lid/wall.
+REALISTA = {
+    "base": ("#232427", "#050506"),
+    "lid": ("#232427", "#050506"),
+    "wall": ("#2e2f33", "#0a0a0b"),
+    "canto": ("#3a3b40", "#050506"),
+    "profile": ("#b9bfc8", "#5d636c"),
+    "profile_h": ("#a9afb8", "#555b63"),
+    "aluminio": ("#c9ced6", "#69707a"),
+    "herraje": ("#c2c7cf", "#5f656e"),
+    "cierre": ("#d8dce2", "#6b717a"),
+    "remache": ("#d0d4da", "#7a8089"),
+    "plato": ("#9ea4ad", "#4d525a"),
+    "rueda": ("#1f2a44", "#0b0f18"),
+    "rueda_freno": ("#1f2a44", "#0b0f18"),
+    "rueda_placa": ("#b5bac2", "#5a5f67"),
+    "rueda_horq": ("#c3c8cf", "#5a5f67"),
+    "freno": ("#d23b3b", "#5e1414"),
+    "base_ruedas": ("#2b2c30", "#0a0a0b"),
+    "equipo": ("#3b4656", "#151a22"),
+    "rack_frente": ("#1d1f24", "#5d636c"),
+    "espuma": ("#2a2b2e", "#111214"),
+    "cajon": ("#2c2d31", "#0a0a0b"),
+    "resalte": ("#f59e0b", "#7c4a03"),
+}
+# grupos de metal: más contraste entre la cara iluminada y la de sombra
+REALISTA_METAL = {"profile", "profile_h", "aluminio", "herraje", "cierre", "remache", "plato",
+                  "rueda_placa", "rueda_horq"}

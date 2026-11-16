@@ -132,6 +132,7 @@ class Malla3D(WireframeMesh3D):
     # calados pasantes: (nombre del panel, contorno en el mundo sobre la cara exterior)
     calados: List[Tuple[str, List[Point3D]]] = field(default_factory=list)
     solidos: List[Solido3D] = field(default_factory=list)
+    interior_desde: int = -1     # índice en `solidos` donde empieza el interior (-1: no hay)
 
 
 def _sum(*vs: Sequence[float]) -> Vec:
@@ -674,13 +675,16 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
     # Interiores (equipos, espuma, cajones, rack), en coordenadas del mundo
     if geo.get("interior") is not None and op.interior and op.paso >= 99 and not op.resaltar_que \
             and not op.vista_parte:
+        interior_desde = len(k.solidos)
         _interior_3d(k, geo["interior"], lift)
+    else:
+        interior_desde = -1
 
     pts = [p for f in k.caras for p in f.vertices] or [Point3D(0, 0, 0)]
     caja = (Point3D(min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)),
             Point3D(max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
     return Malla3D(faces=k.caras, segments=k.segmentos, bounding_box=caja, rotulos=k.rotulos, calados=k.calados,
-                   solidos=k.solidos)
+                   solidos=k.solidos, interior_desde=interior_desde)
 
 
 _COLOR_INTERIOR = {"equipo": "equipo", "rack": "equipo", "riel": "aluminio", "corredera": "aluminio",

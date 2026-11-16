@@ -18,7 +18,8 @@ Programa de escritorio (Python + PySide6 + OpenGL) para diseñar y fabricar flig
 - **Autoguardado, recuperación y versiones**: el case abierto se guarda solo cada 3 minutos si tiene cambios (**Archivo → Autoguardado**: 1, 3, 5 o 10 minutos, o desactivado; un case nuevo empieza a autoguardarse cuando le ponés nombre). Cada 30 segundos queda además una copia de recuperación: si la app se cierra de golpe, al volver a abrirla ofrece recuperar los cambios. Cada vez que se guarda, lo que había antes queda como versión fechada en `.versiones/<nombre del case>/` junto al archivo (una cada 10 minutos como mucho; todas las de dos días, una por día hasta los dos meses y una por mes después). **Archivo → Versiones anteriores** (`Ctrl+Alt+V`) o **Versiones…** en Mis cases las lista con medidas y qué cambió, y restaura la elegida en la ventana sin tocar el archivo. Al salir con cambios sin guardar, la app pregunta.
 - **Asistente de case nuevo** (`Ctrl+Shift+N` o el botón **Asistente…**): estilo, qué va adentro (vacío, espuma con equipos o rack), medidas sugeridas a partir de los equipos (o exteriores a mano), terminaciones y un resumen antes de abrirlo en el Taller.
 - **Biblioteca de equipos** (`Ctrl+B`, menú **Editar**): tus equipos con sus medidas, peso, U de rack y forma del calado, guardados una vez para cualquier case. Se buscan, se editan en la tabla y se pasan a una planilla CSV de Excel y desde ella. Las tablas de equipos de la espuma y del rack tienen **Desde la biblioteca…** y **Guardar en la biblioteca**.
-- **Vista 3D** con las tapas abiertas o cerradas.
+- **Interfaz nueva**: tema oscuro azul, barra lateral de íconos (Medidas, Armado, Herrajes, Ruedas, Interior, Accesorios, Vista) que muestra sólo las secciones de ese grupo, botón **Panel** para esconder el panel y agrandar la vista 3D, y una barra de datos bajo la vista (medida exterior, paneles, perfiles, herrajes y avisos).
+- **Vista 3D animada**: las tapas se abren girando sobre su bisagra, se ocultan con un clic, los cajones salen con su deslizador, se puede ver sólo el cuerpo o sólo las tapas y ocultar grupos de piezas (placas, aluminio, herrajes, ruedas, bandejas, equipos, espuma, cajones). Colores de case real, fondo claro y cubo de vistas para cambiar de vista con un clic.
 - **Optimización de cortes** (pestaña **Placas**): las piezas acomodadas en placas enteras, cuántas comprar, aprovechamiento, retazo útil y un DXF por placa para la CNC.
 - **Paquete de producción** (`Ctrl+P`): DXF por pieza y por capa de espuma, lista de cortes y materiales en CSV, `planos.pdf`, instructivo de montaje y el case en STEP para CAD.
 
@@ -144,7 +145,30 @@ Las miniaturas se dibujan con la misma vista 3D del instructivo y quedan guardad
 
 ### Vista 3D
 
-La barra de arriba de la vista tiene: acercar y alejar, qué hace el botón izquierdo del mouse (girar, **mano** para mover la imagen o zoom), girar 90°, vistas (isométrica, frente, atrás, lados, arriba, abajo), encuadrar, perspectiva, cotas y ejes. Además:
+![Tapa delantera abierta y cajones afuera](captura-vista-cajones.png)
+
+El botón **Vista** de la barra lateral abre el panel de la vista:
+
+- **Mostrar**: todo el case, sólo el cuerpo o sólo las tapas.
+- **Tapas**: cada tapa con **Abrir** (gira sobre su bisagra, con animación) y **Ocultar**. La tapa de arriba de un case parado abre hacia atrás; la delantera de un rack frontal sube como un alero. Los mismos botones están arriba a la derecha de la vista 3D. **Ver el interior** abre la primera tapa (se marca solo al cargar el primer interior).
+- **Cajones**: un deslizador por cajón para sacarlo con su corredera, y **Sacar todos** / **Guardar todos**.
+- **Ocultar**: placas, perfiles de aluminio, herrajes, ruedas y pies, bandejas, equipos y rack, espuma y cajones. Lo que está oculto aparece abajo, en la barra de datos.
+- **Aspecto**: colores de case real (placa del color del proyecto, negra si es negra, aluminio y herrajes cromados) o los colores técnicos de antes, fondo claro, grilla del piso y cubo de vistas.
+
+![Tapa delantera oculta y cajones a medio salir](captura-tapa-oculta.png)
+
+![Fondo claro, sin herrajes](captura-fondo-claro.png)
+
+**Acotar y medir**:
+
+- **Cotas** (botón con la cota ↔): ancho, fondo y alto por fuera del case (sin ruedas) y el alto de cada tapa cerrada, dibujadas al costado del case.
+- **Medir** (botón de la regla): clic en dos puntos del case y muestra la distancia y cuánto cambia en X, Y y Z. El punto se engancha a la esquina o vértice más cercano al mouse (se marca en celeste antes de hacer clic). Un tercer clic empieza otra medida; `Esc` la borra.
+
+![Cotas y una medida](captura-medir.png)
+
+El **cubo de vistas** (arriba a la derecha) gira con el case y cada cara lleva su nombre pegado en perspectiva (FRENTE, DERECHA, ARRIBA…). Un clic en una cara cambia a esa vista.
+
+La barra de arriba de la vista tiene: acercar y alejar, qué hace el botón izquierdo del mouse (girar alrededor del case, **mano** para mover la imagen, o zoom arrastrando hacia arriba y abajo), girar 90°, vistas (isométrica, frente, atrás, lados, arriba, abajo), encuadrar, perspectiva, cotas, medir y ejes. Los íconos son del set [Tabler Icons](https://tabler.io/icons) (licencia MIT, en `flightcase/resources/iconos`). Además:
 
 - Rueda del mouse: zoom hacia donde está el puntero. Botón derecho o rueda apretada: mover. Doble clic: encuadrar.
 - Teclado (con la vista seleccionada): flechas giran de a 5°, Mayús + flechas mueven, `+` y `-` hacen zoom, `Inicio` o `F` encuadran.

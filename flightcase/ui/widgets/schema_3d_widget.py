@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 import math
+
+import numpy as np
 from typing import Optional, Tuple, List
 from PySide6.QtCore import Qt, QPoint, QPointF, QRectF, Signal
 from PySide6.QtGui import (
@@ -12,6 +14,7 @@ from PySide6.QtGui import (
     QFont,
     QFontMetrics,
     QPolygonF,
+    QTransform,
     QMouseEvent,
     QWheelEvent,
     QSurfaceFormat,
@@ -33,7 +36,7 @@ from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from OpenGL import GL, GLU
 
 from ...taller.malla import DimensionCallout3D, Point3D, PolygonFace3D, WireframeMesh3D
-from ..theme import COLORS
+from ..theme import COLORS, FONDO_3D, REALISTA, REALISTA_METAL
 
 
 class Schema3DCanvas(QOpenGLWidget):
@@ -44,6 +47,7 @@ class Schema3DCanvas(QOpenGLWidget):
     """
 
     view_changed = Signal()
+    medicion_cambiada = Signal(str)    # texto de la medida (vacío = sin medida)
     projection_changed = Signal(bool)  # True = Perspective, False = Parallel
 
     def __init__(self, parent: Optional[QWidget] = None):
@@ -69,6 +73,18 @@ class Schema3DCanvas(QOpenGLWidget):
         self.show_dimensions: bool = True
         self.show_inside_walls: bool = True
         self.show_axes: bool = True
+        self.fondo_claro: bool = False        # fondo claro (para capturas o pantallas con sol)
+        self.mostrar_piso: bool = True        # grilla del piso
+        self.realista: bool = True            # colores de case real (placa negra, aluminio)
+        self.colores_placa: dict = {}         # color de la placa del proyecto: base, lid, wall
+        self.mostrar_cubo: bool = True        # cubo de vistas arriba a la derecha
+        self._cubo_caras: List[Tuple[QPolygonF, str]] = []
+        # herramienta Medir: clic en dos puntos del case (se engancha al vértice más cercano)
+        self.modo_medir: bool = False
+        self.medicion: List[Point3D] = []
+        self._punto_cerca: Optional[Point3D] = None
+        self._matrices: Optional[Tuple[np.ndarray, np.ndarray]] = None   # modelview, proyección
+        self._vertices: Optional[np.ndarray] = None
 
         # Geometry Data
         self.mesh: Optional[WireframeMesh3D] = None
@@ -87,6 +103,7 @@ class Schema3DCanvas(QOpenGLWidget):
     def set_mesh(self, mesh: WireframeMesh3D) -> None:
         """Sets flightcase 3D mesh and triggers a redraw."""
         self.mesh = mesh
+        self._vertices = None
         self.update()
 
     def set_perspective(self, is_perspective: bool) -> None:
@@ -279,7 +296,9 @@ class Schema3DCanvas(QOpenGLWidget):
             self.view_changed.emit()
 
     def _poner_cursor(self, arrastrando: bool = False) -> None:
-        if self.modo_raton == "mover":
+        if getattr(self, "modo_medir", False) and not arrastrando:
+            forma = Qt.CursorShape.CrossCursor
+        elif self.modo_raton == "mover":
             forma = Qt.CursorShape.ClosedHandCursor if arrastrando else Qt.CursorShape.OpenHandCursor
         elif self.modo_raton == "zoom":
             forma = Qt.CursorShape.SizeVerCursor
@@ -336,6 +355,211 @@ class Schema3DCanvas(QOpenGLWidget):
         self.show_axes = bool(si)
         self._cambio()
 
+    # --- Medir ---
+
+    RADIO_ENGANCHE = 14.0     # píxeles
+
+    def set_modo_medir(self, si: bool) -> None:
+        self.modo_medir = bool(si)
+        self._punto_cerca = None
+        if not si:
+            self.borrar_medicion()
+        self._poner_cursor()
+        self.update()
+
+    def borrar_medicion(self) -> None:
+        if self.medicion:
+            self.medicion = []
+            self.medicion_cambiada.emit("")
+            self.update()
+
+    @staticmethod
+    def texto_medida(a: Point3D, b: Point3D) -> str:
+        fmt = lambda v: f"{v:.1f}".rstrip("0").rstrip(".").replace(".", ",")
+        dx, dy, dz = abs(b.x - a.x), abs(b.y - a.y), abs(b.z - a.z)
+        d = math.sqrt(dx * dx + dy * dy + dz * dz)
+        return f"{fmt(d)} mm  (Δx {fmt(dx)} · Δy {fmt(dy)} · Δz {fmt(dz)})"
+
+    def _proyectar_np(self, pts: np.ndarray) -> Optional[np.ndarray]:
+        """(x, y en píxeles, profundidad) de cada punto, con las matrices del último cuadro."""
+        if self._matrices is None or len(pts) == 0:
+            return None
+        mv, pr = self._matrices
+        h4 = np.hstack([pts, np.ones((len(pts), 1))]) @ mv @ pr
+        w = np.where(np.abs(h4[:, 3]) < 1e-12, 1e-12, h4[:, 3])
+        ndc = h4[:, :3] / w[:, None]
+        W, H = max(1, self.width()), max(1, self.height())
+        return np.column_stack([(ndc[:, 0] + 1) / 2 * W, H - (ndc[:, 1] + 1) / 2 * H, ndc[:, 2]])
+
+    def punto_cercano(self, pos: QPointF) -> Optional[Point3D]:
+        """El vértice del case más cercano al mouse (y de esos, el de más adelante)."""
+        if self.mesh is None:
+            return None
+        if self._vertices is None:
+            pts = {(p.x, p.y, p.z) for f in self.mesh.faces for p in f.vertices}
+            self._vertices = np.array(sorted(pts), dtype=float).reshape(-1, 3)
+        pr = self._proyectar_np(self._vertices)
+        if pr is None:
+            return None
+        d = np.hypot(pr[:, 0] - pos.x(), pr[:, 1] - pos.y())
+        cerca = np.nonzero(d <= self.RADIO_ENGANCHE)[0]
+        if len(cerca) == 0:
+            return None
+        i = cerca[np.argmin(pr[cerca, 2] + d[cerca] * 1e-4)]
+        x, y, z = self._vertices[i]
+        return Point3D(float(x), float(y), float(z))
+
+    def _clic_medir(self, pos: QPointF) -> bool:
+        pt = self.punto_cercano(pos)
+        if pt is None:
+            return False
+        if len(self.medicion) >= 2:
+            self.medicion = []
+        self.medicion.append(pt)
+        texto = self.texto_medida(*self.medicion) if len(self.medicion) == 2 else ""
+        self.medicion_cambiada.emit(texto)
+        self.update()
+        return True
+
+    def _dibujar_medicion(self, painter: QPainter) -> None:
+        if not self.modo_medir:
+            return
+        pts = list(self.medicion) + ([self._punto_cerca] if self._punto_cerca is not None else [])
+        if not pts:
+            return
+        pr = self._proyectar_np(np.array([(p.x, p.y, p.z) for p in pts], dtype=float))
+        if pr is None:
+            return
+        color = QColor("#22d3ee")
+        scr = [QPointF(float(x), float(y)) for x, y, _ in pr]
+        n = len(self.medicion)
+        if n == 2:
+            painter.setPen(QPen(color, 2.0))
+            painter.drawLine(scr[0], scr[1])
+            texto = self.texto_medida(*self.medicion)
+            mid = QPointF((scr[0].x() + scr[1].x()) / 2, (scr[0].y() + scr[1].y()) / 2)
+            f = QFont("Segoe UI", 10, QFont.Weight.Bold)
+            painter.setFont(f)
+            r = QFontMetrics(f).boundingRect(texto)
+            caja = QRectF(mid.x() - r.width() / 2 - 7, mid.y() - r.height() - 12, r.width() + 14, r.height() + 6)
+            painter.setBrush(QBrush(QColor(8, 20, 32, 235)))
+            painter.drawRoundedRect(caja, 4, 4)
+            painter.setPen(QColor("#a5f3fc"))
+            painter.drawText(caja, Qt.AlignmentFlag.AlignCenter, texto)
+        elif n == 1 and self._punto_cerca is not None:
+            painter.setPen(QPen(color, 1.4, Qt.PenStyle.DashLine))
+            painter.drawLine(scr[0], scr[-1])
+        painter.setBrush(QBrush(color))
+        for i, q in enumerate(scr):
+            enganche = self._punto_cerca is not None and i == len(scr) - 1
+            painter.setPen(QPen(QColor("#0b1120"), 1.2))
+            painter.drawEllipse(q, 6.0 if enganche else 4.5, 6.0 if enganche else 4.5)
+
+    def set_fondo_claro(self, si: bool) -> None:
+        self.fondo_claro = bool(si)
+        self._cambio()
+
+    def set_mostrar_piso(self, si: bool) -> None:
+        self.mostrar_piso = bool(si)
+        self._cambio()
+
+    def set_realista(self, si: bool) -> None:
+        self.realista = bool(si)
+        self._cambio()
+
+    def set_colores_placa(self, colores: dict) -> None:
+        self.colores_placa = dict(colores or {})
+        self.update()
+
+    # --- Cubo de vistas (arriba a la derecha: clic en una cara = esa vista) ---
+
+    CUBO_LADO = 64.0
+    CUBO_ROTULOS = {(0, -1, 0): "FRENTE", (0, 1, 0): "ATRÁS", (1, 0, 0): "DERECHA", (-1, 0, 0): "IZQUIERDA",
+                    (0, 0, 1): "ARRIBA", (0, 0, -1): "ABAJO"}
+    CUBO_VISTAS = {(0, -1, 0): "frente", (0, 1, 0): "atras", (1, 0, 0): "derecha", (-1, 0, 0): "izquierda",
+                   (0, 0, 1): "arriba", (0, 0, -1): "abajo"}
+
+    def proyectar_direccion(self, x: float, y: float, z: float) -> Tuple[float, float, float]:
+        """(derecha, abajo, hacia el que mira) en pantalla de una dirección del mundo, con la
+        misma rotación que la cámara de OpenGL (elevación sobre X, azimut sobre Z)."""
+        az, el = math.radians(self.azimuth_deg), math.radians(self.elevation_deg)
+        x1 = x * math.cos(az) + y * math.sin(az)
+        y1 = -x * math.sin(az) + y * math.cos(az)
+        y2 = y1 * math.sin(el) + z * math.cos(el)
+        prof = -y1 * math.cos(el) + z * math.sin(el)
+        return x1, -y2, prof
+
+    def centro_cubo(self) -> QPointF:
+        return QPointF(self.width() - 78.0, 78.0)
+
+    def _armar_cubo(self) -> List[Tuple[QPolygonF, str, Tuple[int, int, int], float]]:
+        c, L = self.centro_cubo(), self.CUBO_LADO
+        caras = []
+        for n in self.CUBO_ROTULOS:
+            _, _, prof = self.proyectar_direccion(*n)
+            if prof <= 0.02:
+                continue
+            i = [k for k in range(3) if n[k]][0]
+            u = [0.0, 0.0, 0.0]
+            v = [0.0, 0.0, 0.0]
+            u[(i + 1) % 3] = 1.0
+            v[(i + 2) % 3] = 1.0
+            pts = []
+            for a, b in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+                q = [n[k] + a * u[k] + b * v[k] for k in range(3)]
+                sx, sy, _ = self.proyectar_direccion(*q)
+                pts.append(QPointF(c.x() + sx * L / 2, c.y() + sy * L / 2))
+            caras.append((QPolygonF(pts), self.CUBO_VISTAS[n], n, prof))
+        caras.sort(key=lambda t: t[3])
+        return caras
+
+    def vista_en_cubo(self, pos: QPointF) -> Optional[str]:
+        """La vista de la cara del cubo bajo el punto (o None)."""
+        if not self.mostrar_cubo:
+            return None
+        for poly, vista, _, _ in reversed(self._armar_cubo()):
+            if poly.containsPoint(pos, Qt.FillRule.OddEvenFill):
+                return vista
+        return None
+
+    # dirección «derecha» y «arriba» del texto sobre cada cara, mirándola desde afuera
+    CUBO_TEXTO = {(0, -1, 0): ((1, 0, 0), (0, 0, 1)), (0, 1, 0): ((-1, 0, 0), (0, 0, 1)),
+                  (1, 0, 0): ((0, 1, 0), (0, 0, 1)), (-1, 0, 0): ((0, -1, 0), (0, 0, 1)),
+                  (0, 0, 1): ((1, 0, 0), (0, 1, 0)), (0, 0, -1): ((1, 0, 0), (0, -1, 0))}
+
+    def transformacion_cara(self, n: Tuple[int, int, int]) -> QTransform:
+        """Lleva el cuadrado (-50..50, -50..50) de la cara `n` del cubo a la pantalla, en
+        perspectiva: así el rótulo queda pegado a la cara y gira con el cubo."""
+        c, k = self.centro_cubo(), self.CUBO_LADO / 2 / 50.0
+        der, arriba = self.CUBO_TEXTO[n]
+        rx, ry, _ = self.proyectar_direccion(*der)
+        ux, uy, _ = self.proyectar_direccion(*arriba)
+        nx, ny, _ = self.proyectar_direccion(*n)
+        return QTransform(rx * k, ry * k, -ux * k, -uy * k,
+                          c.x() + nx * self.CUBO_LADO / 2, c.y() + ny * self.CUBO_LADO / 2)
+
+    def _dibujar_cubo(self, painter: QPainter) -> None:
+        claro = self.fondo_claro
+        for poly, vista, n, prof in self._armar_cubo():
+            tono = int(60 + 70 * prof) if not claro else int(235 - 40 * (1 - prof))
+            relleno = QColor(tono // 2 + 10, tono // 2 + 22, tono + 20) if not claro else QColor(tono, tono, tono + 8)
+            painter.setBrush(QBrush(relleno))
+            painter.setPen(QPen(QColor("#93a4c3") if not claro else QColor("#7b8494"), 1.2))
+            painter.drawPolygon(poly)
+            if prof > 0.12:
+                painter.save()
+                painter.setTransform(self.transformacion_cara(n), True)
+                texto = self.CUBO_ROTULOS[n]
+                f = QFont("Segoe UI")
+                f.setPixelSize(int(min(25, 140 / len(texto))))
+                f.setBold(True)
+                painter.setFont(f)
+                col = QColor("#e6ecf7") if not claro else QColor("#2b3240")
+                col.setAlphaF(min(1.0, 0.35 + prof))
+                painter.setPen(col)
+                painter.drawText(QRectF(-50, -50, 100, 100), Qt.AlignmentFlag.AlignCenter, texto)
+                painter.restore()
+
     def keyPressEvent(self, event) -> None:
         k, mods = event.key(), event.modifiers()
         paso = 40.0 if mods & Qt.KeyboardModifier.ShiftModifier else 0.0
@@ -350,6 +574,8 @@ class Schema3DCanvas(QOpenGLWidget):
             self.acercar()
         elif k in (Qt.Key.Key_Minus, Qt.Key.Key_Underscore):
             self.alejar()
+        elif k == Qt.Key.Key_Escape and self.modo_medir:
+            self.borrar_medicion()
         elif k in (Qt.Key.Key_Home, Qt.Key.Key_F):
             self.encuadrar()
         else:
@@ -361,12 +587,24 @@ class Schema3DCanvas(QOpenGLWidget):
     # --- Mouse Event Handlers ---
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            vista = self.vista_en_cubo(event.position())
+            if vista:
+                self.set_vista(vista)
+                return
+            if self.modo_medir and self._clic_medir(event.position()):
+                return
         self._last_mouse_pos = event.position().toPoint()
         self._mouse_button_down = event.button()
         self._poner_cursor(arrastrando=True)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         curr_pos = event.position().toPoint()
+        if self.modo_medir and self._mouse_button_down is None:
+            cerca = self.punto_cercano(event.position())
+            if cerca != self._punto_cerca:
+                self._punto_cerca = cerca
+                self.update()
         if self._last_mouse_pos is None or self._mouse_button_down is None:
             return
         delta = curr_pos - self._last_mouse_pos
@@ -422,12 +660,13 @@ class Schema3DCanvas(QOpenGLWidget):
         w, h = max(1, self.width()), max(1, self.height())
         aspect = w / h
 
-        # 1. Clear color and depth buffers
-        bg = QColor(COLORS.get("bg_schema", "#141419"))
-        GL.glClearColor(bg.redF(), bg.greenF(), bg.blueF(), 1.0)
+        # 1. Clear color and depth buffers, con un degradado de fondo
+        arriba, abajo = (QColor(c) for c in FONDO_3D["claro" if self.fondo_claro else "oscuro"])
+        GL.glClearColor(abajo.redF(), abajo.greenF(), abajo.blueF(), 1.0)
         dpr = self.devicePixelRatioF()      # en Retina el buffer es 2x: si no, el 3D ocupa un cuarto
         GL.glViewport(0, 0, max(1, round(w * dpr)), max(1, round(h * dpr)))
         GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
+        self._dibujar_degradado(arriba, abajo)
 
         if not self.mesh:
             painter = QPainter(self)
@@ -487,7 +726,8 @@ class Schema3DCanvas(QOpenGLWidget):
         GL.glEnable(GL.GL_DEPTH_TEST)
 
         # 5a. Ground Reference Grid
-        self._draw_gl_ground_grid(p_max)
+        if self.mostrar_piso:
+            self._draw_gl_ground_grid(p_max)
 
         # 5b. Solid Panel Polygons with Directional Lighting & Offset
         if self.mesh.faces:
@@ -500,6 +740,8 @@ class Schema3DCanvas(QOpenGLWidget):
         # 6. Capture GL Transformation Matrices for 2D Coordinate Unprojecting
         mv_matrix = GL.glGetDoublev(GL.GL_MODELVIEW_MATRIX)
         proj_matrix = GL.glGetDoublev(GL.GL_PROJECTION_MATRIX)
+        self._matrices = (np.array(mv_matrix, dtype=float).reshape(4, 4),
+                          np.array(proj_matrix, dtype=float).reshape(4, 4))
         viewport = (0, 0, w, h)       # las cotas y los ejes se dibujan en píxeles lógicos (QPainter)
 
         def project_3d_to_screen(p: Point3D) -> QPointF:
@@ -523,9 +765,32 @@ class Schema3DCanvas(QOpenGLWidget):
         # 7c. HUD Status & Info (Top-Left)
         self._draw_hud(painter)
 
+        # 7c'. Medición (herramienta Medir)
+        self._dibujar_medicion(painter)
+
+        # 7d. Cubo de vistas (arriba a la derecha)
+        if self.mostrar_cubo:
+            self._dibujar_cubo(painter)
+
         painter.end()
 
     # --- 3D OpenGL Rendering Helpers ---
+
+    def _dibujar_degradado(self, arriba: QColor, abajo: QColor) -> None:
+        GL.glMatrixMode(GL.GL_PROJECTION)
+        GL.glLoadIdentity()
+        GL.glMatrixMode(GL.GL_MODELVIEW)
+        GL.glLoadIdentity()
+        GL.glDisable(GL.GL_DEPTH_TEST)
+        GL.glBegin(GL.GL_QUADS)
+        GL.glColor4f(abajo.redF(), abajo.greenF(), abajo.blueF(), 1.0)
+        GL.glVertex2f(-1.0, -1.0)
+        GL.glVertex2f(1.0, -1.0)
+        GL.glColor4f(arriba.redF(), arriba.greenF(), arriba.blueF(), 1.0)
+        GL.glVertex2f(1.0, 1.0)
+        GL.glVertex2f(-1.0, 1.0)
+        GL.glEnd()
+        GL.glEnable(GL.GL_DEPTH_TEST)
 
     def _draw_gl_ground_grid(self, p_max: Point3D) -> None:
         """Renders ground reference grid in the Z = 0 ground plane."""
@@ -533,7 +798,7 @@ class Schema3DCanvas(QOpenGLWidget):
         span_y = max(200.0, p_max.y * 1.3)
         step = 100.0
 
-        grid_c = QColor(COLORS.get("grid_line", "#23232f"))
+        grid_c = QColor(FONDO_3D["grilla_clara"] if self.fondo_claro else FONDO_3D["grilla"])
         GL.glColor4f(grid_c.redF(), grid_c.greenF(), grid_c.blueF(), 0.5)
         GL.glLineWidth(1.0)
         GL.glBegin(GL.GL_LINES)
@@ -670,6 +935,8 @@ class Schema3DCanvas(QOpenGLWidget):
             edge_color = QColor(base_edge_hex)
             return fill_color, edge_color, line_width
 
+        if self.realista:
+            return self._estilo_realista(face, shade)
         base_fill_hex = COLORS.get(f"{face.color_group}_fill", COLORS["base_fill"])
         base_edge_hex = COLORS.get(f"{face.color_group}_edge", COLORS["base_edge"])
         line_width = 1.6
@@ -691,6 +958,22 @@ class Schema3DCanvas(QOpenGLWidget):
 
         edge_color = QColor(base_edge_hex)
         return fill_color, edge_color, line_width
+
+    def _estilo_realista(self, face: PolygonFace3D, shade: float) -> Tuple[QColor, QColor, float]:
+        """Colores de un case de verdad: placa (negra si el proyecto no dice otra), aluminio y
+        herrajes cromados. Las aristas van finas y oscuras para que se lea la forma."""
+        grupo = face.color_group
+        relleno, borde = REALISTA.get(grupo, REALISTA["herraje"])
+        if grupo in self.colores_placa and QColor(self.colores_placa[grupo]).lightness() > 40:
+            relleno = self.colores_placa[grupo]          # placa de color (las negras usan el negro de acá)
+            borde = QColor(relleno).darker(260).name()
+        if face.is_endgrain and grupo in ("base", "lid"):
+            relleno = QColor(relleno).darker(115).name() if relleno != REALISTA[grupo][0] else REALISTA["canto"][0]
+        c = QColor(relleno)
+        brillo = 0.35 + 0.75 * shade if grupo in REALISTA_METAL else 0.55 + 0.55 * shade
+        fill = QColor(max(0, min(255, int(c.red() * brillo))), max(0, min(255, int(c.green() * brillo))),
+                      max(0, min(255, int(c.blue() * brillo))))
+        return fill, QColor(borde), 1.0
 
     # --- 2D Vector Overlay Helpers ---
 
@@ -821,7 +1104,7 @@ class Schema3DCanvas(QOpenGLWidget):
     def _draw_hud(self, painter: QPainter) -> None:
         """Draws HUD viewport status overlay in top-left."""
         painter.setFont(QFont("Segoe UI", 9))
-        painter.setPen(QColor("#9e9eb4"))
+        painter.setPen(QColor("#5b6475") if self.fondo_claro else QColor("#8b97b0"))
         proj_name = "Perspectiva" if self.is_perspective else "Paralela (orto)"
         info = f"{proj_name} | Azimut {self.azimuth_deg:.0f}° | Elevación {self.elevation_deg:.0f}° | Zoom {self.zoom_factor:.2f}x"
         painter.drawText(12, 20, info)
