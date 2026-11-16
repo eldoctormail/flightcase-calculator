@@ -196,7 +196,7 @@ def generar_miniatura(ruta: str) -> Optional[str]:
         params["_carpeta"] = os.path.dirname(os.path.abspath(ruta))
         png.parent.mkdir(parents=True, exist_ok=True)
         tmp = png.with_name(png.stem + f".{os.getpid()}.{id(params)}.png")
-        if renderizar(malla_3d(calcular(params)), str(tmp), CAMARA_MINIATURA, TAM_MINIATURA):
+        if renderizar(malla_3d(calcular(params)), str(tmp), CAMARA_MINIATURA, TAM_MINIATURA, transparente=True):
             os.replace(tmp, png)
             return str(png)
     except Exception:

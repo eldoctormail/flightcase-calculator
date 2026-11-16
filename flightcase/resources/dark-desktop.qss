@@ -518,3 +518,172 @@ QFrame#barra3d QToolButton:checked {
   background-color: #1d3460;
   border-color: #3b82f6;
 }
+
+/* ---------------------------------------------------------------- pantalla de inicio */
+
+QDialog#pantallaInicio {
+  background-color: #0f1626;
+}
+
+QFrame#navInicio {
+  background-color: #0b1120;
+  border-right: 1px solid #1f2a42;
+}
+
+QLabel#marcaInicio {
+  font-size: 14pt;
+  font-weight: 700;
+}
+
+QToolButton#botonNavInicio {
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 7px 8px;
+  text-align: left;
+  color: #aab5cc;
+}
+
+QToolButton#botonNavInicio:hover {
+  background-color: #17213a;
+  color: #e6ecf7;
+}
+
+QToolButton#botonNavInicio:checked {
+  background-color: #1d3460;
+  border-color: #2f5bb0;
+  color: #ffffff;
+}
+
+QFrame#centroInicio, QWidget#paginaInicio, QScrollArea#scrollInicio {
+  background-color: #0f1626;
+}
+
+QLabel#tituloInicio {
+  font-size: 20pt;
+  font-weight: 700;
+}
+
+QLabel#subtituloInicio {
+  color: #8b97b0;
+}
+
+QFrame#campoNombre {
+  background-color: #141d30;
+  border: 1px solid #26334f;
+  border-radius: 6px;
+}
+
+QLineEdit#nombreProyecto {
+  background-color: transparent;
+  border: none;
+  padding: 0px;
+  font-size: 10.5pt;
+}
+
+QPushButton#pestanaInicio {
+  padding: 6px 12px;
+  border-radius: 6px;
+}
+
+QPushButton#pestanaInicio:checked {
+  background-color: #2f6fe4;
+  border-color: #3b82f6;
+}
+
+QFrame#tarjetaInicio {
+  background-color: #141d30;
+  border: 1px solid #22304c;
+  border-radius: 8px;
+}
+
+QFrame#tarjetaInicio:hover {
+  border-color: #34466c;
+}
+
+QFrame#tarjetaInicio[elegida="true"] {
+  border: 1px solid #3b82f6;
+  background-color: #16223a;
+}
+
+QFrame#tarjetaInicio QWidget#chipsTarjeta, QFrame#tarjetaInicio QLabel {
+  background-color: transparent;
+}
+
+QFrame#tarjetaInicio QLabel#imagenTarjeta {
+  background-color: qradialgradient(cx:0.5, cy:0.45, radius:0.75, fx:0.5, fy:0.4,
+                                    stop:0 #2a4378, stop:1 #141d30);
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+
+QFrame#tarjetaInicio QLabel#marcaElegida {
+  background-color: #3b82f6;
+  border-radius: 11px;
+}
+
+QLabel#tituloTarjeta {
+  font-weight: 600;
+  padding-top: 4px;
+}
+
+QLabel#textoTarjeta {
+  color: #8b97b0;
+  font-size: 9pt;
+}
+
+QPushButton#chipEstilo {
+  background-color: #182238;
+  border: 1px solid #26334f;
+  border-radius: 9px;
+  padding: 2px 8px;
+  font-size: 8.5pt;
+  color: #aab5cc;
+}
+
+QPushButton#chipEstilo:hover {
+  border-color: #3b82f6;
+  color: #e6ecf7;
+}
+
+QPushButton#chipEstilo:checked {
+  background-color: #1d3460;
+  border-color: #3b82f6;
+  color: #ffffff;
+}
+
+QFrame#previaInicio {
+  background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #13203a, stop:1 #0d1424);
+  border-left: 1px solid #1f2a42;
+}
+
+QLabel#tituloPrevia {
+  font-size: 15pt;
+  font-weight: 700;
+}
+
+QLabel#imagenPrevia {
+  background-color: qradialgradient(cx:0.5, cy:0.5, radius:0.6, fx:0.5, fy:0.5,
+                                    stop:0 #24407a, stop:1 transparent);
+}
+
+QLabel#familiaPrevia {
+  color: #3b82f6;
+  font-size: 8pt;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+QLabel#nombrePrevia {
+  font-size: 12pt;
+  font-weight: 600;
+}
+
+QFrame#lineaPrevia {
+  background-color: #26334f;
+}
+
+QFrame#pieInicio {
+  background-color: #0f1626;
+  border-top: 1px solid #1f2a42;
+}

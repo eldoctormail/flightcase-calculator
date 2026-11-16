@@ -46,6 +46,7 @@ class FlightCaseMainWindow(QMainWindow):
         self.taller_widget.ruta_cambiada.connect(self._ruta_cambiada)
         self.taller_widget.proyectos_pedidos.connect(self.proyectos)
         self.taller_widget.case_nuevo.connect(self._case_nuevo_creado)
+        self.taller_widget.pantalla_inicio = self.pantalla_inicio
         self.taller_widget.guardado.connect(self._guardado)
         self.lbl_autoguardado = QLabel()
         self.lbl_autoguardado.setStyleSheet("color:#8a93a3; padding-right:6px")
@@ -242,7 +243,8 @@ class FlightCaseMainWindow(QMainWindow):
         barra = self.menuBar()
         self.file_menu = barra.addMenu("&Archivo")
         m = self.file_menu
-        self._accion(m, "&Nuevo case", "Ctrl+N", self._taller_nuevo, "Case nuevo con las reglas del taller")
+        self._accion(m, "&Nuevo case…", "Ctrl+N", self.pantalla_inicio,
+                     "Pantalla de inicio: elegí un estilo de case o una plantilla y ponele nombre")
         self._accion(m, "Nuevo case con el a&sistente...", "Ctrl+Shift+N", self._asistente,
                      "Case nuevo paso a paso: estilo, equipos, medidas y terminaciones")
         self._accion(m, "&Mis cases...", "Ctrl+Shift+O", self.proyectos,
@@ -385,6 +387,44 @@ class FlightCaseMainWindow(QMainWindow):
         self.dialogo_proyectos().exec()
         self._update_recent_files_menu()
         self._actualizar()
+
+    def pantalla_inicio(self, al_abrir: bool = False) -> bool:
+        """La pantalla de inicio: proyecto nuevo con estilo o plantilla, Mis cases, abrir o seguir.
+        Al abrir la app, cancelarla deja el último case como estaba."""
+        from .widgets.inicio_widget import PantallaInicio
+        t = self.taller_widget
+        if not al_abrir and not t.confirmar_cambios("Proyecto nuevo", "empezar otro"):
+            return False
+        s = _settings()
+        dlg = PantallaInicio(self, recientes=self._get_recent_files(), ultimo=t.ruta if al_abrir else None,
+                             mostrar_al_abrir=s.value("inicio/mostrar", True, type=bool))
+        hecho = bool(dlg.exec())
+        s.setValue("inicio/mostrar", dlg.chk_al_abrir.isChecked())
+        if not hecho:
+            return False
+        if dlg.accion == "crear":
+            t.crear(dlg.estilo.id if dlg.estilo else None, dlg.plantilla, dlg.nombre)
+            self._actualizar()
+            if t.ruta:
+                self._add_recent_file(t.ruta)
+            else:
+                self._case_nuevo_creado()        # el aviso de la barra de estado, después de _actualizar
+            return True
+        elif dlg.accion == "proyectos":
+            self.proyectos()
+        elif dlg.accion == "abrir":
+            self.abrir()
+        elif dlg.accion == "asistente":
+            self._asistente()
+        self._actualizar()
+        return True
+
+    def al_abrir(self) -> None:
+        """Al arrancar: primero lo que haya para recuperar; si no, la pantalla de inicio."""
+        if self.ofrecer_recuperacion():
+            return
+        if _settings().value("inicio/mostrar", True, type=bool):
+            self.pantalla_inicio(al_abrir=True)
 
     def _taller_nuevo(self) -> None:
         self.taller_widget.nuevo()
@@ -543,7 +583,7 @@ def run_app() -> int:
     file_filter = _FileOpenFilter(app)
     app.installEventFilter(file_filter)
     window.show()
-    QTimer.singleShot(300, window.ofrecer_recuperacion)    # si la última vez se cerró de golpe
+    QTimer.singleShot(300, window.al_abrir)    # recuperar si se cerró de golpe, o la pantalla de inicio
 
     from ..actualizaciones import es_app_instalada
     if es_app_instalada() and window.actualizador.buscar_al_abrir:   # desde el código no: la versión es otra
