@@ -121,3 +121,11 @@ def test_parametros_con_nombre_en_castellano(widget):
     textos = [l.text() for l in widget.toolbox.findChildren(QLabel)]
     assert "Unidades de rack (U)" in textos and "Espesor de la placa" in textos
     assert not any(t.startswith(("int_", "rack_", "ref_", "cierre_")) for t in textos)
+
+
+def test_pestana_peso(widget):
+    widget.recalcular()
+    pc = widget.resultado.valores["peso"]
+    assert "Peso:" in widget.lbl_resumen.text()
+    assert "Case vacío" in widget.lbl_peso.text()
+    assert widget.tabla_peso.rowCount() == len(pc.lineas)

@@ -37,7 +37,7 @@ from PySide6.QtWidgets import (
 
 from ...paths import bundled_resource
 from ...taller import estilos
-from ...taller.modelo import CatalogoTaller, ResultadoTaller, calcular, fmt, parametros_por_defecto
+from ...taller.modelo import CatalogoTaller, ResultadoTaller, calcular, catalogo_actual, fmt, parametros_por_defecto
 from ...taller.scad import escribir_proyecto, leer_proyecto, literal, valor_literal
 
 # Opciones fijas de los parámetros de texto que las tienen
@@ -92,14 +92,11 @@ REF_CATEGORIAS: Dict[str, Optional[tuple]] = {
     "ref_riel": ("rack",), "ref_corredera": None,
 }
 SEPARADOR_REF = " — "
-_catalogo: Optional[CatalogoTaller] = None
 
 
 def catalogo() -> CatalogoTaller:
-    global _catalogo
-    if _catalogo is None:
-        _catalogo = CatalogoTaller()
-    return _catalogo
+    """El catálogo en uso, con los cambios del usuario (Editar → Catálogo)."""
+    return catalogo_actual()
 
 
 def etiqueta_ref(ref: str) -> str:
@@ -113,9 +110,14 @@ def ref_de_texto(texto: str) -> str:
 
 
 def _ayuda_articulo(fila: Dict[str, Any]) -> str:
-    datos = ", ".join(f"{k}: {fmt(v) if not isinstance(v, str) else v}" for k, v in fila.get("datos", {}).items())
+    from ...taller import catalogo as C
+    datos = C.resumen_datos(fila)
+    extra = "".join(f"\n{t}: {fila[k]}" for k, t in (("proveedor", "Proveedor"), ("nota", "Nota")) if fila.get(k))
+    if fila.get("origen") in ("propio", "modificado"):
+        extra += "\nDe tu catálogo" + (" (cambiado)" if fila["origen"] == "modificado" else "")
     nota = "" if fila.get("verificado", True) else "\nMedidas estimadas: verificalas con la pieza."
-    return f"{fila['nombre']} ({fila['categoria']})" + (f"\n{datos}" if datos else "") + nota
+    return f"{fila['nombre']} ({C.NOMBRES.get(fila['categoria'], fila['categoria'])})" + \
+        (f"\n{datos}" if datos else "") + extra + nota
 
 
 def _llenar_combo_catalogo(w: QComboBox, categorias: Optional[tuple], vacio: bool) -> None:
@@ -446,6 +448,20 @@ class _EditorTabla:
                                 f"Se guardaron {len(nuevos)} equipos en la biblioteca.{extra}")
         return len(nuevos)
 
+    def refrescar_etiquetas(self) -> None:
+        """«ref — nombre» de nuevo, con los nombres del catálogo actual."""
+        self.tabla.blockSignals(True)
+        try:
+            for c, (_, tipo, _r) in enumerate(self.columnas):
+                if tipo not in ("ref", "placa"):
+                    continue
+                for r in range(self.tabla.rowCount()):
+                    it = self.tabla.item(r, c)
+                    if it and it.text().strip():
+                        it.setText(etiqueta_ref(ref_de_texto(it.text())))
+        finally:
+            self.tabla.blockSignals(False)
+
     def _agregar(self) -> None:
         self.tabla.insertRow(self.tabla.rowCount())
 
@@ -583,6 +599,7 @@ class TallerWidget(QWidget):
         barra.addWidget(self.btn_rehacer)
         for texto, slot in (("Mis cases…", self.proyectos_pedidos.emit),
                             ("Nuevo", self.nuevo), ("Asistente…", lambda: self.asistente()),
+                            ("Catálogo…", lambda: self.editar_catalogo()),
                             ("Abrir .scad…", self.abrir),
                             ("Guardar .scad…", self.guardar), ("Planos PDF…", lambda: self.exportar_planos()),
                             ("Exportar paquete…", self.exportar),
@@ -699,6 +716,16 @@ class TallerWidget(QWidget):
         self.tabla_interior = self._tabla(["Tipo", "Nombre", "Medidas", "Posición", "Nota"])
         li.addWidget(self.tabla_interior, 1)
         self.tabs.addTab(pagina_int, "Interior")
+        pagina_peso = QWidget()
+        lp = QVBoxLayout(pagina_peso)
+        lp.setContentsMargins(0, 0, 0, 0)
+        self.lbl_peso = QLabel()
+        self.lbl_peso.setWordWrap(True)
+        self.lbl_peso.setTextFormat(Qt.RichText)
+        lp.addWidget(self.lbl_peso)
+        self.tabla_peso = self._tabla(["Parte", "Qué", "Cantidad", "Peso unitario", "Total kg", "De dónde sale"])
+        lp.addWidget(self.tabla_peso, 1)
+        self.tabs.addTab(pagina_peso, "Peso")
         dl.addWidget(self.tabs, 1)
         self.lbl_avisos = QLabel()
         self.lbl_avisos.setWordWrap(True)
@@ -1069,7 +1096,9 @@ class TallerWidget(QWidget):
             f" &nbsp;·&nbsp; <b>Placa:</b> {v['placa_material']}"
             + (f" (+ {len(otros)} paneles en otra placa)" if (otros := v.get("materiales_paneles") or {}) else "") +
             f" &nbsp;·&nbsp; {n_paneles} paneles, {sum(p.cantidad for p in res.perfiles)} tramos de perfil"
-            + (f" &nbsp;·&nbsp; <b>Forro:</b> {len(fo.piezas)} piezas" if (fo := v.get("forro")) is not None and fo.piezas else ""))
+            + (f" &nbsp;·&nbsp; <b>Forro:</b> {len(fo.piezas)} piezas" if (fo := v.get("forro")) is not None and fo.piezas else "")
+            + (f" &nbsp;·&nbsp; <b>Peso:</b> {pc.resumen()}" if (pc := v.get("peso")) else ""))
+        self._mostrar_peso(v.get("peso"))
         calados: Dict[str, int] = {}
         for c in res.calados:
             calados[c.panel] = calados.get(c.panel, 0) + 1
@@ -1113,6 +1142,28 @@ class TallerWidget(QWidget):
         self.vista_placas.set_resultado(res)
         self._actualizar_3d()
 
+    def _mostrar_peso(self, pc) -> None:
+        from ...taller import peso as _peso
+        if pc is None:
+            self.lbl_peso.setText("")
+            self._llenar(self.tabla_peso, [])
+            return
+        kg = _peso._kg
+        partes = " &nbsp;·&nbsp; ".join(f"{p}: {kg(t)} kg" for p, t in pc.partes.items())
+        txt = f"<b>Case vacío: {kg(pc.vacio)} kg</b>"
+        if pc.total > pc.vacio + 0.005:
+            txt += f" &nbsp;·&nbsp; <b>Con equipos: {kg(pc.total)} kg</b>"
+        txt += f"<br>{partes}"
+        if pc.estimado > 0.005:
+            txt += (f"<br><span style='color:#a15c00'>{kg(pc.estimado)} kg salen de valores estimados. "
+                    "Para el peso real, cargá la densidad de la placa, los g/m de los perfiles y el peso de "
+                    "cada herraje en el catálogo (Ctrl+K).</span>")
+        if pc.sin_dato:
+            txt += ("<br><span style='color:#a15c00'>Sin peso (no suman): "
+                    + ", ".join(dict.fromkeys(pc.sin_dato)) + ".</span>")
+        self.lbl_peso.setText(txt)
+        self._llenar(self.tabla_peso, _peso.filas_tabla(pc))
+
     def _actualizar_3d(self, *_args) -> None:
         res = self.resultado
         if res is None:
@@ -1150,6 +1201,30 @@ class TallerWidget(QWidget):
         from .biblioteca_widget import BibliotecaDialog
         BibliotecaDialog(self).exec()
 
+    def editar_catalogo(self, categoria: str = "") -> None:
+        from .catalogo_widget import CatalogoDialog
+        dlg = CatalogoDialog(self, categoria)
+        dlg.exec()
+        if dlg.cambiado:
+            self.catalogo_cambiado()
+
+    def catalogo_cambiado(self) -> None:
+        """Se editó el catálogo: listas de herrajes y placas al día y el case recalculado."""
+        for nombre, ed in self.editores.items():
+            if isinstance(ed, _Editor) and isinstance(ed.widget, QComboBox) and nombre in REF_CATEGORIAS:
+                valor = ed.valor()
+                w = ed.widget
+                w.blockSignals(True)
+                w.clear()
+                _llenar_combo_catalogo(w, REF_CATEGORIAS[nombre], vacio=True)
+                w.blockSignals(False)
+                ed.poner(valor)
+            elif isinstance(ed, _EditorTabla):
+                ed.refrescar_etiquetas()
+        self.herrajes.catalogo_cambiado()
+        self.recalcular()
+
+        self.set_params({})
     def hay_cambios(self) -> bool:
         """True si el case cambió desde que se abrió, se guardó o se empezó."""
         self._leer_editores()

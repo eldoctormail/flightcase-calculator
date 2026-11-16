@@ -55,9 +55,13 @@ def round_os(x: float) -> float:
 # ---------------------------------------------------------------------------
 
 class CatalogoTaller:
+    """Catálogo de herrajes, perfiles y placas. Sin `filas`: el de la app con los cambios
+    del usuario encima (ver catalogo.py)."""
+
     def __init__(self, filas: Optional[List[Dict[str, Any]]] = None) -> None:
         if filas is None:
-            filas = json.loads(bundled_resource("catalogo_fr.json").read_text(encoding="utf-8"))
+            from . import catalogo as _catalogo
+            filas = _catalogo.filas_actuales()
         self.filas = filas
         self._por_ref = {}
         for f in filas:
@@ -78,10 +82,26 @@ class CatalogoTaller:
     def verificado(self, ref: str) -> bool:
         return self._por_ref[ref]["verificado"] if self.existe(ref) else True
 
+    def propio(self, ref: str) -> bool:
+        """Cargado o cambiado por el usuario (no tal como viene con la app)."""
+        return self.existe(ref) and self._por_ref[ref].get("origen") in ("propio", "modificado")
+
     def dato(self, ref: str, clave: str, defecto: Any) -> Any:
         if not self.existe(ref):
             return defecto
         return self._por_ref[ref]["datos"].get(clave, defecto)
+
+
+_actual: Dict[str, Any] = {"filas": None, "cat": None}
+
+
+def catalogo_actual() -> CatalogoTaller:
+    """El catálogo en uso (se vuelve a armar sólo si el usuario lo cambió)."""
+    from . import catalogo as _catalogo
+    filas = _catalogo.filas_actuales()
+    if _actual["filas"] is not filas:
+        _actual["filas"], _actual["cat"] = filas, CatalogoTaller(filas)
+    return _actual["cat"]
 
 
 def parametros_por_defecto() -> Dict[str, Any]:
@@ -173,7 +193,7 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     P = parametros_por_defecto()
     if params:
         P.update(params)
-    cat = catalogo or CatalogoTaller()
+    cat = catalogo or catalogo_actual()
     g = P.get
 
     int_ancho = g("int_ancho"); int_prof = g("int_prof")
@@ -887,8 +907,12 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
             A.append(s("La referencia ", r[0], " (", cat.nombre(r[0]), ") no es del tipo esperado (", r[1], ")."))
     est = [r[0] for r in _refs_usadas if ce(r[0]) and not cat.verificado(r[0])
            and r[1] in ("angulo", "esquinero", "cierre", "manija", "rueda", "plato", "cazoleta")]
-    _gen = [r for r in est if r.startswith("LBD-")]
-    est = [r for r in est if not r.startswith("LBD-")]
+    _prop = [r for r in est if cat.propio(r)]
+    _gen = [r for r in est if r.startswith("LBD-") and r not in _prop]
+    est = [r for r in est if not r.startswith("LBD-") and r not in _prop]
+    if _prop:
+        A.append("Medidas sin confirmar (están marcadas así en tu catálogo) para " + ", ".join(_prop)
+                 + ": medí el herraje antes de cortar o calar.")
     if _gen:
         A.append("Medidas genéricas para " + ", ".join(_gen)
                  + ": confirmalas con el herraje que compres antes de cortar o calar.")
@@ -1174,7 +1198,7 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
                                       " m² de forro (a las dos caras: forro y placa)"), ""))
         A += _forro.avisos
 
-    return ResultadoTaller(
+    res = ResultadoTaller(
         info=info, paneles=paneles, calados=calados, marcas=marcas, perfiles=perfiles, extras=extras_p,
         herrajes=herrajes, panelmat=panelmat, bandejas=bandejas_out, avisos=A,
         valores={"ext_ancho": ext_ancho, "ext_prof": ext_prof, "ext_alto": ext_alto, "pared": pared,
@@ -1185,6 +1209,10 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
                  "forro": _forro,
                  "forro_opciones": _fo.opciones(_2t, lambda c: _nombre_forro(c, _2t, _nombre_pieza_forro))},
     )
+    # ---- peso real (peso.py): no está en flightcase.scad ----
+    from . import peso as _peso
+    res.valores["peso"] = _peso.calcular(res, P, cat)
+    return res
 
 
 def _nombre_forro(cara: str, dos_tapas: bool, nombre_panel) -> str:
@@ -1205,7 +1233,7 @@ def interior_para_exterior(params: Optional[Dict[str, Any]], ancho: float, prof:
     Las paredes, la espuma y el aluminio dependen de la construcción elegida, así que se
     calcula con el modelo y se corrige la diferencia (es lineal: alcanza con una o dos vueltas)."""
     P = dict(params or {})
-    cat = catalogo or CatalogoTaller()
+    cat = catalogo or catalogo_actual()
     for _ in range(4):
         v = calcular(P, cat).valores
         d = (ancho - v["ext_ancho"], prof - v["ext_prof"], alto - v["ext_alto"])

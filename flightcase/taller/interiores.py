@@ -278,6 +278,10 @@ def calcular(P: Dict[str, Any], ctx: Dict[str, Any], cat: CatalogoTaller) -> Res
     if ref_esp and cat.existe(ref_esp):
         mat_esp = cat.nombre(ref_esp)
         plancha = float(cat.dato(ref_esp, "esp", plancha))
+        try:
+            dens_esp = float(cat.dato(ref_esp, "densidad", 0) or 0) or dens_esp     # kg/m³ del catálogo
+        except (TypeError, ValueError):
+            pass
     elif ref_esp:
         A.append(s("La referencia ", ref_esp, " no está en el catálogo: revisá el número."))
     area_por_esp: Dict[float, float] = {}

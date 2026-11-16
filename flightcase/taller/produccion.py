@@ -46,6 +46,7 @@ def datos(res: ResultadoTaller) -> Dict[str, Any]:
     a mano van además en d["manuales"] (por panel, en coordenadas del panel)."""
     d = gen.parsear_datos(lineas_datos(res))
     d["manuales"] = manuales_por_panel(res)
+    d["peso"] = res.valores.get("peso")
     return d
 
 
