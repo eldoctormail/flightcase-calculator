@@ -271,4 +271,16 @@ Los conectores están en el catálogo, en la categoría **Conectores y energía*
 - Las medidas de los que no son D son aproximadas (quedan *sin verificar* en el catálogo): medí el tuyo y corregilas en **Catálogo…**, o agregá otros conectores con su forma, calado, brida, tornillos y fondo.
 - En la vista 3D se ven la brida, el frente del conector y el cuerpo que entra en el case (el *fondo*). Dos conectores pueden ir pegados; la app avisa si las bridas se pisan o si un conector cae sobre el aluminio.
 
+### Modelos 3D de los herrajes (STEP)
+
+![Conector BNC, jack y una pieza propia con su modelo STEP en el frente del case](captura-modelo-step.png)
+
+Muchos fabricantes dan el modelo 3D de cada herraje en STEP (`.step` / `.stp`). En **Catálogo…**, elegí el artículo (un cierre, una manija, un conector, un accesorio propio…) y tocá **Modelo 3D…**: la app copia el archivo a tu carpeta de datos (`modelos_3d/`) y lo deja en la columna *Modelo 3D*. Desde ahí, cada vez que pongas ese herraje con **Herrajes a mano**:
+
+- la **vista 3D** y los renders muestran la pieza real, con sus aristas, en vez de la caja simplificada;
+- el **STEP del case** lleva el modelo del fabricante tal cual, con sus caras curvas (no en triángulos), ubicado y con su unidad (también si viene en pulgadas);
+- un accesorio propio mide lo que mide su modelo (para las marcas, los avisos y los planos).
+
+*Frente del modelo* dice qué eje del modelo mira hacia afuera del case (vacío = `+Z`; si la pieza aparece de costado o al revés, probá con otro) y *Entra en la placa* cuántos milímetros quedan metidos en la madera (cierres embutidos, conectores). El STEP se lee sin librerías de CAD (planos, cilindros, conos, esferas, toros, superficies de revolución y de extrusión, B-splines y ensambles); los tests comparan los volúmenes con OpenCASCADE. Un herraje espejado va al STEP del case como superficies, porque un ensamble STEP no puede espejar una pieza.
+
 Los tests comparan el resultado con OpenSCAD: los datos de 18 proyectos y variantes (`tests/golden/taller`) y las listas y DXF de 3 proyectos (`tests/golden/taller_paquete`). Para regenerarlos: `python tools/generar_golden.py ruta/a/flightcase-generador`.

@@ -133,6 +133,17 @@ class Malla3D(WireframeMesh3D):
     calados: List[Tuple[str, List[Point3D]]] = field(default_factory=list)
     solidos: List[Solido3D] = field(default_factory=list)
     interior_desde: int = -1     # índice en `solidos` donde empieza el interior (-1: no hay)
+    modelos: List["ModeloPuesto"] = field(default_factory=list)   # herrajes con modelo STEP
+
+
+@dataclass
+class ModeloPuesto:
+    """Un modelo STEP de herraje puesto en el case (para copiarlo entero al STEP del case).
+    `matriz` (4x4) lleva las coordenadas del modelo en mm a las del case armado."""
+    nombre: str
+    ruta: str
+    matriz: object
+    color: str = "herraje"
 
 
 def _sum(*vs: Sequence[float]) -> Vec:
@@ -172,6 +183,47 @@ class _Constructor:
         self.rotulos: List[Rotulo] = []
         self.calados: List[Tuple[str, List[Point3D]]] = []
         self.solidos: List[Solido3D] = []
+        self.modelos: List[ModeloPuesto] = []
+
+    def rigida(self) -> "object":
+        """Matriz 4x4 de las coordenadas locales del case a las del mundo (ubicar() y el giro de
+        la tapa, que son movimientos rígidos)."""
+        import numpy as np
+        o = self._p((0.0, 0.0, 0.0), False)
+        M = np.eye(4)
+        M[:3, 3] = (o.x, o.y, o.z)
+        for i, e in enumerate(((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))):
+            q = self._p(e, False)
+            M[:3, i] = (q.x - o.x, q.y - o.y, q.z - o.z)
+        return M
+
+    def modelo(self, mod, orient, local, color: str, capa: int, etiqueta: str) -> None:
+        """Dibuja un modelo STEP: `orient` lo pone derecho sobre la cara y `local` (4x4) lo
+        lleva a las coordenadas locales del case."""
+        import numpy as np
+        M = self.rigida() @ local @ orient
+        m = mod.malla
+        V = m.vertices @ M[:3, :3].T + M[:3, 3]
+        espejo = float(np.linalg.det(M[:3, :3])) < 0
+        pts = [Point3D(float(x), float(y), float(z)) for x, y, z in V]
+        T = m.triangulos[:, ::-1] if espejo else m.triangulos
+        a, b, c = V[T[:, 0]], V[T[:, 1]], V[T[:, 2]]
+        nn = np.cross(b - a, c - a)
+        largo = np.linalg.norm(nn, axis=1)
+        desde = len(self.caras)
+        for (i, j, k_), n_, l in zip(T.tolist(), nn.tolist(), largo.tolist()):
+            if l <= 1e-12:
+                continue
+            self.caras.append(PolygonFace3D(vertices=(pts[i], pts[j], pts[k_]), normal=(n_[0] / l, n_[1] / l, n_[2] / l),
+                                            color_group=color, label=etiqueta, layer_order=capa, contorno=False))
+        for ar in m.aristas:
+            q = ar @ M[:3, :3].T + M[:3, 3]
+            for p0, p1 in zip(q[:-1].tolist(), q[1:].tolist()):
+                self.segmentos.append(Segment3D(Point3D(*p0), Point3D(*p1), "arista", color, etiqueta))
+        if espejo:     # un espejo no se puede ubicar en un STEP: va como superficies
+            self.solidos.append(Solido3D(etiqueta, color, desde, len(self.caras)))
+        else:
+            self.modelos.append(ModeloPuesto(etiqueta, mod.ruta, M, color))
 
     def cerrar(self, desde: int, color: str, etiqueta: str) -> None:
         """Las caras agregadas desde `desde` forman un cuerpo cerrado."""
@@ -373,11 +425,14 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
     manuales = v.get("manuales")
     man_panel: Dict[str, list] = {}
     man_ids = set()
+    con_modelo: set = set()
     if manuales is not None:
         for c in manuales.colocados:
             if c.panel:
                 man_panel.setdefault(c.panel, []).append(c)
         man_ids = {id(x) for x in manuales.calados + manuales.marcas}
+        # lo que dibuja el modelo STEP de un herraje no se dibuja además simplificado
+        con_modelo = {id(x) for c in manuales.colocados if c.modelo and c.panel for x in c.calados + c.marcas}
     res_man = op.resaltar_manuales
 
     def col_m(obj, paso: int, color: str) -> str:
@@ -425,7 +480,7 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
             k.calados.append((p.nombre, [k._p(_sum(o, _mul(u, a), _mul(vv, b)), False)
                                          for a, b in _rect_redondeado(x0, y0, x1, y1, c.radio)]))
             sol_panel.agujeros.append(k.calados[-1][1])
-            if c.tipo.startswith("encastre") and k.visible(P_RUEDAS):
+            if c.tipo.startswith("encastre") and k.visible(P_RUEDAS) and id(c) not in con_modelo:
                 # plato de apilado: reborde por fuera y cubeta metida en la tapa (encastre de flightcase.scad)
                 ala, prof = geo.get("encastre_ala", 10), geo.get("encastre_prof", 30)
                 col_p = col_m(c, P_RUEDAS, "plato")
@@ -456,9 +511,11 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
                                        (x0, y0, e_, c.alto), (x1 - e_, y0, e_, c.alto)):
                     k.caja(_sum(o, _mul(u, a0), _mul(vv, b0)), u, vv, n, aw, bh, prof + 1.5, col_p,
                            ComponentLayer.BASE_ALU, "Cazoleta")
-            if c.tipo in ("manija", "manija a mano") and k.visible(P_MANIJAS):
+            if c.tipo in ("manija", "manija a mano") and k.visible(P_MANIJAS) and id(c) not in con_modelo:
                 _manija_embutida(k, o, u, vv, n, x0, y0, x1, y1, col_m(c, P_MANIJAS, "herraje"))
         for m in marcas.get(p.id, []):
+            if id(m) in con_modelo:
+                continue
             if m.tipo == "manija_sup" and k.visible(P_MANIJAS):
                 _manija_superficie(k, o, u, vv, n, m.x, m.y, m.ancho, k.color(P_MANIJAS, "herraje"))
             elif m.tipo == "cierre_acceso" and k.visible(P_CIERRES):
@@ -705,7 +762,7 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
     caja = (Point3D(min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)),
             Point3D(max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
     return Malla3D(faces=k.caras, segments=k.segmentos, bounding_box=caja, rotulos=k.rotulos, calados=k.calados,
-                   solidos=k.solidos, interior_desde=interior_desde)
+                   solidos=k.solidos, interior_desde=interior_desde, modelos=k.modelos)
 
 
 _COLOR_INTERIOR = {"equipo": "equipo", "rack": "equipo", "riel": "aluminio", "corredera": "aluminio",
@@ -970,6 +1027,34 @@ def _manija_superficie(k: _Constructor, o: Vec, u: Vec, v: Vec, n: Vec, x: float
     k.cilindro(P(x, y, 10), u, v, fuera, 7, ancho - 30, "rueda", ComponentLayer.BASE_ALU, "Manija", lados=14)
 
 
+def _herraje_con_modelo(k: _Constructor, o: Vec, u: Vec, v: Vec, fuera: Vec, h, color: str, capa: int) -> bool:
+    """El modelo STEP del herraje en su lugar; False si no se pudo cargar (va simplificado)."""
+    import numpy as np
+    from . import modelos3d, step_leer
+    try:
+        info = modelos3d.del_articulo(h.datos)
+    except (step_leer.ErrorStep, OSError):
+        return False
+    if info is None:
+        return False
+    mod, orient, _medidas = info
+    (ax, ay), (bx, by) = h.modelo_ejes
+    A = np.array(_sum(_mul(u, ax), _mul(v, ay)))
+    B = np.array(_sum(_mul(u, bx), _mul(v, by)))
+    C = np.array(fuera, dtype=float)
+    # la vista de algunas caras (la de abajo) es un espejo: el modelo va derecho igual,
+    # salvo que se pida espejado
+    derecho = float(np.dot(np.cross(A, B), C)) > 0
+    if derecho == bool(getattr(h.fila, "espejo", False)):
+        A = -A
+    cx, cy = h.modelo_centro
+    local = np.eye(4)
+    local[:3, 0], local[:3, 1], local[:3, 2] = A, B, C
+    local[:3, 3] = _sum(o, _mul(u, cx), _mul(v, cy))
+    k.modelo(mod, orient, local, color, capa, h.nombre)
+    return True
+
+
 def _herraje_manual(k: _Constructor, geo: dict, o: Vec, u: Vec, v: Vec, n: Vec, h, resalte: Optional[str],
                     ex: float) -> None:
     """Herraje puesto a mano que no sale de un calado ni de una marca de cierre: piezas de
@@ -979,6 +1064,9 @@ def _herraje_manual(k: _Constructor, geo: dict, o: Vec, u: Vec, v: Vec, n: Vec, 
     x0, y0 = h.px - h.pw / 2, h.py - h.ph / 2
     col = resalte or "herraje"
     capa = ComponentLayer.BASE_ALU
+    if getattr(h, "modelo", ""):
+        if _herraje_con_modelo(k, o, u, v, fuera, h, resalte or "herraje", capa):
+            return
     if h.forma == "rueda":
         d = h.datos
         g2 = dict(geo, rueda_placa=list(d.get("placa") or [h.pw, h.ph]),

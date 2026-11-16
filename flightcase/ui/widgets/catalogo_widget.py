@@ -128,6 +128,7 @@ class CatalogoDialog(QDialog):
                 ("− Quitar", self.quitar, "Saca los artículos elegidos de las listas"),
                 ("Restaurar original", self.restaurar, "Vuelve los artículos elegidos a como vienen con la app"),
                 ("Recuperar quitados…", self.recuperar_quitados, "Vuelve a poner los artículos de la app que quitaste"),
+                ("Modelo 3D…", self.modelo_3d, "Carga el modelo 3D (.step) que da el fabricante para el artículo elegido"),
                 ("Importar planilla…", self.importar, "Agrega o actualiza artículos desde un CSV (por ref)"),
                 ("Exportar planilla…", self.exportar, "Guarda en un CSV los artículos que se ven en la tabla")):
             b = QPushButton(texto)
@@ -428,6 +429,64 @@ class CatalogoDialog(QDialog):
         self._guardar([])
         self._rehacer()
         self._estado(f"Se recuperaron {len(quitados)} artículos.")
+
+    def modelo_3d(self, ruta: Optional[str] = None) -> Optional[str]:
+        """Carga (o quita) el modelo STEP del artículo elegido. Devuelve el texto del resumen."""
+        from ...taller import modelos3d, step_leer
+        elegidas = self._elegidas()
+        if len(elegidas) != 1:
+            self._estado("Elegí un artículo (un herraje) para cargarle su modelo 3D.")
+            return None
+        i = elegidas[0]
+        f = copy.deepcopy(self.filas[i])
+        if f["categoria"] not in C.CON_MODELO:
+            self._estado(f"Los artículos de «{C.NOMBRES.get(f['categoria'], f['categoria'])}» no llevan modelo 3D.")
+            return None
+        if ruta is None and f["datos"].get("modelo"):
+            caja = QMessageBox(self)
+            caja.setWindowTitle("Modelo 3D")
+            caja.setText(f"{f['ref']} ya tiene el modelo {f['datos']['modelo']}.")
+            cambiar = caja.addButton("Cambiar…", QMessageBox.AcceptRole)
+            quitar = caja.addButton("Quitar el modelo", QMessageBox.DestructiveRole)
+            caja.addButton("Cancelar", QMessageBox.RejectRole)
+            caja.exec()
+            if caja.clickedButton() is quitar:
+                for k in ("modelo", "modelo_frente", "modelo_adentro"):
+                    f["datos"].pop(k, None)
+                self.filas[i] = f
+                self._guardar([f])
+                self._rehacer(i)
+                self._estado(f"{f['ref']}: sin modelo 3D (se dibuja simplificado).")
+                return None
+            if caja.clickedButton() is not cambiar:
+                return None
+        if not ruta:
+            ruta, _ = QFileDialog.getOpenFileName(self, f"Modelo 3D de {f['ref']}", "",
+                                                  "Modelo STEP (*.step *.stp *.STEP *.STP);;Todos (*)")
+        if not ruta:
+            return None
+        self.setCursor(Qt.WaitCursor)
+        try:
+            nombre, mod = modelos3d.importar(ruta, f["ref"])
+        except (step_leer.ErrorStep, OSError) as e:
+            self.unsetCursor()
+            QMessageBox.warning(self, "Modelo 3D", f"No se pudo leer {os.path.basename(ruta)}:\n{e}")
+            return None
+        self.unsetCursor()
+        f["datos"]["modelo"] = nombre
+        frente = f["datos"].get("modelo_frente") or "+Z"
+        a, b, c = modelos3d.medidas(mod.malla, frente)
+        self.filas[i] = f
+        self._guardar([f])
+        self._rehacer(i)
+        texto = (f"{f['ref']}: modelo {nombre} cargado ({a:.1f} x {b:.1f} mm, {c:.1f} mm de alto con el frente "
+                 f"{frente}). Ponelo con «Herrajes a mano»; si queda de costado, cambiá «Frente del modelo».")
+        avisos = modelos3d.avisos(mod)
+        self._estado(texto)
+        if avisos:
+            QMessageBox.information(self, "Modelo 3D", texto + "\n\nAlgunas caras no se pudieron dibujar (en el STEP "
+                                    "del case van igual, completas):\n" + "\n".join(avisos[:10]))
+        return texto
 
     def importar(self, ruta: Optional[str] = None) -> None:
         if not ruta:

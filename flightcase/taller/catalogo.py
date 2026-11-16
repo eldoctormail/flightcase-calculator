@@ -147,6 +147,21 @@ _CON_PESO = ("esquinero", "escuadra", "cierre", "bisagra", "tope", "manija", "ru
 for _c, _n, _m in CATEGORIAS:
     if _c in _CON_PESO:
         _m.append(("peso", "Peso (g)", "num", "Peso de una unidad en gramos, para el peso total del case (pesala o sacala de la ficha del proveedor)."))
+# Modelo 3D (STEP) del fabricante: se dibuja en la vista 3D y va tal cual al STEP del case
+# (en los herrajes puestos a mano). Ver modelos3d.py.
+CON_MODELO = ("manija", "cierre", "bisagra", "tope", "pie", "rueda", "rueda_otra", "plato", "escuadra",
+              "conector", "extra", "esquinero", "rack")
+FRENTES_MODELO = ("+Z", "-Z", "+X", "-X", "+Y", "-Y")
+for _c, _n, _m in CATEGORIAS:
+    if _c in CON_MODELO:
+        _m += [
+            ("modelo", "Modelo 3D", "texto", "Archivo .step de la pieza (botón «Modelo 3D…»). Se ve en la vista 3D y "
+             "va con sus curvas al STEP del case, en los herrajes puestos a mano."),
+            ("modelo_frente", "Frente del modelo", FRENTES_MODELO, "Qué eje del modelo mira hacia afuera del case "
+             "(vacío = +Z). Si la pieza aparece de costado o al revés, probá con otro."),
+            ("modelo_adentro", "Entra en la placa", "num", "Cuántos mm del modelo quedan metidos en la placa "
+             "(cierres embutidos, conectores). 0 = apoya sobre la cara."),
+        ]
 NOMBRES = {c: n for c, n, _ in CATEGORIAS}
 MEDIDAS = {c: m for c, _, m in CATEGORIAS}
 
