@@ -79,6 +79,8 @@ def test_foto_de_la_vista_3d(qapp, tmp_path):
     assert w.copiar_imagen_3d()
     mime = QApplication.clipboard().mimeData()
     assert mime.hasFormat("image/png") and mime.hasImage()
+    QApplication.clipboard().clear()     # con la plataforma offscreen, una imagen en el portapapeles
+    #                                      al cerrar Python lo hace caer (segfault al salir)
     assert "foto" in w.barra_3d.botones and w.barra_3d.botones["foto"].menu().actions()
 
 
