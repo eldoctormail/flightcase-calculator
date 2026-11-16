@@ -860,6 +860,16 @@
   ]
  },
  {
+  "seccion": "DXF para la CNC",
+  "parametros": [
+   {
+    "nombre": "dxf_capas",
+    "etiqueta": "Capas del DXF",
+    "ayuda": "Nombre y color de cada capa en los DXF de piezas y placas, para que coincidan con las de tu CAM: 0 (contorno y calados), REBAJE, PERFORACIONES (remaches), TORNILLOS, MARCA, GRABADO, PLACA, TEXTO, o una capa propia de un herraje (Capa DXF del calado o de los agujeros en el catálogo). Nombre vacío = el de la app; color = número de color de AutoCAD (1 rojo, 2 amarillo, 3 verde, 4 cian, 5 azul, 6 magenta, 7 blanco)."
+   }
+  ]
+ },
+ {
   "seccion": "Corte y compra",
   "parametros": [
    {

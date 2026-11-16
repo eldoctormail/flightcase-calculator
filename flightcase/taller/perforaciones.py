@@ -14,7 +14,8 @@ De dónde sale cada agujero (coordenadas del panel visto desde afuera, como los 
 - Cierres, bisagras, manijas, cazoletas y platos: alrededor del calado o sobre la huella
   del herraje, con la cantidad de remaches del catálogo. Si el artículo del catálogo trae
   `perforaciones` ([[dx, dy], ...] en mm desde el centro del herraje; en cierres y bisagras,
-  dy desde la línea de cierre, negativo del lado del cuerpo) se usan esas.
+  dy desde la línea de cierre, negativo del lado del cuerpo) se usan esas, con su diámetro
+  (`perforacion_d`) y su capa (`capa_agujeros`) si los trae.
 - Herrajes puestos a mano: lo mismo, según su categoría.
 - Marco de la base suelta: tornillos para madera.
 
@@ -37,6 +38,13 @@ TORNILLO_D = 3.0          # mecha guía para los tornillos de madera del marco d
 DISTANCIA_MINIMA = 6.0    # dos agujeros más cerca que esto son el mismo
 
 Vec = Tuple[float, float, float]
+
+
+def capa_valida(nombre: Any, defecto: str) -> str:
+    """Nombre de capa DXF limpio (mayúsculas, sin espacios ni signos raros) o el de siempre."""
+    import re
+    t = re.sub(r"[^A-Za-z0-9_\-$]", "_", str(nombre or "").strip()).strip("_").upper()
+    return t or defecto
 
 
 @dataclass
@@ -312,6 +320,14 @@ def calcular(res: ResultadoTaller) -> Dict[str, List[Agujero]]:
         if pid in out:
             out[pid].append(Agujero(x, y, d, capa, origen))
 
+    def propio(datos: Dict[str, Any]) -> Tuple[float, str]:
+        """Diámetro y capa de los agujeros de un herraje: los del catálogo, o los de siempre."""
+        try:
+            dm = float(datos.get("perforacion_d") or 0)
+        except (TypeError, ValueError):
+            dm = 0.0
+        return (dm if dm > 0 else d_rem), capa_valida(datos.get("capa_agujeros"), CAPA_REMACHES)
+
     def huella(pid: str, x0: float, y0: float, x1: float, y1: float) -> None:
         if pid in huellas:
             huellas[pid].append((min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)))
@@ -443,6 +459,7 @@ def calcular(res: ResultadoTaller) -> Dict[str, List[Agujero]]:
             if abs(nx) > 0.01 and abs(ny) > 0.01:
                 oblicua = (nx, ny)
         lx, ly = mx + ex * alto, my + ey * alto          # punto de la línea de cierre
+        dm, capa = propio(datos)
         n = int(datos.get("remaches", 6) or 0)
         propias = _lista_perforaciones(datos)
         if propias is None:
@@ -477,11 +494,11 @@ def calcular(res: ResultadoTaller) -> Dict[str, List[Agujero]]:
             # a lo largo de la junta (dx) y alejándose de la línea (dist)
             if oblicua is not None:
                 nx, ny = oblicua
-                agregar(pid, lx + ny * dx - nx * dist, ly - nx * dx - ny * dist, tipo)
+                agregar(pid, lx + ny * dx - nx * dist, ly - nx * dx - ny * dist, tipo, dm, capa)
             elif ex == 0:
-                agregar(pid, lx + dx, ly - ey * dist, tipo)
+                agregar(pid, lx + dx, ly - ey * dist, tipo, dm, capa)
             else:
-                agregar(pid, lx - ex * dist, ly + dx, tipo)
+                agregar(pid, lx - ex * dist, ly + dx, tipo, dm, capa)
         # huella del herraje: tapa los remaches del perfil que quedan debajo
         a = 30.0 if tipo == "bisagra" else 26.0
         lejos = 58.0 if cuerpo else 44.0
@@ -536,8 +553,9 @@ def calcular(res: ResultadoTaller) -> Dict[str, List[Agujero]]:
                         pts.append((m.x + a, m.y + c) if larga else (m.x + c, m.y + a))
             else:
                 pts = _alrededor(m.x, m.y, w, h, -6, n)
+            dm, capa = propio(datos)
             for x, y in pts:
-                agregar(m.panel, x, y, "manija" if m.tipo == "manija_sup" else "herraje")
+                agregar(m.panel, x, y, "manija" if m.tipo == "manija_sup" else "herraje", dm, capa)
             huella(m.panel, m.x - w / 2, m.y - h / 2, m.x + w / 2, m.y + h / 2)
 
     for c in res.calados:
@@ -565,8 +583,9 @@ def calcular(res: ResultadoTaller) -> Dict[str, List[Agujero]]:
             pts = [(c.cx + q[0], c.cy + q[1]) for q in (_rotar(dx, dy, giro) for dx, dy in propias)]
         else:
             pts = _alrededor(c.cx, c.cy, c.ancho, c.alto, reborde / 2, n)
+        dm, capa = propio(datos)
         for x, y in pts:
-            agregar(c.panel, x, y, tipo)
+            agregar(c.panel, x, y, tipo, dm, capa)
         huella(c.panel, c.cx - c.ancho / 2 - reborde, c.cy - c.alto / 2 - reborde,
                c.cx + c.ancho / 2 + reborde, c.cy + c.alto / 2 + reborde)
 

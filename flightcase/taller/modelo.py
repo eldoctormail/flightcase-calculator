@@ -219,6 +219,7 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     res = _calcular(P, cat)
     res.valores["formulas"] = _fx
     res.valores["medida_interior"] = dict(_aj, pedido=pedido) if _aj else None
+    res.valores["dxf_capas"] = list(P.get("dxf_capas") or [])
     res.avisos[:0] = _fx.avisos
     res.avisos += _mi.avisos_paso(P, cat)
     return res

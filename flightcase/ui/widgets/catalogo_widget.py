@@ -129,6 +129,8 @@ class CatalogoDialog(QDialog):
                 ("Restaurar original", self.restaurar, "Vuelve los artículos elegidos a como vienen con la app"),
                 ("Recuperar quitados…", self.recuperar_quitados, "Vuelve a poner los artículos de la app que quitaste"),
                 ("Modelo 3D…", self.modelo_3d, "Carga el modelo 3D (.step) que da el fabricante para el artículo elegido"),
+                ("Dibujo del calado…", self.dibujo_calado, "Carga un .dxf o .svg con la forma del calado del artículo "
+                 "elegido (manijas, cierres, cazoletas, platos, conectores y accesorios)"),
                 ("Importar planilla…", self.importar, "Agrega o actualiza artículos desde un CSV (por ref)"),
                 ("Exportar planilla…", self.exportar, "Guarda en un CSV los artículos que se ven en la tabla")):
             b = QPushButton(texto)
@@ -207,6 +209,8 @@ class CatalogoDialog(QDialog):
                 texto += f"\nOpciones: {', '.join(tipo)}."
             elif tipo == "par":
                 texto += "\nDos medidas: 100 x 85."
+            elif tipo == "puntos":
+                texto += "\nAgujeros: -20 x 15; 20 x 15."
             self.tabla.horizontalHeaderItem(c).setToolTip(texto.strip())
 
     def _llenar(self) -> None:
@@ -244,7 +248,7 @@ class CatalogoDialog(QDialog):
             elif clase == "dato":
                 v = f.get("datos", {}).get(clave)
                 it = QTableWidgetItem(C.texto_valor(v))
-                if tipo in ("num", "par") or (tipo is None and isinstance(v, (int, float, list))):
+                if tipo in ("num", "par", "puntos") or (tipo is None and isinstance(v, (int, float, list))):
                     it.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             elif clase == "resumen":
                 it = QTableWidgetItem(C.resumen_datos(f))
@@ -486,6 +490,39 @@ class CatalogoDialog(QDialog):
         if avisos:
             QMessageBox.information(self, "Modelo 3D", texto + "\n\nAlgunas caras no se pudieron dibujar (en el STEP "
                                     "del case van igual, completas):\n" + "\n".join(avisos[:10]))
+        return texto
+
+    def dibujo_calado(self, ruta: Optional[str] = None) -> Optional[str]:
+        """Carga el contorno del calado (.dxf o .svg) del artículo elegido y le pone la forma «dibujo»."""
+        from ...taller import calados_cnc
+        elegidas = self._elegidas()
+        if len(elegidas) != 1:
+            self._estado("Elegí un artículo (un herraje) para cargarle el dibujo de su calado.")
+            return None
+        i = elegidas[0]
+        f = copy.deepcopy(self.filas[i])
+        if f["categoria"] not in C.CON_CALADO:
+            self._estado(f"Los artículos de «{C.NOMBRES.get(f['categoria'], f['categoria'])}» no llevan calado.")
+            return None
+        if not ruta:
+            ruta, _ = QFileDialog.getOpenFileName(self, f"Dibujo del calado de {f['ref']}", "",
+                                                  "Dibujo (*.dxf *.svg *.DXF *.SVG);;Todos (*)")
+        if not ruta:
+            return None
+        try:
+            nombre = calados_cnc.importar_dibujo(ruta, f["ref"])
+        except (OSError, ValueError) as e:
+            QMessageBox.warning(self, "Dibujo del calado", f"No se pudo usar {os.path.basename(ruta)}:\n{e}")
+            return None
+        f["datos"]["corte_dibujo"] = nombre
+        if f["categoria"] != "conector":
+            f["datos"]["forma_corte"] = "dibujo"
+        self.filas[i] = f
+        self._guardar([f])
+        self._rehacer(i)
+        texto = (f"{f['ref']}: el calado sale con la forma de {nombre}, encajada en el ancho x alto del calado "
+                 "(sin deformarla).")
+        self._estado(texto)
         return texto
 
     def importar(self, ruta: Optional[str] = None) -> None:

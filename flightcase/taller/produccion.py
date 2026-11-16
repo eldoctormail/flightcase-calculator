@@ -12,7 +12,7 @@ import csv
 import math
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from .modelo import ResultadoTaller, fmt
 from .planos import generar as gen
@@ -51,6 +51,9 @@ def datos(res: ResultadoTaller) -> Dict[str, Any]:
     d["manuales"] = manuales_por_panel(res)
     from . import perforaciones
     d["perforaciones"] = {pid: perforaciones.tuplas(ags) for pid, ags in perforaciones.calcular(res).items()}
+    from . import calados_cnc
+    calados_cnc.aplicar(d, res)
+    d["dxf_capas"] = res.valores.get("dxf_capas") or []
     d["peso"] = res.valores.get("peso")
     return d
 
@@ -109,6 +112,70 @@ def _dxf_circulo(capa: str, c, r: float) -> str:
 
 
 COLORES_CAPA = {"MARCA": 5, "PERFORACIONES": 6, "TORNILLOS": 30}
+CAPAS_DE_LA_APP = ("0", "REBAJE", "MARCA", "GRABADO", "PERFORACIONES", "TORNILLOS", "PLACA", "TEXTO")
+
+
+def mapa_capas(filas: Any) -> Dict[str, Tuple[str, Optional[int]]]:
+    """Tabla dxf_capas [[capa, nombre en el DXF, color], ...] -> {capa: (nombre, color o None)}.
+    Una fila con el nombre vacío deja el de la app (sirve para cambiar sólo el color)."""
+    from .perforaciones import capa_valida
+    out: Dict[str, Tuple[str, Optional[int]]] = {}
+    for f in filas or []:
+        if not isinstance(f, (list, tuple)) or not f or not str(f[0]).strip():
+            continue
+        capa = capa_valida(f[0], "0") if str(f[0]).strip() != "0" else "0"
+        nombre = capa_valida(f[1], capa) if len(f) > 1 and str(f[1] or "").strip() not in ("", "0") else \
+            ("0" if len(f) > 1 and str(f[1]).strip() == "0" else capa)
+        color = None
+        if len(f) > 2 and str(f[2] if f[2] is not None else "").strip():
+            try:
+                color = max(1, min(255, int(float(str(f[2]).replace(",", ".")))))
+            except ValueError:
+                color = None
+        out[capa] = (nombre, color)
+    return out
+
+
+def aplicar_capas(texto: str, mapa: Dict[str, Tuple[str, Optional[int]]]) -> str:
+    """Cambia los nombres y colores de las capas de un DXF de la app (código 8 de cada entidad y
+    la tabla LAYER). Si dos capas quedan con el mismo nombre, la tabla queda con una sola."""
+    if not mapa:
+        return texto
+    v = texto.split("\n")
+    out: List[str] = []
+    i = 0
+    vistas: set = set()
+    while i < len(v):
+        if v[i] == "  0" and i + 1 < len(v) and v[i + 1] == "LAYER":
+            # entrada de la tabla: 0 LAYER 2 nombre 70 0 62 color 6 CONTINUOUS
+            bloque = v[i:i + 10]
+            nombre = bloque[3]
+            nuevo, color = mapa.get(nombre, (nombre, None))
+            if nuevo in vistas:
+                i += 10
+                continue
+            vistas.add(nuevo)
+            bloque[3] = nuevo
+            if color is not None:
+                bloque[7] = str(color)
+            out += bloque
+            i += 10
+            continue
+        if v[i] == "  8" and i + 1 < len(v) and v[i + 1] in mapa:
+            out += [v[i], mapa[v[i + 1]][0]]
+            i += 2
+            continue
+        out.append(v[i])
+        i += 1
+    res = "\n".join(out)
+    # el conteo de la tabla de capas
+    n = sum(1 for k in range(len(out) - 1) if out[k] == "  0" and out[k + 1] == "LAYER")
+    marca = "  0\nTABLE\n  2\nLAYER\n 70\n"
+    j = res.find(marca)
+    if j >= 0:
+        k = res.find("\n", j + len(marca))
+        res = res[:j + len(marca)] + str(n) + res[k:]
+    return res
 
 
 def _color_capa(capa: str) -> int:
@@ -152,14 +219,16 @@ def panel_dxf(ancho: float, alto: float, calados: List[Dict[str, Any]] = (), tra
     ent: List[str] = []
     esquinas = list(contorno) if contorno else [(0, 0), (ancho, 0), (ancho, alto), (0, alto)]
     ent += [_dxf_linea("0", esquinas[i], esquinas[(i + 1) % len(esquinas)]) for i in range(len(esquinas))]
+    capas = [("0", 7), ("REBAJE", 1)]
     for c in calados:
-        capa = "REBAJE" if c["tipo"] == "rebaje" else "0"
+        capa = "REBAJE" if c["tipo"] == "rebaje" else (c.get("capa") or "0")
+        if capa not in [q[0] for q in capas]:
+            capas.append((capa, _color_capa(capa)))
         if c.get("puntos"):   # calado de espuma con forma (redondo, dedos, contorno)
             ent += [_dxf_polilinea(capa, pts) for pts in c["puntos"]]
             continue
         r = 0.0 if c["tipo"] == "rebaje" else c.get("r", 0.0)
         ent += _rect_redondeado(capa, c["cx"], c["cy"], c["w"], c["h"], r)
-    capas = [("0", 7), ("REBAJE", 1)]
     for capa, pts in trazos:
         ent += [_dxf_linea(capa, pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
         if capa not in [c[0] for c in capas]:
@@ -346,10 +415,12 @@ def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool =
         paq.avisos.append("El proyecto no tiene paneles.")
         return paq
 
+    capas = mapa_capas(d.get("dxf_capas"))
+
     def escribir(nombre: str, texto: str) -> None:
         ruta = os.path.join(carpeta, "dxf", nombre)
         with open(ruta, "w", encoding="utf-8", newline="\n") as f:
-            f.write(texto)
+            f.write(aplicar_capas(texto, capas))
         paq.archivos.append(ruta)
 
     piezas = gen.agrupar_piezas(d)
@@ -386,7 +457,8 @@ def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool =
     paq.avisos += av
     trazos = {pz["num"]: trazos_manuales(d["manuales"].get(pz["ids"][0], [])) for pz in piezas if not pz.get("extra")}
     agujeros = {pz["num"]: pz.get("agujeros", []) for pz in piezas if not pz.get("extra")}
-    paq.archivos += P.escribir_dxf_placas(placas, piezas, os.path.join(carpeta, "dxf", "placas"), trazos, agujeros)
+    paq.archivos += P.escribir_dxf_placas(placas, piezas, os.path.join(carpeta, "dxf", "placas"), trazos, agujeros,
+                                          capas)
     ruta = os.path.join(carpeta, "placas.csv")
     with open(ruta, "w", newline="", encoding="utf-8-sig") as f:
         csv.writer(f, delimiter=";").writerows(P.filas_csv(placas, "dxf/placas/"))

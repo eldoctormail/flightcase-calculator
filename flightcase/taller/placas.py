@@ -230,7 +230,9 @@ def placa_dxf(pl: Dict[str, Any], piezas_por_num: Dict[int, Dict[str, Any]],
         esq = [t(*q) for q in pz["contorno"]] if pz.get("contorno") else [t(0, 0), t(w, 0), t(w, h), t(0, h)]
         ent += [_dxf_linea("0", esq[i], esq[(i + 1) % len(esq)]) for i in range(len(esq))]
         for c in pz.get("calados", []):
-            capa = "REBAJE" if c["tipo"] == "rebaje" else "0"
+            capa = "REBAJE" if c["tipo"] == "rebaje" else (c.get("capa") or "0")
+            if capa not in [q[0] for q in capas]:
+                capas.append((capa, _color_capa(capa)))
             if c.get("puntos"):
                 ent += [_dxf_polilinea(capa, [t(*q) for q in pts]) for pts in c["puntos"]]
                 continue
@@ -271,15 +273,19 @@ def _nombre_archivo(i: int, material: str) -> str:
 
 def escribir_dxf_placas(placas: List[Dict[str, Any]], piezas: List[Dict[str, Any]], carpeta: str,
                         trazos_por_num: Optional[Dict[int, List[tuple]]] = None,
-                        agujeros_por_num: Optional[Dict[int, List[tuple]]] = None) -> List[str]:
-    """Un DXF por placa en `carpeta`. Devuelve las rutas."""
+                        agujeros_por_num: Optional[Dict[int, List[tuple]]] = None,
+                        capas: Optional[Dict[str, tuple]] = None) -> List[str]:
+    """Un DXF por placa en `carpeta`. Devuelve las rutas. `capas`: nombres y colores propios
+    (produccion.mapa_capas)."""
+    from .produccion import aplicar_capas
     os.makedirs(carpeta, exist_ok=True)
     por_num = {pz["num"]: pz for pz in piezas}
     rutas = []
     for i, pl in enumerate(placas, 1):
         ruta = os.path.join(carpeta, _nombre_archivo(i, pl["material"]))
         with open(ruta, "w", encoding="utf-8", newline="\n") as f:
-            f.write(placa_dxf(pl, por_num, trazos_por_num, agujeros_por_num=agujeros_por_num))
+            f.write(aplicar_capas(placa_dxf(pl, por_num, trazos_por_num, agujeros_por_num=agujeros_por_num),
+                                  capas or {}))
         pl["dxf"] = os.path.basename(ruta)
         rutas.append(ruta)
     return rutas

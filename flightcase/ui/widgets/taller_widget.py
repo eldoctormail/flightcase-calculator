@@ -83,6 +83,7 @@ TABLAS: Dict[str, List[tuple]] = {
     "formulas": [("Medida o variable", "texto", None), ("Fórmula", "texto", None)],
     "paneles_material": [("Panel o grupo", "panel", None), ("Placa del catálogo", "placa", ""),
                          ("Espesor", "num", 0), ("Material", "texto", "")],
+    "dxf_capas": [("Capa de la app", "capa_dxf", None), ("Nombre en el DXF", "texto", ""), ("Color (1-255)", "num", None)],
     "piezas": [("Pieza", "pieza", None), ("Artículo del catálogo", "pieza_ref", ""), ("Color", "texto", ""),
                ("Sin la pieza", "num", 0)],
     "forro": [("Cara o grupo", "cara", None), ("Material", "forro_tipo", "alfombra"), ("Espesor", "num", 0),
@@ -104,6 +105,9 @@ REF_CATEGORIAS: Dict[str, Optional[tuple]] = {
     "ref_riel": ("rack",), "ref_corredera": None,
 }
 SEPARADOR_REF = " — "
+
+
+from ...taller.produccion import CAPAS_DE_LA_APP  # noqa: E402
 
 
 def catalogo() -> CatalogoTaller:
@@ -396,6 +400,7 @@ class _EditorTabla:
                         "pieza": lambda: _DelegadoPanel(self.tabla, self.opciones_pieza),
                         "pieza_ref": lambda: _DelegadoArticulo(self.tabla, ("esquinero", "angulo", "placa")),
                         "forro_tipo": lambda: _DelegadoOpciones(self.tabla, ["alfombra", "espuma", "no"]),
+                        "capa_dxf": lambda: _DelegadoOpciones(self.tabla, list(CAPAS_DE_LA_APP)),
                         "forro_ref": lambda: _DelegadoArticulo(self.tabla, ("espuma", "alfombra"))}.get(tipo)
             if delegado:
                 d = delegado()

@@ -164,6 +164,7 @@
  "encastre_ala": 10,
  "encastre_profundidad": 30,
  "encastre_remaches": 6,
+ "dxf_capas": [],
  "barra_largo": 6000,
  "sierra_kerf": 3,
  "placa_largo": 2440,
