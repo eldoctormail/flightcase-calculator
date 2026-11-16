@@ -44,7 +44,7 @@ CARAS = ("frente", "trasera", "izq", "der", "arriba", "abajo")
 OPUESTA = {"frente": "trasera", "trasera": "frente", "izq": "der", "der": "izq", "arriba": "abajo", "abajo": "arriba"}
 SUFIJO = " a mano"          # tipo de los calados y marcas de los herrajes manuales
 CATEGORIAS = ("manija", "cierre", "bisagra", "tope", "pie", "rueda", "rueda_otra", "plato", "escuadra",
-              "extra", "esquinero", "rack")
+              "conector", "extra", "esquinero", "rack")
 _REMACHES_DEF = {"manija": 6, "cierre": 6, "bisagra": 6, "tope": 8, "plato": 6}
 _MEDIDA_DEF = {"cierre": (50, 70), "bisagra": (60, 60), "tope": (60, 30), "manija": (120, 35),
                "escuadra": (40, 40), "esquinero": (50, 50)}
@@ -369,8 +369,38 @@ def _medidas(cat: CatalogoTaller, f: Fila, categoria: str) -> Tuple[str, float, 
     if categoria == "pie":
         dm = float(d.get("diametro", 38))
         return "pie", dm, dm, d
+    if categoria == "conector":
+        corte = d.get("corte") or [24, 24]
+        brida = d.get("brida") or [float(corte[0]) + 4, float(corte[1]) + 4]
+        return "conector", float(brida[0]), float(brida[1]), d
     w, h = _MEDIDA_DEF.get(categoria, (40, 40))
     return "superficie", f.ancho or float(w), f.alto or float(h), d
+
+
+def calados_conector(panel: str, px: float, py: float, d: Dict[str, Any], giro: int) -> List[Any]:
+    """Calado de un conector (redondo o rectangular) y los agujeros de sus tornillos: dos en
+    diagonal (conectores D) o cuatro en las esquinas."""
+    from .modelo import Calado
+    corte = d.get("corte") or [24, 24]
+    cw, ch = _girada(float(corte[0]), float(corte[1]), giro)
+    redondo = d.get("forma", "redondo") == "redondo"
+    radio = min(cw, ch) / 2 if redondo else float(d.get("radio", 0) or 0)
+    out = [Calado(panel, "conector" + SUFIJO, px, py, cw, ch, radio)]
+    tor = d.get("tornillos")
+    dt = float(d.get("tornillo_d", 3.2) or 0)
+    if tor and dt > 0:
+        n = int(d.get("tornillos_n", 2) or 2)
+        tx, ty = float(tor[0]) / 2, float(tor[1]) / 2
+        if n >= 4:
+            puntos = [(-tx, -ty), (tx, -ty), (tx, ty), (-tx, ty)]
+        elif ty == 0 or tx == 0:
+            puntos = [(-tx, -ty), (tx, ty)]
+        else:
+            puntos = [(-tx, ty), (tx, -ty)]       # en diagonal: arriba a la izquierda y abajo a la derecha
+        for ax, ay in puntos:
+            dx, dy = _rotar(ax, ay, giro)
+            out.append(Calado(panel, "agujero" + SUFIJO, px + dx, py + dy, dt, dt, dt / 2))
+    return out
 
 
 def _girada(w: float, h: float, giro: int) -> Tuple[float, float]:
@@ -506,6 +536,9 @@ def aplicar(P: Dict[str, Any], geo: Dict[str, Any], paneles: Sequence[Any], X: f
                                 dx, dy = _rotar(ax * ag[0] / 2, ay * ag[1] / 2, gira)
                                 col.calados.append(Calado(p.id, "agujero" + SUFIJO, px + dx, py + dy, dag, dag, dag / 2))
                     col.marcas.append(Marca(p.id, "herraje" + SUFIJO, px, py, pw, ph, nombre))
+                elif forma == "conector":
+                    col.calados += calados_conector(p.id, px, py, datos, gira)
+                    col.marcas.append(Marca(p.id, "herraje" + SUFIJO, px, py, pw, ph, nombre))
                 else:
                     col.marcas.append(Marca(p.id, "herraje" + SUFIJO, px, py, pw, ph, nombre))
             # aluminio: lo que va sobre la cara no puede pisar ángulos, perfiles ni esquineros
@@ -539,7 +572,9 @@ def aplicar(P: Dict[str, Any], geo: Dict[str, Any], paneles: Sequence[Any], X: f
                 if o.tipo.startswith("agujero"):
                     continue
                 ro = (o.cx - o.ancho / 2, o.cy - o.alto / 2, o.cx + o.ancho / 2, o.cy + o.alto / 2)
-                if _solapa(rc, ro, 10):
+                # dos conectores pueden ir pegados (sus bridas ya se controlan como superficies)
+                juntos = c.tipo.startswith("conector") and o.tipo.startswith("conector")
+                if _solapa(rc, ro, 0.5 if juntos else 10):
                     col.avisos.append(s("En ", nombres_panel.get(c.panel, c.panel), " el calado de ", c.tipo,
                                         " queda a menos de 10 mm del de ", o.tipo, ": se pisan."))
                     break
@@ -564,7 +599,7 @@ def aplicar(P: Dict[str, Any], geo: Dict[str, Any], paneles: Sequence[Any], X: f
 def _lista(R: ResultadoManuales, cat: CatalogoTaller) -> None:
     """Herrajes para la lista de materiales y remaches que suman."""
     grupos: Dict[Tuple[str, str], Dict[str, Any]] = {}
-    ruedas = 0
+    ruedas = tornillos = 0
     remaches = 0
     for c in R.colocados:
         f = c.fila
@@ -582,6 +617,8 @@ def _lista(R: ResultadoManuales, cat: CatalogoTaller) -> None:
             remaches += int(c.datos.get("remaches", _REMACHES_DEF.get(c.categoria, 0)))
         if c.forma == "rueda":
             ruedas += 1
+        if c.forma == "conector":
+            tornillos += sum(1 for k in c.calados if k.tipo.startswith("agujero"))
         g = grupos.setdefault(clave, dict(cant=0, donde=[], detalle=detalle))
         g["cant"] += 1
         if c.cara_nombre.lower() not in g["donde"]:
@@ -591,6 +628,8 @@ def _lista(R: ResultadoManuales, cat: CatalogoTaller) -> None:
                            + "a mano: " + ", ".join(g["donde"]), ref])
     if ruedas:
         R.herrajes.append(["Bulón M8 + arandela + tuerca autofrenante", 4 * ruedas, "ruedas puestas a mano", ""])
+    if tornillos:
+        R.herrajes.append(["Tornillo M3 x 12 + tuerca para conector", tornillos, "conectores puestos a mano", ""])
     R.remaches = remaches
 
 

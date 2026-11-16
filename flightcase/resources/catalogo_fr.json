@@ -1667,5 +1667,418 @@
   "nombre": "Carátula 24 XLR 2 U 19\"",
   "datos": {},
   "verificado": true
+ },
+ {
+  "ref": "CON-NAC3-IN",
+  "categoria": "conector",
+  "nombre": "powerCON entrada (azul), conector D",
+  "datos": {
+   "forma": "redondo",
+   "corte": [
+    24,
+    24
+   ],
+   "brida": [
+    26,
+    31
+   ],
+   "tornillos": [
+    19,
+    24
+   ],
+   "tornillos_n": 2,
+   "tornillo_d": 3.2,
+   "fondo": 40,
+   "peso": 40
+  },
+  "verificado": false,
+  "proveedor": "Genérico (medidas de un conector D, tipo Neutrik)"
+ },
+ {
+  "ref": "CON-NAC3-OUT",
+  "categoria": "conector",
+  "nombre": "powerCON salida (gris), conector D",
+  "datos": {
+   "forma": "redondo",
+   "corte": [
+    24,
+    24
+   ],
+   "brida": [
+    26,
+    31
+   ],
+   "tornillos": [
+    19,
+    24
+   ],
+   "tornillos_n": 2,
+   "tornillo_d": 3.2,
+   "fondo": 40,
+   "peso": 40
+  },
+  "verificado": false,
+  "proveedor": "Genérico (medidas de un conector D, tipo Neutrik)"
+ },
+ {
+  "ref": "CON-TRUE1-IN",
+  "categoria": "conector",
+  "nombre": "powerCON TRUE1 entrada, conector D",
+  "datos": {
+   "forma": "redondo",
+   "corte": [
+    24,
+    24
+   ],
+   "brida": [
+    26,
+    31
+   ],
+   "tornillos": [
+    19,
+    24
+   ],
+   "tornillos_n": 2,
+   "tornillo_d": 3.2,
+   "fondo": 45,
+   "peso": 45
+  },
+  "verificado": false,
+  "proveedor": "Genérico (medidas de un conector D, tipo Neutrik)"
+ },
+ {
+  "ref": "CON-TRUE1-OUT",
+  "categoria": "conector",
+  "nombre": "powerCON TRUE1 salida, conector D",
+  "datos": {
+   "forma": "redondo",
+   "corte": [
+    24,
+    24
+   ],
+   "brida": [
+    26,
+    31
+   ],
+   "tornillos": [
+    19,
+    24
+   ],
+   "tornillos_n": 2,
+   "tornillo_d": 3.2,
+   "fondo": 45,
+   "peso": 45
+  },
+  "verificado": false,
+  "proveedor": "Genérico (medidas de un conector D, tipo Neutrik)"
+ },
+ {
+  "ref": "CON-XLR3-H",
+  "categoria": "conector",
+  "nombre": "XLR 3 polos hembra de panel, conector D",
+  "datos": {
+   "forma": "redondo",
+   "corte": [
+    24,
+    24
+   ],
+   "brida": [
+    26,
+    31
+   ],
+   "tornillos": [
+    19,
+    24
+   ],
+   "tornillos_n": 2,
+   "tornillo_d": 3.2,
+   "fondo": 30,
+   "peso": 25
+  },
+  "verificado": false,
+  "proveedor": "Genérico (medidas de un conector D, tipo Neutrik)"
+ },
+ {
+  "ref": "CON-XLR3-M",
+  "categoria": "conector",
+  "nombre": "XLR 3 polos macho de panel, conector D",
+  "datos": {
+   "forma": "redondo",
+   "corte": [
+    24,
+    24
+   ],
+   "brida": [
+    26,
+    31
+   ],
+   "tornillos": [
+    19,
+    24
+   ],
+   "tornillos_n": 2,
+   "tornillo_d": 3.2,
+   "fondo": 25,
+   "peso": 22
+  },
+  "verificado": false,
+  "proveedor": "Genérico (medidas de un conector D, tipo Neutrik)"
+ },
+ {
+  "ref": "CON-XLR5-H",
+  "categoria": "conector",
+  "nombre": "XLR 5 polos hembra (DMX), conector D",
+  "datos": {
+   "forma": "redondo",
+   "corte": [
+    24,
+    24
+   ],
+   "brida": [
+    26,
+    31
+   ],
+   "tornillos": [
+    19,
+    24
+   ],
+   "tornillos_n": 2,
+   "tornillo_d": 3.2,
+   "fondo": 30,
+   "peso": 26
+  },
+  "verificado": false,
+  "proveedor": "Genérico (medidas de un conector D, tipo Neutrik)"
+ },
+ {
+  "ref": "CON-ETHERCON",
+  "categoria": "conector",
+  "nombre": "etherCON RJ45 pasante, conector D",
+  "datos": {
+   "forma": "redondo",
+   "corte": [
+    24,
+    24
+   ],
+   "brida": [
+    26,
+    31
+   ],
+   "tornillos": [
+    19,
+    24
+   ],
+   "tornillos_n": 2,
+   "tornillo_d": 3.2,
+   "fondo": 35,
+   "peso": 22
+  },
+  "verificado": false,
+  "proveedor": "Genérico (medidas de un conector D, tipo Neutrik)"
+ },
+ {
+  "ref": "CON-SPEAKON",
+  "categoria": "conector",
+  "nombre": "speakON 4 polos de panel, conector D",
+  "datos": {
+   "forma": "redondo",
+   "corte": [
+    24,
+    24
+   ],
+   "brida": [
+    26,
+    31
+   ],
+   "tornillos": [
+    19,
+    24
+   ],
+   "tornillos_n": 2,
+   "tornillo_d": 3.2,
+   "fondo": 30,
+   "peso": 25
+  },
+  "verificado": false,
+  "proveedor": "Genérico (medidas de un conector D, tipo Neutrik)"
+ },
+ {
+  "ref": "CON-USB",
+  "categoria": "conector",
+  "nombre": "USB pasante, conector D",
+  "datos": {
+   "forma": "redondo",
+   "corte": [
+    24,
+    24
+   ],
+   "brida": [
+    26,
+    31
+   ],
+   "tornillos": [
+    19,
+    24
+   ],
+   "tornillos_n": 2,
+   "tornillo_d": 3.2,
+   "fondo": 30,
+   "peso": 15
+  },
+  "verificado": false,
+  "proveedor": "Genérico (medidas de un conector D, tipo Neutrik)"
+ },
+ {
+  "ref": "CON-BNC",
+  "categoria": "conector",
+  "nombre": "BNC pasante, conector D",
+  "datos": {
+   "forma": "redondo",
+   "corte": [
+    24,
+    24
+   ],
+   "brida": [
+    26,
+    31
+   ],
+   "tornillos": [
+    19,
+    24
+   ],
+   "tornillos_n": 2,
+   "tornillo_d": 3.2,
+   "fondo": 25,
+   "peso": 12
+  },
+  "verificado": false,
+  "proveedor": "Genérico (medidas de un conector D, tipo Neutrik)"
+ },
+ {
+  "ref": "CON-CIEGA-D",
+  "categoria": "conector",
+  "nombre": "Tapa ciega para conector D",
+  "datos": {
+   "forma": "redondo",
+   "corte": [
+    24,
+    24
+   ],
+   "brida": [
+    26,
+    31
+   ],
+   "tornillos": [
+    19,
+    24
+   ],
+   "tornillos_n": 2,
+   "tornillo_d": 3.2,
+   "fondo": 3,
+   "peso": 5
+  },
+  "verificado": false,
+  "proveedor": "Genérico (medidas de un conector D, tipo Neutrik)"
+ },
+ {
+  "ref": "CON-IEC-C14",
+  "categoria": "conector",
+  "nombre": "Entrada IEC C14 a presión (de panel)",
+  "datos": {
+   "forma": "rectangular",
+   "corte": [
+    27.5,
+    20
+   ],
+   "radio": 1,
+   "brida": [
+    32,
+    24
+   ],
+   "fondo": 25,
+   "peso": 20
+  },
+  "verificado": false,
+  "proveedor": "Genérico"
+ },
+ {
+  "ref": "CON-IEC-C13",
+  "categoria": "conector",
+  "nombre": "Salida IEC C13 de panel con tornillos",
+  "datos": {
+   "forma": "rectangular",
+   "corte": [
+    24,
+    20
+   ],
+   "radio": 1,
+   "brida": [
+    50,
+    24
+   ],
+   "tornillos": [
+    40,
+    0
+   ],
+   "tornillos_n": 2,
+   "tornillo_d": 3.2,
+   "fondo": 25,
+   "peso": 20
+  },
+  "verificado": false,
+  "proveedor": "Genérico"
+ },
+ {
+  "ref": "CON-SCHUKO",
+  "categoria": "conector",
+  "nombre": "Toma Schuko de panel con tapa",
+  "datos": {
+   "forma": "redondo",
+   "corte": [
+    40,
+    40
+   ],
+   "brida": [
+    50,
+    50
+   ],
+   "tornillos": [
+    38,
+    38
+   ],
+   "tornillos_n": 4,
+   "tornillo_d": 3.5,
+   "fondo": 40,
+   "peso": 90
+  },
+  "verificado": false,
+  "proveedor": "Genérico"
+ },
+ {
+  "ref": "CON-PASACABLES",
+  "categoria": "conector",
+  "nombre": "Pasacables con cepillo",
+  "datos": {
+   "forma": "rectangular",
+   "corte": [
+    90,
+    40
+   ],
+   "radio": 5,
+   "brida": [
+    110,
+    60
+   ],
+   "tornillos": [
+    100,
+    50
+   ],
+   "tornillos_n": 4,
+   "tornillo_d": 4,
+   "fondo": 5,
+   "peso": 60
+  },
+  "verificado": false,
+  "proveedor": "Genérico"
  }
 ]

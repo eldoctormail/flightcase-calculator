@@ -996,6 +996,26 @@ def _herraje_manual(k: _Constructor, geo: dict, o: Vec, u: Vec, v: Vec, n: Vec, 
             _manija_superficie(k, o, u, v, n, h.px, h.py, h.pw, col)
         else:
             _manija_superficie(k, o, v, u, n, h.py, h.px, h.ph, col)
+    elif h.forma == "conector":
+        # brida por fuera, el frente del conector un poco saliente y el cuerpo hacia adentro
+        d = h.datos
+        corte = d.get("corte") or [24, 24]
+        cw, ch = (corte[1], corte[0]) if h.giro_panel % 180 else (corte[0], corte[1])
+        cw, ch = float(cw), float(ch)
+        fondo = float(d.get("fondo", 30) or 0)
+        k.caja(P(x0, y0, 0), u, v, fuera, h.pw, h.ph, 2.0, resalte or "rack_frente", capa, h.nombre)
+        if d.get("forma", "redondo") == "redondo":
+            r = min(cw, ch) / 2
+            k.cilindro(P(h.px, h.py, 3.5), fuera, u, v, r - 1.5, 3.0, resalte or "herraje", capa, h.nombre, lados=20)
+            if fondo > 0:
+                k.cilindro(P(h.px, h.py, -fondo / 2), fuera, u, v, r - 0.5, fondo, resalte or "rack_frente", capa, h.nombre,
+                           lados=20)
+        else:
+            k.caja(P(h.px - cw / 2 + 1.5, h.py - ch / 2 + 1.5, 2.0), u, v, fuera, cw - 3, ch - 3, 1.5,
+                   resalte or "herraje", capa, h.nombre)
+            if fondo > 0:
+                k.caja(P(h.px - cw / 2 + 0.5, h.py - ch / 2 + 0.5, -fondo), u, v, fuera, cw - 1, ch - 1, fondo,
+                       resalte or "rack_frente", capa, h.nombre)
     elif h.forma == "logo":
         grabado = h.fila.modo == "grabado"
         z = 0.2

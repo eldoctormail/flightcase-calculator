@@ -17,7 +17,11 @@ from PySide6.QtGui import QBrush, QColor, QFont, QKeySequence, QPainter, QPainte
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QDoubleSpinBox,
+    QFormLayout,
+    QSpinBox,
     QFileDialog,
     QHBoxLayout,
     QInputDialog,
@@ -33,7 +37,8 @@ from ...taller.modelo import ResultadoTaller, catalogo_actual, fmt
 
 NOMBRE_CATEGORIA = {"manija": "Manija", "cierre": "Cierre", "bisagra": "Bisagra", "tope": "Tope", "pie": "Pie",
                     "rueda": "Rueda", "rueda_otra": "Rueda", "plato": "Plato de apilado", "escuadra": "Escuadra",
-                    "extra": "Extra", "esquinero": "Esquinero", "rack": "Rack"}
+                    "extra": "Extra", "esquinero": "Esquinero", "rack": "Rack",
+                    "conector": "Conector"}
 PIEZA_PROPIA = "__propia__"
 
 C_FONDO = QColor("#ffffff")
@@ -195,8 +200,11 @@ class Lienzo2D(QWidget):
             return f
         dx, dy = self._mov[0] - f["x"], self._mov[1] - f["y"]
         r = f["rect"]
-        return dict(f, x=self._mov[0], y=self._mov[1], rect=(r[0] + dx, r[1] + dy, r[2] + dx, r[3] + dy),
-                    lineas=[[(a + dx, b + dy) for a, b in l] for l in f.get("lineas", [])])
+        mover = lambda q: (q[0] + dx, q[1] + dy, q[2] + dx, q[3] + dy)
+        return dict(f, x=self._mov[0], y=self._mov[1], rect=mover(r),
+                    lineas=[[(a + dx, b + dy) for a, b in l] for l in f.get("lineas", [])],
+                    agujeros=[mover(a) for a in f.get("agujeros", [])],
+                    interior=[(mover(q), rad) for q, rad in f.get("interior", [])])
 
     def _forma(self, p: QPainter, f: Dict[str, Any], color: QColor, manual: bool) -> None:
         r = self._rect(f["rect"])
@@ -223,12 +231,24 @@ class Lienzo2D(QWidget):
                 for q in l[1:]:
                     camino.lineTo(self.a_pantalla(*q))
                 p.drawPath(camino)
+        for r_i, rad_i in f.get("interior", []):
+            q = self._rect(r_i)
+            p.setPen(QPen(color, 1.3))
+            p.setBrush(Qt.NoBrush)
+            rad = min(rad_i * self._escala()[0], q.width() / 2, q.height() / 2)
+            p.drawRoundedRect(q, rad, rad)
         if manual:
             for a in f.get("agujeros", []):
                 p.setPen(QPen(color, 1))
                 p.drawEllipse(self._rect(a))
             p.setPen(color if not f.get("aviso") else QColor("#b03a2e"))
             txt = ("⚠ " if f.get("aviso") else "") + f["nombre"]
+            if forma == "conector":     # van pegados: el nombre corto y que no pise al de al lado
+                txt = ("⚠ " if f.get("aviso") else "") + f["nombre"].split(" ")[0].rstrip(",")
+                ancho = r.width() + 4
+                txt = p.fontMetrics().elidedText(txt, Qt.ElideRight, int(ancho))
+                p.drawText(QRectF(r.left() - 2, r.top() - 17, ancho, 16), Qt.AlignHCenter | Qt.AlignBottom, txt)
+                return
             p.drawText(QRectF(r.left() - 60, r.top() - 17, r.width() + 120, 16), Qt.AlignHCenter | Qt.AlignBottom, txt)
 
     def _cotas(self, p: QPainter, f: Dict[str, Any]) -> None:
@@ -401,6 +421,64 @@ def distancia_junta(c: Optional[hm.Cara], x: float, y: float) -> Optional[Tuple[
     return mejor
 
 
+def conectores(cat) -> List[Dict[str, Any]]:
+    """Conectores del catálogo (para armar un panel de conexiones)."""
+    return [f for f in hm.catalogo_colocable(cat) if f["categoria"] == "conector"]
+
+
+def fila_de_conectores(cat, refs: Sequence[str], x: float, y: float, separacion: float = 6.0,
+                       vertical: bool = False) -> List[Tuple[str, float, float]]:
+    """(ref, x, y) de cada conector, uno al lado del otro con `separacion` mm entre las bridas
+    y el grupo centrado en (x, y)."""
+    medidas = []
+    for r in refs:
+        d = cat.fila(r)["datos"] if cat.existe(r) else {}
+        b = d.get("brida") or d.get("corte") or [26, 31]
+        medidas.append(float(b[1] if vertical else b[0]))
+    total = sum(medidas) + separacion * max(len(medidas) - 1, 0)
+    pos, out = -total / 2, []
+    for r, m in zip(refs, medidas):
+        c = pos + m / 2
+        out.append((r, round(x, 2), round(y - c, 2)) if vertical else (r, round(x + c, 2), round(y, 2)))
+        pos += m + separacion
+    return out
+
+
+class DialogoPanelConexiones(QDialog):
+    """Elegir cuántos de cada conector van juntos en un panel de conexiones."""
+
+    def __init__(self, cat, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Panel de conexiones")
+        lay = QVBoxLayout(self)
+        nota = QLabel("Cuántos de cada conector van en la cara. Se ponen en fila, centrados donde está el "
+                      "herraje elegido (o en el centro de la cara), y después se mueven uno por uno.")
+        nota.setWordWrap(True)
+        lay.addWidget(nota)
+        form = QFormLayout()
+        self.cantidades: Dict[str, QSpinBox] = {}
+        for f in conectores(cat):
+            sp = QSpinBox()
+            sp.setRange(0, 24)
+            self.cantidades[f["ref"]] = sp
+            form.addRow(f["nombre"], sp)
+        self.sp_sep = _num(0, 200)
+        self.sp_sep.setValue(6)
+        self.sp_sep.setToolTip("Distancia entre las bridas de dos conectores vecinos")
+        form.addRow("Separación", self.sp_sep)
+        self.cmb_dir = QComboBox()
+        self.cmb_dir.addItems(["En fila (horizontal)", "En columna (vertical)"])
+        form.addRow("Ubicación", self.cmb_dir)
+        lay.addLayout(form)
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept)
+        bb.rejected.connect(self.reject)
+        lay.addWidget(bb)
+
+    def refs(self) -> List[str]:
+        return [r for r, sp in self.cantidades.items() for _ in range(sp.value())]
+
+
 class HerrajesManualesWidget(QWidget):
     """Editor de ``herrajes_manuales`` sobre la vista 2D de cada cara."""
 
@@ -457,6 +535,11 @@ class HerrajesManualesWidget(QWidget):
         self.btn_logo.setToolTip("Placa de logo a partir de un dibujo .svg o .dxf")
         self.btn_logo.clicked.connect(lambda: self.agregar_logo())
         f1.addWidget(self.btn_logo)
+        self.btn_conexiones = QPushButton("Panel de conexiones…")
+        self.btn_conexiones.setToolTip("Varios conectores juntos (powerCON, XLR, etherCON, IEC, Schuko, pasacables) "
+                                       "en fila sobre esta cara")
+        self.btn_conexiones.clicked.connect(lambda: self.panel_conexiones())
+        f1.addWidget(self.btn_conexiones)
         raiz.addLayout(f1)
 
         f2 = QHBoxLayout()
@@ -611,15 +694,20 @@ class HerrajesManualesWidget(QWidget):
         for col in man.colocados:
             if col.cara != c.id:
                 continue
-            agujeros = []
+            agujeros, interior = [], []
             for k in col.calados:
-                if k.tipo.startswith("agujero") and col.panel:
+                if (k.tipo.startswith("agujero") or k.tipo.startswith("conector")) and col.panel:
                     pc = c.panel(col.panel)
                     a = c.a_vista(*c.panel_a_cara(pc, k.cx - k.ancho / 2, k.cy - k.alto / 2))
                     b = c.a_vista(*c.panel_a_cara(pc, k.cx + k.ancho / 2, k.cy + k.alto / 2))
-                    agujeros.append((min(a[0], b[0]), min(a[1], b[1]), max(a[0], b[0]), max(a[1], b[1])))
+                    r = (min(a[0], b[0]), min(a[1], b[1]), max(a[0], b[0]), max(a[1], b[1]))
+                    if k.tipo.startswith("agujero"):
+                        agujeros.append(r)
+                    else:       # calado del conector, dentro de su brida
+                        interior.append((r, k.radio))
             out.append(dict(idx=col.indice, x=col.x, y=col.y, rect=col.rect_vista, forma=col.forma,
                             lineas=col.lineas, nombre=col.nombre, aviso=" ".join(col.avisos), agujeros=agujeros,
+                            interior=interior,
                             radio=float(col.datos.get("radio", 0)) if col.forma == "calado" else 0))
         return out
 
@@ -746,6 +834,30 @@ class HerrajesManualesWidget(QWidget):
         self.filas.append(hm.Fila(ref, c.id, round(x, 2), round(y, 2), ancho=ancho, alto=alto))
         self.sel = len(self.filas) - 1
         self._emitir()
+
+    def panel_conexiones(self, refs: Optional[Sequence[str]] = None, separacion: float = 6.0,
+                         vertical: bool = False) -> int:
+        """Agrega varios conectores en fila (con el diálogo si no se pasan `refs`); devuelve cuántos."""
+        c = self.cara_actual()
+        if c is None:
+            return 0
+        if refs is None:
+            if not conectores(self.cat):
+                self.lbl_info.setText("No hay conectores en el catálogo (categoría «Conectores y energía»).")
+                return 0
+            dlg = DialogoPanelConexiones(self.cat, self)
+            if dlg.exec() != QDialog.Accepted:
+                return 0
+            refs, separacion, vertical = dlg.refs(), dlg.sp_sep.value(), dlg.cmb_dir.currentIndex() == 1
+        if not refs:
+            return 0
+        f = self.filas[self.sel] if 0 <= self.sel < len(self.filas) and self.filas[self.sel].cara == c.id else None
+        x, y = (f.x, f.y) if f is not None else (c.ancho / 2, c.alto / 2)
+        for ref, cx, cy in fila_de_conectores(self.cat, refs, x, y, separacion, vertical):
+            self.filas.append(hm.Fila(ref, c.id, cx, cy))
+        self.sel = len(self.filas) - 1
+        self._emitir()
+        return len(refs)
 
     def agregar_logo(self, ruta: Optional[str] = None, ancho: float = 150.0) -> None:
         c = self.cara_actual()
