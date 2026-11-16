@@ -680,7 +680,16 @@ def armar_pasos(d, piezas):
         bis = herraje(["bisagra"], "Bisagra")
         pos_b = sorted({round(m["x"]) for m in d["marcas"].get("cuerpo_trasera", [])
                         if m["tipo"] == "bisagra"})
-        if pos_b:
+        pu = info.get("puertas")
+        if pu:      # rack con puertas: bisagras en un costado, en cada puerta
+            lado = "izquierdo" if pu[0] == "izq" else "derecho"
+            pos_p = sorted({round(m["x"]) for pid in (f"cuerpo_{pu[0]}",)
+                            for m in d["marcas"].get(pid, []) if m["tipo"] == "bisagra"})
+            txt.append(f"Puertas: {pu[1]} × {con_ref(bis)} por puerta, en el costado {lado}"
+                       + (": ejes a " + ", ".join(fmt(x) for x in pos_p) + " mm del borde del lateral" if pos_p else "")
+                       + ". Montalas con la puerta cerrada y trabada con los cierres del otro costado, así "
+                       "queda alineada. Con bisagras desmontables la puerta sale levantándola abierta.")
+        elif pos_b:
             txt.append(f"{len(pos_b)} × {con_ref(bis)}, en la trasera: ejes a "
                        + ", ".join(fmt(x) for x in pos_b) + " mm del borde izquierdo, con el case "
                        "cerrado para que la tapa quede alineada.")

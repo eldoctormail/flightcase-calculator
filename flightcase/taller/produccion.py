@@ -30,6 +30,8 @@ def lineas_datos(res: ResultadoTaller) -> List[str]:
     """Las mismas líneas @@TIPO|... que imprime OpenSCAD con parte="datos"."""
     out = [_linea("INFO", k, *v) for k, v in res.info.items()]
     out += [_linea("PANEL", p.id, p.nombre, p.grupo, p.ancho, p.alto) for p in res.paneles]
+    out += [_linea("CONTORNO", p.id, *[f"{fmt(x)};{fmt(y)}" for x, y in p.contorno])
+            for p in res.paneles if p.contorno]
     out += [_linea("CALADO", c.panel, c.tipo, c.cx, c.cy, c.ancho, c.alto, c.radio) for c in res.calados]
     out += [_linea("MARCA", m.panel, m.tipo, m.x, m.y, m.ancho, m.alto, m.texto) for m in res.marcas]
     out += [_linea("PERFIL", p.nombre, p.descripcion, p.largo, p.cantidad, p.corte, p.ref) for p in res.perfiles]
@@ -124,13 +126,15 @@ def _rect_redondeado(capa: str, cx: float, cy: float, w: float, h: float, r: flo
     ]
 
 
-def panel_dxf(ancho: float, alto: float, calados: List[Dict[str, Any]] = (), trazos: List[tuple] = ()) -> str:
+def panel_dxf(ancho: float, alto: float, calados: List[Dict[str, Any]] = (), trazos: List[tuple] = (),
+              contorno: Optional[List[tuple]] = None) -> str:
     """DXF de un panel: contorno y calados pasantes en la capa 0 (como OpenSCAD) y
     rebajes (no pasantes) en la capa REBAJE. `trazos` (capa, polilínea) agrega las marcas
-    de los herrajes puestos a mano (capa MARCA) y los logos grabados (capa GRABADO)."""
+    de los herrajes puestos a mano (capa MARCA) y los logos grabados (capa GRABADO).
+    `contorno` reemplaza al rectángulo ancho x alto (paneles en trapecio)."""
     ent: List[str] = []
-    esquinas = [(0, 0), (ancho, 0), (ancho, alto), (0, alto)]
-    ent += [_dxf_linea("0", esquinas[i], esquinas[(i + 1) % 4]) for i in range(4)]
+    esquinas = list(contorno) if contorno else [(0, 0), (ancho, 0), (ancho, alto), (0, alto)]
+    ent += [_dxf_linea("0", esquinas[i], esquinas[(i + 1) % len(esquinas)]) for i in range(len(esquinas))]
     for c in calados:
         capa = "REBAJE" if c["tipo"] == "rebaje" else "0"
         if c.get("puntos"):   # calado de espuma con forma (redondo, dedos, contorno)
@@ -332,7 +336,7 @@ def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool =
     for pz in piezas:
         pz["dxf"] = f"{pz['num']:02d}_{pz['ids'][0]}_x{pz['cant']}.dxf"
         escribir(pz["dxf"], panel_dxf(pz["w"], pz["h"], pz["calados"],
-                                      trazos_manuales(d["manuales"].get(pz["ids"][0], []))))
+                                      trazos_manuales(d["manuales"].get(pz["ids"][0], [])), pz.get("contorno")))
     for i, e in enumerate(d["extras"]):
         num_p = len(piezas) + 1
         nombre = f"{num_p:02d}_extra{i + 1}_x{e['cant']}.dxf"
@@ -401,7 +405,11 @@ def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool =
                     render_png = None
             if instructivo:
                 from .planos import instructivo as ins
-                pasos = ins.armar_pasos(d, piezas)
+                if res.valores.get("forma"):    # rack inclinado, funda, plegable: pasos propios
+                    from .formas import pasos_instructivo
+                    pasos = pasos_instructivo(d, piezas)
+                else:
+                    pasos = ins.armar_pasos(d, piezas)
                 from .planos import interior as pl_int
                 p_int = pl_int.pasos_instructivo(res, piezas)
                 from . import herrajes_manuales as hman
@@ -412,6 +420,9 @@ def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool =
                 laminas = ins.renderizar_laminas(render, d, piezas, os.path.join(carpeta, "montaje"), pasos)
                 paq.archivos += sorted(set(laminas.values()))
         vistas = _vistas_extra(d, carpeta) + _vista_cubierta(res, d, carpeta) + _vistas_interior(res, carpeta, piezas)
+        if res.valores.get("forma"):
+            from .formas import vistas_planos
+            vistas = vistas_planos(res, carpeta) + vistas
         ruta = os.path.join(carpeta, "planos.pdf")
         gen.generar_pdf(ruta, d, piezas, placas, barras, render_png, None, laminas.get("explotado"), vistas)
         paq.archivos += [v[1] for v in vistas] + [ruta]

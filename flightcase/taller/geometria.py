@@ -160,7 +160,10 @@ def _girar(geo: dict) -> Callable[[Vec], Vec]:
 
 class _Constructor:
     def __init__(self, ubicar: Callable[[Vec], Vec], girar: Callable[[Vec], Vec], op: Opciones3D) -> None:
-        self.ubicar, self.girar, self.op = ubicar, girar, op
+        self.ubicar, self._girar0, self.op = ubicar, girar, op
+        # giro rígido (centro, eje unitario, ángulo) en coordenadas locales antes de ubicar():
+        # las puertas de un rack abren girando sobre sus bisagras
+        self.giro: Optional[Tuple[Vec, Vec, float]] = None
         self.caras: List[PolygonFace3D] = []
         self.segmentos: List[Segment3D] = []
         self.rotulos: List[Rotulo] = []
@@ -192,9 +195,50 @@ class _Constructor:
         if x1 - x0 > 0.01 and y1 - y0 > 0.01 and z1 - z0 > 0.01:
             self.caja((x0, y0, z0), (1, 0, 0), (0, 1, 0), (0, 0, 1), x1 - x0, y1 - y0, z1 - z0, color, capa, etiqueta)
 
+    def _rot(self, v: Vec, trasladar: bool) -> Vec:
+        if self.giro is None:
+            return v
+        c, e, a = self.giro
+        p = _sum(v, _mul(c, -1)) if trasladar else v
+        ca, sa = math.cos(a), math.sin(a)
+        d = sum(p[i] * e[i] for i in range(3))
+        cr = (e[1] * p[2] - e[2] * p[1], e[2] * p[0] - e[0] * p[2], e[0] * p[1] - e[1] * p[0])
+        r = tuple(p[i] * ca + cr[i] * sa + e[i] * d * (1 - ca) for i in range(3))   # Rodrigues
+        return _sum(r, c) if trasladar else r  # type: ignore[return-value]
+
+    def girar(self, n: Vec) -> Vec:
+        return self._girar0(self._rot(n, False))
+
     def _p(self, v: Vec, mundo: bool) -> Point3D:
-        x, y, z = v if mundo else self.ubicar(v)
+        x, y, z = v if mundo else self.ubicar(self._rot(v, True))
         return Point3D(x, y, z)
+
+    def prisma(self, o: Vec, u: Vec, v: Vec, n: Vec, contorno: Sequence[Tuple[float, float]], c: float,
+               color: str, capa: int, etiqueta: str = "") -> None:
+        """Panel con contorno (convexo) en el plano o + a·u + b·v, de espesor c hacia n."""
+        P = lambda a, b, h: self._p(_sum(o, _mul(u, a), _mul(v, b), _mul(n, h)), False)
+        desde = len(self.caras)
+        abajo = [P(a, b, 0) for a, b in contorno]
+        arriba = [P(a, b, c) for a, b in contorno]
+        self.caras.append(PolygonFace3D(vertices=tuple(reversed(abajo)), normal=self.girar(_mul(n, -1)),
+                                        color_group=color, label=etiqueta, layer_order=capa))
+        self.caras.append(PolygonFace3D(vertices=tuple(arriba), normal=self.girar(n), color_group=color,
+                                        label=etiqueta, layer_order=capa))
+        m = len(contorno)
+        ca_, cb_ = sum(a for a, _ in contorno) / m, sum(b for _, b in contorno) / m
+        for i in range(m):
+            j = (i + 1) % m
+            (a0, b0), (a1, b1) = contorno[i], contorno[j]
+            lado = _sum(_mul(u, a1 - a0), _mul(v, b1 - b0))
+            nrm = (lado[1] * n[2] - lado[2] * n[1], lado[2] * n[0] - lado[0] * n[2], lado[0] * n[1] - lado[1] * n[0])
+            l = math.sqrt(sum(x * x for x in nrm)) or 1.0
+            medio = _sum(_mul(u, (a0 + a1) / 2 - ca_), _mul(v, (b0 + b1) / 2 - cb_))
+            if sum(medio[q] * nrm[q] for q in range(3)) < 0:
+                nrm = _mul(nrm, -1)
+            self.caras.append(PolygonFace3D(vertices=(abajo[i], abajo[j], arriba[j], arriba[i]),
+                                            normal=self.girar(_mul(nrm, 1 / l)), color_group=color, label=etiqueta,
+                                            is_endgrain=color in ("base", "lid"), layer_order=capa))
+        self.cerrar(desde, color, etiqueta)
 
     def caja(self, o: Vec, u: Vec, v: Vec, n: Vec, a: float, b: float, c: float, color: str,
              capa: int, etiqueta: str = "", mundo: bool = False) -> None:
@@ -291,12 +335,28 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
     """Malla para Schema3DCanvas (y para las láminas) a partir del resultado del taller."""
     op = op or Opciones3D()
     geo = res.valores["geo"]
+    if geo.get("forma"):     # rack inclinado, funda de rack, baúl plegable
+        from .geometria_formas import malla_formas
+        return malla_formas(res, op)
     v = res.valores
     X, Y, Z = v["ext_ancho"], v["ext_prof"], v["ext_alto"]
     k = _Constructor(_ubicador(geo, Z), _girar(geo), op)
     t = geo["espesor"]
     ex = op.explotar
     lift = op.abrir_tapa + (ex * 2.2 if ex > 0 else 0)
+    # puertas de rack: no se levantan, abren girando sobre la línea de las bisagras
+    puertas = geo.get("puertas")
+    giros: Dict[str, Tuple[Vec, Vec, float]] = {}
+    if puertas:
+        lift = ex * 2.2 if ex > 0 else 0.0
+        if op.abrir_tapa > 0:
+            izq = puertas["lado"] == "izq"
+            xe = -geo["cierre_saliente"] if izq else X + geo["cierre_saliente"]
+            sy = -1.0 if izq else 1.0
+            ang = math.radians(100)
+            giros["tapa"] = ((xe, 0.0, geo["z_cierre"] + lift), (0.0, sy, 0.0), ang)
+            if geo["dos_tapas"]:
+                giros["tapa2"] = ((xe, 0.0, geo["z_cierre2"] - lift), (0.0, -sy, 0.0), ang)
     desplaz = {"cuerpo": 0.0, "tapa": lift, "tapa2": -lift}
     paneles = {p.id: p for p in res.paneles}
     calados: Dict[str, list] = {}
@@ -328,6 +388,7 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
     for col in geo["colocaciones"]:
         p = paneles[col["id"]]
         grupo = col["grupo"]
+        k.giro = giros.get(grupo)
         paso_p = P_CUERPO if grupo == "cuerpo" else P_TAPA
         if not k.visible(paso_p):
             continue
@@ -429,6 +490,8 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
             for hm_ in man_panel.get(p.id, []):
                 _herraje_manual(k, geo, o, u, vv, n, hm_, "resalte" if res_man else None, ex)
 
+    k.giro = None
+
     # Base de ruedas bajo el panel de abajo, con sus ruedas
     base = geo["base"]
     if base and base["panel"] in paneles and k.visible(P_RUEDAS):
@@ -484,11 +547,15 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
         sin_tapas = op.resaltar_cubierta or op.vista_parte or op.resaltar_que
         aro(zc1 - m_alto + ex * 0.7, m_alto, k.color_perfil(P_AROS, "profile"), True)
         if not sin_tapas:
+            k.giro = giros.get("tapa")
             aro(zc1 + lift - ex * 0.7, h_alto, k.color_perfil(P_AROS, "profile_h"))
+            k.giro = None
         if geo["dos_tapas"]:
             aro(zc2 - ex * 0.7, m_alto, k.color_perfil(P_AROS, "profile"), True)
             if not sin_tapas:
+                k.giro = giros.get("tapa2")
                 aro(zc2 - h_alto - lift + ex * 0.7, h_alto, k.color_perfil(P_AROS, "profile_h"))
+                k.giro = None
 
     # Ángulos de las aristas y esquineros (aristas_y_esquineros)
     paso_ar_c, paso_ar_t = (P_CUERPO, P_TAPA) if hib else (P_ARISTAS, P_ARISTAS)
@@ -531,6 +598,7 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
             paso_e = paso_ar_t if (z > 0 or geo["dos_tapas"]) else paso_ar_c
             if op.vista_parte and z > 0:
                 continue
+            k.giro = giros.get("tapa") if z > 0 else (giros.get("tapa2") if geo["dos_tapas"] else None)
             for y0, sy in ((0.0, -1), (Y, 1)):
                 arista((ed, y0, z + dz), (0, sy, 0), (0, 0, sz), (1, 0, 0), geo["L_x"], paso_e)
             for x0, sx in ((0.0, -1), (X, 1)):
@@ -538,15 +606,19 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
             for x0, sx in ((0.0, -1), (X, 1)):
                 for y0, sy in ((0.0, -1), (Y, 1)):
                     esquinero((x0, y0, z + dz), (sx, 0, 0), (0, sy, 0), (0, 0, sz))
+        k.giro = None
         for x0, sx in ((0.0, -1), (X, 1)):
             for y0, sy in ((0.0, -1), (Y, 1)):
                 z_c = zc2 + m_alto if geo["dos_tapas"] else ed
                 if ver_fija or (y0 > 0 and ver_cub):
                     arista((x0, y0, z_c), (sx, 0, 0), (0, sy, 0), (0, 0, 1), geo["L_zc"], paso_ar_c, cl if y0 > 0 else 0.0)
                 if not op.vista_parte:
+                    k.giro = giros.get("tapa")
                     arista((x0, y0, zc1 + h_alto + lift), (sx, 0, 0), (0, sy, 0), (0, 0, 1), geo["L_zt"], paso_ar_t)
+                    k.giro = giros.get("tapa2")
                     if geo["dos_tapas"]:
                         arista((x0, y0, ed - lift), (sx, 0, 0), (0, sy, 0), (0, 0, 1), geo["L_zt2"], paso_ar_t)
+                    k.giro = None
 
     # Juntas de las tapas de acceso laterales (juntas_acceso)
     if geo["acceso"] and k.visible(P_CUERPO):

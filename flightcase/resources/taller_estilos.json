@@ -78,6 +78,33 @@
              "ruedas": 4, "_base_ruedas": "auto"}
  },
  {
+  "id": "rack_puertas",
+  "nombre": "Rack 19\" con puertas adelante y atrás",
+  "descripcion": "Rack parado con puertas en el frente y en la trasera que abren de costado sobre tres bisagras desmontables (se pueden sacar) y cierran con cierres del otro costado. Base de ruedas.",
+  "params": {"orientacion": "frontal", "tapas": 2, "puertas": true, "puerta_lado": "izq", "bisagras": 3,
+             "ref_bisagra": "08-2251", "paredes_enteras_cuerpo": "frente", "extremos_cubren": true,
+             "cierres_laterales": "si", "cierres_lateral_n": 2, "refuerzos": 1, "ruedas": 4, "_base_ruedas": "auto"}
+ },
+ {
+  "id": "rack_inclinado",
+  "nombre": "Rack inclinado para consola",
+  "descripcion": "Cuerpo en cuña: el frente es más bajo que la trasera y la consola se atornilla en rieles de rack paralelos a la pendiente. La tapa cierra sobre el plano inclinado. El alto interior es el de atrás y el de adelante va en «Alto interior adelante».",
+  "params": {"forma": "inclinado", "orientacion": "vertical", "incl_rieles": true, "tapas": 1, "ruedas": 0, "pies": 4, "manijas": true}
+ },
+ {
+  "id": "funda_rack",
+  "nombre": "Funda de rack (sleeve)",
+  "descripcion": "Tubo de 19\" abierto adelante y atrás, sin tapas: bordes terminados en ángulo, esquineros en las ocho puntas y rieles adelante y atrás. Para meterla dentro de otro case o usarla en un estante. Ancho, alto (largo interior) y profundidad (alto interior) como en un rack.",
+  "params": {"forma": "funda", "orientacion": "frontal", "rack_traseros": true, "ruedas": 0, "manijas": true}
+ },
+ {
+  "id": "baul_plegable",
+  "nombre": "Baúl plegable",
+  "descripcion": "Base de 18 mm con ruedas y cuatro paredes con bisagra de piano que se pliegan hacia adentro cuando el baúl está vacío; las esquinas se traban con cierres. La tapa va arriba. Ocupa mucho menos al volver vacío.",
+  "params": {"forma": "plegable", "orientacion": "vertical", "ruedas": 4, "rueda_frenos": 2, "ref_bisagra": "08-2605", "manijas": true,
+             "pleg_cierres_esquina": 2}
+ },
+ {
   "id": "acostado_dos_tapas",
   "nombre": "Case acostado con tapas a los costados",
   "descripcion": "Case que viaja acostado, con una tapa en cada costado: para pantallas, tableros y equipos largos. Base de ruedas abajo.",

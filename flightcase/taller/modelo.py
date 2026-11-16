@@ -12,7 +12,7 @@ import json
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..paths import bundled_resource
 from . import materiales as _mat
@@ -99,6 +99,9 @@ class Panel:
     grupo: str
     ancho: float
     alto: float
+    # contorno del panel cuando no es un rectángulo (vista desde afuera, dentro de 0..ancho x 0..alto):
+    # lados de un case inclinado; no está en flightcase.scad
+    contorno: Optional[List[Tuple[float, float]]] = None
 
 
 @dataclass
@@ -175,6 +178,9 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         P.update(params)
     cat = catalogo or CatalogoTaller()
     g = P.get
+    from . import formas as _formas
+    if _formas.es_forma(P):     # rack inclinado, funda de rack, baúl plegable (formas.py)
+        return _formas.calcular(P, cat)
 
     int_ancho = g("int_ancho"); int_prof = g("int_prof")
     int_alto_cuerpo = g("int_alto_cuerpo"); int_alto_tapa = g("int_alto_tapa")
@@ -224,6 +230,8 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     rebaje_refuerzos = g("rebaje_refuerzos"); rebaje_holgura = g("rebaje_holgura")
     ref_tope = g("ref_tope"); espuma_esp = g("espuma_esp"); ref_espuma = g("ref_espuma"); extras = g("extras")
     color_placa = g("color_placa"); color_tapa = g("color_tapa")
+    # puertas: las tapas de un rack abren girando sobre bisagras en un costado (no está en flightcase.scad)
+    puertas = bool(g("puertas", False)); puerta_lado = "der" if g("puerta_lado", "izq") == "der" else "izq"
     cd = cat.dato; ce = cat.existe
 
     # ---- valores efectivos según catálogo ----
@@ -325,6 +333,8 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     _2t = tapas == 2
     _hz = orientacion == "horizontal"
     _fr = orientacion == "frontal"
+    _door = puertas and _fr
+    _lado_c = "izq" if puerta_lado == "der" else "der"     # donde cierran las puertas
     _acost = _hz or _fr
     _fe = paredes_enteras != "laterales"
     _fec = (paredes_enteras if paredes_enteras_cuerpo == "" else paredes_enteras_cuerpo) != "laterales"
@@ -577,6 +587,9 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     _sin_frente = cierres_frente_n < 0
     _caras_c1 = ([] if (_fr or _sin_frente) else ["frente"]) + ([] if (_con_bisagras or _sin_frente) else ["trasera"]) + _caras_lat
     _caras_c2 = (([] if (_fr or _sin_frente) else ["frente"]) + ([] if _sin_frente else ["trasera"]) + _caras_lat) if _2t else []
+    if _door:   # las puertas cierran sólo del costado opuesto a las bisagras
+        _caras_c1 = [_lado_c]
+        _caras_c2 = [_lado_c] if _2t else []
 
     def _xs_cara(c, of=off_frente, ol=off_lateral):
         if c in ("frente", "trasera"):
@@ -596,7 +609,15 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
                 lp = lat_pieza(c, xc) if c in ("izq", "der") else [f"cuerpo_{c}", xc]
                 marcas.append(Marca(lp[0], "cierre", lp[1], y_cuerpo, 0, 0, plano))
                 marcas.append(Marca(f"{pre_tapa}{c}", "cierre", x, y_tapa, 0, 0, plano))
-    if _con_bisagras and not _piano:
+    if _door and _con_bisagras and not _piano:
+        for x in _pos_n(ext_prof, bisagras, cierre_margen):
+            lp = lat_pieza(puerta_lado, x - olc)
+            marcas.append(Marca(lp[0], "bisagra", lp[1], _y_cierre_cuerpo, 0, 0, "c1"))
+            marcas.append(Marca(f"tapa_{puerta_lado}", "bisagra", x - off_lateral, _y_cierre_tapa, 0, 0, "c1"))
+            if _2t:
+                marcas.append(Marca(lp[0], "bisagra", lp[1], _y_cierre2_cuerpo, 0, 0, "c2"))
+                marcas.append(Marca(f"tapa2_{puerta_lado}", "bisagra", x - off_lateral, _y_cierre2_tapa, 0, 0, "c2"))
+    elif _con_bisagras and not _piano:
         for x in _pos_n(ext_ancho, bisagras, cierre_margen):
             marcas.append(Marca("cuerpo_trasera", "bisagra", x - ofc, _y_cierre_cuerpo, 0, 0, "c1"))
             marcas.append(Marca("tapa_trasera", "bisagra", x - off_frente, _y_cierre_tapa, 0, 0, "c1"))
@@ -705,9 +726,9 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     # ---- herrajes ----
     _n_cierres = len([m for m in marcas if (m.tipo == "cierre" and por_id[m.panel].grupo == "cuerpo")
                       or (m.tipo == "cierre_acceso" and m.panel in ("cuerpo_izq", "cuerpo_der"))])
-    _n_bisagras = (1 if _piano else bisagras) if _con_bisagras else 0
-    _largo_piano = ext_ancho - 2 * (E_esq_pata + 10)
-    _bis_rem = 2 * (math.floor(_largo_piano / 50) + 1) if _piano else cd(ref_bisagra, "remaches", 6) * _n_bisagras
+    _n_bisagras = ((1 if _piano else bisagras) * (2 if (_door and _2t) else 1)) if _con_bisagras else 0
+    _largo_piano = (ext_prof if _door else ext_ancho) - 2 * (E_esq_pata + 10)
+    _bis_rem = 2 * (math.floor(_largo_piano / 50) + 1) * _n_bisagras if _piano else cd(ref_bisagra, "remaches", 6) * _n_bisagras
     _tope_rem = cd(ref_tope, "remaches", 8) * topes
     _n_refuerzos = refuerzos * 4 * (2 if _2t else 1)
     _ref_rem = refuerzo_remaches * _n_refuerzos
@@ -743,7 +764,9 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     def nom(ref, defecto):
         return cat.nombre(ref) if ce(ref) else defecto
 
-    if _sin_frente:
+    if _door:
+        cara_txt = s("lateral ", _lado_c, " (cierran las puertas)")
+    elif _sin_frente:
         cara_txt = "laterales"
     elif _lat_cierres:
         cara_txt = "frente y laterales" if _con_bisagras else "frente, trasera y laterales"
@@ -796,7 +819,10 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     if pies == 4:
         H.append([nom(ref_pie, "Pie de goma"), 4, s("Ø", _pie_d, " x ", _pie_h, " mm"), ref_pie])
     if _n_bisagras > 0:
-        H.append([nom(ref_bisagra, "Bisagra"), _n_bisagras, s("cortar a ", _largo_piano, " mm") if _piano else "en la trasera", ref_bisagra])
+        _bis_det = s("en el lateral ", puerta_lado, ", ", (_n_bisagras // (2 if _2t else 1)), " por puerta") if _door else "en la trasera"
+        H.append([nom(ref_bisagra, "Bisagra"), _n_bisagras,
+                  s("cortar a ", _largo_piano, " mm", ", una por puerta" if _door and _2t else "") if _piano else _bis_det,
+                  ref_bisagra])
     if topes > 0:
         H.append([nom(ref_tope, "Tope de tapa"), topes, "sostiene la tapa abierta", ref_tope])
     if _n_refuerzos > 0:
@@ -975,7 +1001,13 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         A.append("Con perfil híbrido los extremos no pueden tapar las paredes: se ignora extremos_cubren.")
     if _2t and _L_zt2 < TRAMO_MINIMO:
         A.append(s("Las verticales de la", _t2, " darían ", _L_zt2, " mm: se omiten."))
-    if _2t and _con_bisagras:
+    if puertas and not _fr:
+        A.append("Las puertas con bisagras al costado se resuelven en racks (orientación frontal): se toma la tapa común.")
+    if _door and not _con_bisagras:
+        A.append("Las puertas no tienen bisagras: poné bisagras (2 o 3 por puerta) o una bisagra de piano.")
+    if _door and _acc:
+        A.append("Con puertas y tapas de acceso laterales, revisá que las bisagras no caigan sobre la junta de la tapa de acceso.")
+    if _2t and _con_bisagras and not _door:
         A.append(s("Con dos tapas, las bisagras van solo en la", _t1, "; la otra cierra con cierres."))
     if _L_zt < TRAMO_MINIMO:
         A.append(s("Las verticales de la tapa darían ", _L_zt, " mm: se omiten, el esquinero llega directo al perfil de cierre. Verificá que la pata del esquinero no pise el cierre."))
@@ -1021,6 +1053,8 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
                    fmt(cierre_m_sup), fmt(cierre_h_sup), fmt(cierre_saliente), fmt(cd(ref_cierre_macho, "canal", 0)), fmt(E_placa_esp)],
         "descuento": [fmt(0 if _hib else descuento_entre)],
     }
+    if _door:
+        info["puertas"] = [puerta_lado, fmt(_n_bisagras // (2 if _2t else 1)), fmt(1 if _piano else 0)]
     if _rebajes:
         info["rebaje"] = [fmt(refuerzo_esp), fmt(rebaje_holgura)]
     if _n_fijas:
@@ -1104,6 +1138,7 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         ruedas=[list(c) for c in ruedas_centros], rueda_alto=E_rueda_alto if ruedas == 4 else 0,
         esq_descuento=E_esq_descuento, esq_pata=E_esq_pata, L_x=_L_x, L_y=_L_y, L_zc=_L_zc, L_zt=_L_zt,
         L_zt2=_L_zt2, arista_esp=hibrido_pared if _hib else E_angulo_esp, ala=15 if _hib else E_angulo_ala,
+        puertas=dict(lado=puerta_lado) if _door else None,
         cubierta=_cub, acceso=_acc, j_cub=_j_cub, pared=pared, olc=olc, a_acc=_a_acc, j_acc=_j_acc,
         w_low=_w_low, cierre_m_sup=cierre_m_sup, cierre_h_sup=cierre_h_sup, ext_alto_cuerpo=ext_alto_cuerpo,
         ruedas_en_base=[list(c) for c in ruedas_en_base], rueda_placa=list(E_rueda_placa),

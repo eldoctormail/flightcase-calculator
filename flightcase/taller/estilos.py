@@ -24,6 +24,7 @@ ARCHIVO_PROPIOS = "taller_estilos_propios.json"
 # Lo que un estilo incluido vuelve a su valor por defecto antes de aplicarse, para que
 # no queden restos del estilo anterior (por ejemplo, bisagras en un rack de dos tapas).
 CLAVES_ESTILO = (
+    "forma", "puertas", "puerta_lado", "incl_rieles", "pleg_base_esp", "pleg_base_material", "pleg_cierres_esquina",
     "tapas", "int_alto_tapa2", "orientacion", "descuento_entre",
     "acceso_lateral", "acceso_junta", "acceso_cierres_n", "acceso_tipo",
     "paredes_enteras", "paredes_enteras_cuerpo", "extremos_cubren",
@@ -35,7 +36,7 @@ CLAVES_ESTILO = (
 
 # Lo que un estilo propio no guarda: medidas, interior, herrajes a mano y la vista.
 NO_GUARDAR = {
-    "int_ancho", "int_prof", "int_alto_cuerpo", "int_alto_tapa", "cantidad_cases",
+    "int_ancho", "int_prof", "int_alto_cuerpo", "int_alto_tapa", "incl_alto_frente", "cantidad_cases",
     "piezas_extra", "bandejas", "equipos", "espumas", "cajones", "rack_u", "rack_equipos",
     "herrajes_manuales", "etiquetas",
     "parte", "panel_id", "rect_w", "rect_h", "abrir_tapa", "angulo_tapa", "mostrar_perfiles",
