@@ -171,9 +171,11 @@ class _Armado:
         if largo >= TRAMO_MINIMO and cant > 0:
             self.perfiles.append(Perfil(perfil, desc, round(largo, 2), cant, corte, ref))
 
-    def arista(self, o: Vec, a: Vec, b: Vec, c: Vec, L: float, mueve: str = "cuerpo", paso: int = F_ARISTAS) -> None:
+    def arista(self, o: Vec, a: Vec, b: Vec, c: Vec, L: float, mueve: str = "cuerpo", paso: int = F_ARISTAS,
+               solo_a: bool = False) -> None:
+        """`solo_a`: el ángulo se remacha sólo a la cara de normal `a` (baúl plegable)."""
         if L >= TRAMO_MINIMO:
-            self.aristas.append(dict(o=o, a=a, b=b, c=c, L=L, mueve=mueve, paso=paso))
+            self.aristas.append(dict(o=o, a=a, b=b, c=c, L=L, mueve=mueve, paso=paso, solo_a=solo_a))
 
     def bloque(self, o: Vec, u: Vec, v: Vec, n: Vec, a: float, b: float, c: float, color: str, etiqueta: str,
                mueve: str = "cuerpo", paso: int = F_AROS) -> None:
@@ -297,6 +299,19 @@ class _Armado:
                 self.calados.append(Calado(m.panel, "cierre", m.x, m.y - 2 - E.cie_corte[1] / 2,
                                            E.cie_corte[0], E.cie_corte[1], E.cie_radio))
 
+    def _perforacion(self) -> Dict[str, Any]:
+        """Datos para la capa de perforaciones de los DXF (perforaciones.py), como modelo.calcular."""
+        P, E, cat = self.P, self.E, self.cat
+        dr = lambda ref: dict(cat.fila(ref)["datos"]) if cat.existe(ref) else {}
+        rb, rm = P.get("ref_bisagra", ""), E.ref_manija
+        return dict(
+            remache_d=E.remache_d, paso=P.get("remache_paso", 100), esq_remaches=E.esq_rem,
+            cierre=dict(dr(E.ref_cierre), remaches=E.cie_rem, tipo="embutido" if E.cie_emb else "superficie",
+                        corte=list(E.cie_corte)),
+            bisagra=dict(dr(rb), remaches=cat.dato(rb, "remaches", 6)), piano=0,
+            manija=dict(dr(rm), remaches=E.man_rem), cazoleta={}, plato={}, marco_ala=0,
+            hibrido_ala=0, hibrido_descuento=0)
+
     # -- cierre del resultado --
     def remaches_de_perfiles(self) -> int:
         paso = self.P.get("remache_paso", 100)
@@ -412,7 +427,7 @@ class _Armado:
             forma=forma, colocaciones=self.col, espesor=E.t, horizontal=False, frontal=False, dos_tapas=False,
             hibrido=False, cubierta=False, acceso=False, base=None, puertas=None, cierre_saliente=E.sal,
             ala_arista=E.ala, ala=E.ala, arista_esp=E.ae, esq_pata=E.pata, esq_descuento=E.ed,
-            cierre_m_alto=E.m_alto, cierre_h_alto=E.h_alto, aristas=self.aristas, bloques=self.bloques,
+            cierre_m_alto=E.m_alto, cierre_h_alto=E.h_alto, cierre_m_sup=E.m_sup, cierre_h_sup=E.h_sup, aristas=self.aristas, bloques=self.bloques,
             esquineros=self.esquineros, herrajes=self.herr, ruedas_abajo=self.ruedas, pies_abajo=self.pies,
             pie_d=E.pie_d, pie_h=E.pie_h, rueda_placa=list(E.rueda_placa), rueda_diametro=E.rueda_d,
             rueda_alto=E.rueda_alto if int(P.get("ruedas", 0) or 0) == 4 else 0, rueda_frenos=P.get("rueda_frenos", 2),
@@ -426,7 +441,8 @@ class _Armado:
                "placa_material": E.material, "placa_kerf": P.get("placa_kerf"), "placa_margen": P.get("placa_margen"),
                "barra_largo": P.get("barra_largo"), "sierra_kerf": P.get("sierra_kerf"),
                "cantidad_cases": P.get("cantidad_cases"), "remache_ref": E.remache_ref, "materiales_paneles": mats,
-               "geo": geo_base, "interiores": interior, "manuales": None, "forma": forma}
+               "geo": geo_base, "interiores": interior, "manuales": None, "forma": forma,
+               "perforacion": self._perforacion()}
         val.update(valores)
         herrajes = [Herraje(*h) for h in self.H]
         return ResultadoTaller(info=info, paneles=self.paneles, calados=self.calados, marcas=self.marcas,
@@ -846,7 +862,7 @@ def _plegable(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
     L_esq = {k_: zc - E.m_alto - (z0 + 5) for k_, z0 in z_ini.items()}
     for x0, sx, grupo in ((0.0, -1, "p_izq"), (X, 1, "p_der")):
         for y0, sy in ((0.0, -1), (Y, 1)):
-            ar.arista((x0, y0, z_ini[x0] + 5), (sx, 0, 0), (0, sy, 0), (0, 0, 1), L_esq[x0], grupo)
+            ar.arista((x0, y0, z_ini[x0] + 5), (sx, 0, 0), (0, sy, 0), (0, 0, 1), L_esq[x0], grupo, solo_a=True)
     A_ = E.perfil_arista
     ar.tramo(A_, "Aristas de la base a lo ancho", X - 2 * ed, 2, "recto", E.ref_arista)
     ar.tramo(A_, "Aristas de la base a lo profundo", Y - 2 * ed, 2, "recto", E.ref_arista)
@@ -927,10 +943,14 @@ def _plegable(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
 def calcular(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
     forma = P.get("forma")
     if forma == "inclinado":
-        return _rack_inclinado(P, cat)
-    if forma == "funda":
-        return _funda(P, cat)
-    return _plegable(P, cat)
+        res = _rack_inclinado(P, cat)
+    elif forma == "funda":
+        res = _funda(P, cat)
+    else:
+        res = _plegable(P, cat)
+    from . import peso as _peso
+    res.valores["peso"] = _peso.calcular(res, P, cat)
+    return res
 
 
 # ---------------------------------------------------------------------------

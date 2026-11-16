@@ -35,6 +35,7 @@ def test_estilo_completo_3d_y_step(eid):
     cs = cuerpos(m, av)
     assert cs and all(c.cerrado for c in cs)
     assert not av
+    assert res.valores["peso"].total > 0
     # abierta y explotada no fallan
     malla_3d(res, Opciones3D(abrir_tapa=300, explotar=100))
 
@@ -116,3 +117,32 @@ def test_plegable_que_no_pliega_avisa():
     p["int_prof"] = 400
     res = calcular(p)
     assert any("no se puede plegar" in a for a in res.avisos)
+
+
+def test_perforaciones_de_las_formas():
+    from flightcase.taller import perforaciones as PF
+    # rack inclinado: los remaches del aro siguen el canto inclinado del lateral, adentro del trapecio
+    p = _con_estilo("rack_inclinado")
+    p["cierres_laterales"] = "si"
+    res = calcular(p)
+    ag = PF.calcular(res)
+    izq = res.panel("cuerpo_izq")
+    (x0, y0), (x1, y1) = izq.contorno[2], izq.contorno[3]
+    canto = lambda a: abs((x1 - x0) * (y0 - a.y) - (x0 - a.x) * (y1 - y0)) / math.hypot(x1 - x0, y1 - y0)
+    arriba = [a for a in ag["cuerpo_izq"] if a.origen == "perfil" and 30 < a.x < izq.ancho - 30 and canto(a) < 40]
+    assert len(arriba) >= 3 and max(canto(a) for a in arriba) - min(canto(a) for a in arriba) < 0.1
+    cie = [a for a in ag["cuerpo_izq"] if a.origen == "cierre"]
+    assert cie and all(10 < canto(a) < 60 for a in cie)
+    assert {"cuerpo_frente", "tapa_frente", "techo", "piso"} <= set(ag)
+    # baúl plegable: bisagras de piano en cada pared y las esquinas sólo remachadas al lateral
+    res = calcular(_con_estilo("baul_plegable"))
+    ag = PF.calcular(res)
+    for pid in ("cuerpo_frente", "cuerpo_trasera", "cuerpo_izq", "cuerpo_der"):
+        assert len([a for a in ag[pid] if a.origen == "bisagra"]) >= 5, pid
+    fr = res.panel("cuerpo_frente")
+    assert not [a for a in ag["cuerpo_frente"] if a.origen == "perfil" and a.y < fr.alto - 60
+                and (a.x < 30 or a.x > fr.ancho - 30)]
+    assert [a for a in ag["cuerpo_frente"] if a.origen == "cierre" and (a.x < 80 or a.x > fr.ancho - 80)]
+    # funda: los bordes de las bocas en piso, techo y laterales
+    ag = PF.calcular(calcular(_con_estilo("funda_rack")))
+    assert set(ag) == {"piso", "techo", "cuerpo_izq", "cuerpo_der"}
