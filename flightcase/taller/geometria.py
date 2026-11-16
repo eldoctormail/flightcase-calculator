@@ -46,6 +46,8 @@ COLORES: Dict[str, str] = {
     "equipo": "#3d4b5c",      # equipos dentro del case
     "rack_frente": "#2f2f2f",
     "espuma": "#3a3a3a",      # espuma gris oscura
+    "forro_alfombra": "#2c2c34",  # forro interior de alfombra
+    "forro_espuma": "#474747",    # forro interior de espuma
     "cajon": "#c9a26b",
     "resalte": "#ffa500",     # Orange: lo que se agrega en el paso
     "rotulo": "#ffffff",
@@ -587,6 +589,15 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
             k.caja((b["cx"] - b["ancho"] / 2, b["cy"] - b["fondo"] / 2, b["z"] + ex * 0.6), (1, 0, 0), (0, 1, 0),
                    (0, 0, 1), b["ancho"], b["fondo"], b["esp"], col,
                    ComponentLayer.INTERNAL_DIVIDERS, f"Bandeja {i + 1}", mundo=True)
+
+    # Forro interior por cara (alfombra o espuma), se mueve con su tapa
+    if geo.get("forro") and op.interior and op.paso >= 99 and not op.resaltar_que and not op.vista_parte:
+        resaltar = {x.strip() for x in op.resaltar_interior.split(",") if x.strip()}
+        for pz in geo["forro"]:
+            col = "resalte" if "forro" in resaltar else f"forro_{pz['tipo']}"
+            for x0, y0, z0, x1, y1, z1 in pz.get("celdas") or [pz["caja"]]:   # partida alrededor de los huecos
+                k.caja((x0, y0, z0 + desplaz.get(pz["grupo"], 0.0)), (1, 0, 0), (0, 1, 0), (0, 0, 1),
+                       x1 - x0, y1 - y0, z1 - z0, col, ComponentLayer.INTERNAL_DIVIDERS, pz["nombre"])
 
     # Interiores (equipos, espuma, cajones, rack), en coordenadas del mundo
     if geo.get("interior") is not None and op.interior and op.paso >= 99 and not op.resaltar_que \

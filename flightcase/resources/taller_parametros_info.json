@@ -395,6 +395,31 @@
   ]
  },
  {
+  "seccion": "Interior: forro por cara",
+  "parametros": [
+   {
+    "nombre": "forro",
+    "etiqueta": "Forro de cada cara",
+    "ayuda": "Alfombra o espuma pegada adentro del case, eligiendo cara por cara. Elegí una cara (piso, frente, laterales, la cara de la tapa, las paredes de la tapa) o un grupo entero (todo el interior, todo el cuerpo, las paredes del cuerpo, toda la tapa), el material (alfombra, espuma o «no» para dejarla sin forro) y el espesor (0 = el del artículo del catálogo o el por defecto). Las filas se aplican en orden: una fila de una cara corrige a la de su grupo. Las medidas interiores siguen siendo el espacio útil: el case crece lo que mide el forro. La tapa va aparte: su cara y sus paredes se eligen por separado. Las piezas de forro salen en la lista de cortes, en DXF (con los huecos de manijas, cierres embutidos y platos) y acomodadas en planchas. Si además cargaste el espesor de la espuma interior, esa espuma va en todas las caras y estas filas la corrigen."
+   },
+   {
+    "nombre": "forro_alfombra_esp",
+    "etiqueta": "Espesor de la alfombra",
+    "ayuda": "espesor de la alfombra (mm) cuando la fila no dice otro"
+   },
+   {
+    "nombre": "forro_alfombra_plancha",
+    "etiqueta": "Trozo de rollo de alfombra",
+    "ayuda": "[largo, ancho] del trozo de alfombra donde se acomodan las piezas (el ancho es el del rollo)"
+   },
+   {
+    "nombre": "forro_espuma_plancha",
+    "etiqueta": "Plancha de espuma del forro",
+    "ayuda": "[largo, ancho] de la plancha de espuma para el forro (si la fila no elige un artículo del catálogo con medida)"
+   }
+  ]
+ },
+ {
   "seccion": "Interior: equipos y espuma",
   "parametros": [
    {
