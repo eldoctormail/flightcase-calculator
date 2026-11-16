@@ -402,6 +402,9 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
     if esp_espuma > 0:
         lineas.insert(4, ("Espuma interior",
                           f"{fmt(esp_espuma)} mm (el interior indicado es el espacio útil)"))
+    if d.get("peso") is not None:
+        lineas.append(("Peso de un case", d["peso"].resumen() + (" (con valores estimados)"
+                                                                 if d["peso"].estimado > 0.005 else "")))
     lineas += [
         ("Placas", "; ".join(f"{n} de {m}" for m, n in contar_placas(placas).items())),
     ]
@@ -819,7 +822,7 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
     tb.scale(1, 1.45)
     Nc = cantidad_cases(d)
     nota = "Cantidades para " + (f"{Nc} cases." if Nc > 1 else "1 case.") + \
-        " Las referencias son las del catálogo de herrajes cargado (flightcase_gen/catalogo_fr.scad)."
+        " Las referencias son las del catálogo de herrajes y placas de la app (Editar → Catálogo)."
     fig.text(0.03, 0.06, nota, fontsize=8, color="#333")
     pdf.savefig(fig, dpi=220)  # imágenes nítidas (por defecto se bajan a 100 dpi)
     plt.close(fig)

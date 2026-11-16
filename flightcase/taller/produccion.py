@@ -49,6 +49,7 @@ def datos(res: ResultadoTaller) -> Dict[str, Any]:
     d["manuales"] = manuales_por_panel(res)
     from . import perforaciones
     d["perforaciones"] = {pid: perforaciones.tuplas(ags) for pid, ags in perforaciones.calcular(res).items()}
+    d["peso"] = res.valores.get("peso")
     return d
 
 
