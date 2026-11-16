@@ -10,7 +10,7 @@ AUTOR = "Javier Amigo"
 def version() -> str:
     try:
         from ._version import VERSION   # lo escribe el workflow de instaladores
-        return VERSION
+        return VERSION.strip().lstrip("vV").lstrip(".")   # «v.0.3.6» se compiló como «.0.3.6»
     except ImportError:
         pass
     try:

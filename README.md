@@ -50,7 +50,7 @@ Para desarrollo, `pytest` (tests automáticos) está en el grupo `dev`: `uv` lo 
 
 ### Instalar en Windows o Mac (sin Python)
 
-Los instaladores se generan solos en GitHub (*Actions → Instaladores*). Para publicar una versión, creá una etiqueta `vX.Y.Z`: aparecen en *Releases*.
+Los instaladores se generan solos en GitHub (*Actions → Instaladores*). Para publicar una versión: *Actions → Instaladores → Run workflow*, escribí el número (por ejemplo `0.3.8`, sin «v» ni punto adelante) y *Run workflow*. Unos 20 minutos después aparece en *Releases* con los tres instaladores, y la app instalada la ofrece sola. (Crear la Release a mano con una etiqueta `vX.Y.Z` también sirve: la app espera a que tenga los instaladores antes de avisar.)
 
 - **Windows**: `LBDFlightcaseMaker-X.Y.Z-Windows-Instalador.exe`. Si aparece «Windows protegió su PC», tocá *Más información → Ejecutar de todas formas* (el instalador todavía no está firmado).
 - **Mac**: `…-macOS-AppleSilicon.dmg` (M1 o más nuevo) o `…-macOS-Intel.dmg`. Arrastrá la app a Aplicaciones. La primera vez, clic derecho sobre la app → *Abrir* (todavía no está firmada por Apple).

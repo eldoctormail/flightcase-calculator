@@ -39,6 +39,7 @@ from typing import Callable, Optional, Tuple
 
 REPO = "eldoctormail/flightcase-calculator"
 URL_ULTIMA = f"https://api.github.com/repos/{REPO}/releases/latest"
+URL_LISTA = f"https://api.github.com/repos/{REPO}/releases?per_page=20"
 URL_RELEASES = f"https://github.com/{REPO}/releases"
 NOMBRE_APP = "LBD Flightcase Maker"
 
@@ -63,8 +64,10 @@ class Novedad:
 
 # ----------------------------------------------------------------- versiones
 def numeros(v: str) -> Tuple[int, ...]:
-    """'v0.3.10' → (0, 3, 10). Lo que no es número se ignora ('0.4.0-beta' → (0, 4, 0))."""
-    v = v.strip().lstrip("vV")
+    """'v0.3.10' → (0, 3, 10). Lo que no es número se ignora ('0.4.0-beta' → (0, 4, 0)).
+
+    También acepta etiquetas escritas «v.0.3.6» (con punto después de la v)."""
+    v = limpiar_version(v)
     partes = []
     for p in v.split("."):
         m = re.match(r"\d+", p)
@@ -74,6 +77,11 @@ def numeros(v: str) -> Tuple[int, ...]:
     while len(partes) > 1 and partes[-1] == 0:      # 0.3 == 0.3.0
         partes.pop()
     return tuple(partes)
+
+
+def limpiar_version(v: str) -> str:
+    """'v0.3.7', 'V0.3.7' o 'v.0.3.6' → '0.3.7' / '0.3.6'."""
+    return (v or "").strip().lstrip("vV").lstrip(". ")
 
 
 def es_mas_nueva(candidata: str, actual: str) -> bool:
@@ -98,13 +106,13 @@ def sufijo_instalador(sistema: str = sys.platform, maquina: Optional[str] = None
 
 
 def novedad_desde_release(release: dict, sistema: str = sys.platform, maquina: Optional[str] = None) -> Novedad:
-    n = Novedad(version=(release.get("tag_name") or "").strip().lstrip("vV"),
+    n = Novedad(version=limpiar_version(release.get("tag_name") or ""),
                 notas=(release.get("body") or "").strip(),
                 pagina=release.get("html_url") or URL_RELEASES)
     sufijo = sufijo_instalador(sistema, maquina)
     if sufijo:
         for a in release.get("assets") or []:
-            if a.get("name", "").endswith(sufijo):
+            if a.get("name", "").endswith(sufijo) and a.get("state", "uploaded") == "uploaded":
                 n.archivo, n.url, n.tamano = a["name"], a["browser_download_url"], int(a.get("size") or 0)
                 break
     return n
@@ -130,17 +138,33 @@ def _abrir(url: str, timeout: float):
     return urllib.request.urlopen(req, timeout=timeout, context=_contexto_ssl())
 
 
-def buscar(version_actual: str, timeout: float = 10) -> Optional[Novedad]:
-    """La última Release si es más nueva que version_actual; None si ya está al día."""
+def buscar(version_actual: str, timeout: float = 10, sistema: str = sys.platform,
+           maquina: Optional[str] = None) -> Optional[Novedad]:
+    """La versión más nueva que version_actual y que ya trae instalador para esta computadora.
+
+    Se miran las últimas Releases (no solo «la última»): cuando se publica una versión, los
+    instaladores tardan unos 20 minutos en compilarse y subirse; mientras tanto esa Release
+    está vacía y se la saltea (se ofrecerá apenas tenga el instalador). None si está al día.
+    """
     try:
-        with _abrir(URL_ULTIMA, timeout) as r:
-            release = json.loads(r.read().decode("utf-8"))
+        with _abrir(URL_LISTA, timeout) as r:
+            releases = json.loads(r.read().decode("utf-8"))
     except Exception as e:
         raise ErrorActualizacion(f"No se pudo consultar GitHub: {e}") from e
-    if release.get("draft") or release.get("prerelease"):
+    if isinstance(releases, dict):          # una sola Release (como devuelve /releases/latest)
+        releases = [releases]
+    candidatas = [novedad_desde_release(rel, sistema, maquina) for rel in releases
+                  if isinstance(rel, dict) and not rel.get("draft") and not rel.get("prerelease")]
+    candidatas = [n for n in candidatas if es_mas_nueva(n.version, version_actual)]
+    if not candidatas:
         return None
-    n = novedad_desde_release(release)
-    return n if es_mas_nueva(n.version, version_actual) else None
+    candidatas.sort(key=lambda n: numeros(n.version), reverse=True)
+    con_instalador = [n for n in candidatas if n.instalable]
+    if con_instalador:
+        return con_instalador[0]
+    if sufijo_instalador(sistema, maquina):
+        return None             # todavía se están compilando los instaladores: se avisa después
+    return candidatas[0]        # sistema sin instalador (Linux): se ofrece la página
 
 
 def descargar(n: Novedad, carpeta: Optional[Path] = None,
