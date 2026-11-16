@@ -47,6 +47,7 @@ from ...taller.scad import escribir_proyecto, leer_proyecto, literal, valor_lite
 # Opciones fijas de los parámetros de texto que las tienen
 OPCIONES: Dict[str, List[str]] = {
     "orientacion": ["vertical", "horizontal", "frontal"],
+    "medida_interior": ["placa", "metal"],
     "forma": ["caja", "inclinado", "funda", "plegable", "slam", "tabla"],
     "slam_caras": ["arriba", "frente", "frente_trasera", "arriba_frente"],
     "tapa_plana": ["slam", "lidmaker"],
@@ -1499,7 +1500,9 @@ class TallerWidget(QWidget):
         n_paneles = len(res.paneles)
         self.lbl_resumen.setText(
             f"<b>Exterior:</b> {fmt(v['ext_ancho'])} × {fmt(v['ext_prof'])} × {fmt(v['ext_alto'])} mm"
-            f" &nbsp;·&nbsp; <b>Sistema:</b> {res.info['sistema'][0]}"
+            + (f" &nbsp;·&nbsp; <b>Interior de metal a metal</b> (+{fmt(mi['suma']['int_ancho'])} mm de placa a placa)"
+               if (mi := v.get("medida_interior")) else "")
+            + f" &nbsp;·&nbsp; <b>Sistema:</b> {res.info['sistema'][0]}"
             f" &nbsp;·&nbsp; <b>Placa:</b> {v['placa_material']}"
             + (f" (+ {len(otros)} paneles en otra placa)" if (otros := v.get("materiales_paneles") or {}) else "") +
             f" &nbsp;·&nbsp; {n_paneles} paneles, {sum(p.cantidad for p in res.perfiles)} tramos de perfil"
