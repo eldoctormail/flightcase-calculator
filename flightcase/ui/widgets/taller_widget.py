@@ -52,7 +52,7 @@ OPCIONES: Dict[str, List[str]] = {
 }
 # Números que sólo toman valores enteros
 ENTEROS = {"tapas", "acceso_cierres_n", "cantidad_cases", "manijas_n", "cierres_frente_n",
-           "cierres_lateral_n", "ruedas", "rueda_frenos", "bandeja_soportes", "encastre_remaches",
+           "cierres_lateral_n", "ruedas", "rueda_frenos", "rueda_fijas", "cazoleta_remaches", "bandeja_soportes", "encastre_remaches",
            "pies", "bisagras", "topes", "refuerzos", "refuerzo_remaches"}
 
 
@@ -83,7 +83,8 @@ REF_CATEGORIAS: Dict[str, Optional[tuple]] = {
     "ref_placa": ("placa",), "ref_angulo": ("angulo",), "ref_hibrido": ("hibrido",),
     "ref_cierre_macho": ("tapa_m", "hibrido"), "ref_cierre_hembra": ("tapa_h", "hibrido"),
     "ref_esquinero": ("esquinero",), "ref_cierre": ("cierre",), "ref_manija": ("manija",),
-    "ref_rueda": ("rueda",), "ref_rueda_freno": ("rueda",), "ref_plato": ("plato",),
+    "ref_rueda": ("rueda",), "ref_rueda_freno": ("rueda",), "ref_rueda_fija": ("rueda",),
+    "ref_cazoleta": ("cazoleta",), "ref_plato": ("plato",),
     "ref_remache": ("remache",), "ref_pie": ("pie",), "ref_bisagra": ("bisagra",), "ref_tope": ("tope",),
     "ref_espuma": ("espuma",), "ref_espuma_bloques": ("espuma",), "ref_escuadra": ("escuadra",),
     "ref_riel": ("rack",), "ref_corredera": None,

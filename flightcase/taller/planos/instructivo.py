@@ -545,7 +545,8 @@ def armar_pasos(d, piezas):
                       texto=tapa_txt))
 
     if not hib:
-        rectos = [p for p in d["perfiles"] if p["corte"] == "recto" and p["perfil"] == arista]
+        rectos = [p for p in d["perfiles"] if p["corte"] == "recto" and p["perfil"] == arista
+                  and not p["desc"].startswith("Marco de la base")]
         def desc_a(t):
             t = t.lower()
             for a, b in ((" cuerpo", " del cuerpo"), (" tapa del.", " de la tapa delantera"),
@@ -587,7 +588,7 @@ def armar_pasos(d, piezas):
         ]))
     refz = herraje(["refuerzo"], "")
     nota_base = None
-    if ruedas and "base_ruedas" in d["paneles"]:
+    if ruedas and "base_ruedas" in d["paneles"] and "base_suelta" not in info:
         bp = d["paneles"]["base_ruedas"]
         mu = [float(x) for x in info.get("mundo", [ext[0], ext[1], ext[2] + ext[3]])]
         mx, my = (mu[0] - bp["w"]) / 2, (mu[1] - bp["h"]) / 2   # margen base-borde del case
@@ -723,7 +724,29 @@ def armar_pasos(d, piezas):
             pie = herraje(["pie"], "Pie de goma")
             txt += [f"Pies ({con_ref(pie)}): con el case dado vuelta, uno en cada marca del piso "
                     f"({base_txt}); atornillalos o remachalos según el modelo."]
-        if ruedas and "base_ruedas" in d["paneles"]:
+        fijas_n = int(float(info.get("ruedas_fijas", ["0"])[0]))
+        txt_fijas = (f"Las {fijas_n} ruedas fijas (sin giro) van del lado opuesto a las de freno: con las fijas atrás "
+                     "el case se empuja derecho, como un carro." if fijas_n else "")
+        if ruedas and "base_ruedas" in d["paneles"] and "base_suelta" in info:
+            bp = d["paneles"]["base_ruedas"]
+            mat_b = d["panelmat"].get("base_ruedas", {}).get("material", "")
+            bs = info["base_suelta"]
+            txt += [
+                f"Base suelta ({num.get('base_ruedas', '?')}, {fmt(bp['w'])} × {fmt(bp['h'])} {mat_b}): avellaná "
+                "por arriba los 16 agujeros de las ruedas, así las cabezas de los bulones quedan al ras.",
+                "Montá cada rueda por abajo con bulón de cabeza fresada desde arriba, arandela y tuerca "
+                "autofrenante del lado de la rueda.",
+                "Cortá el marco: " + "; ".join(f"{p['cant']} × {fmt(p['largo'])} mm de {p['perfil']}"
+                                               for p in d["perfiles"] if p["desc"].startswith("Marco de la base"))
+                + ", cortes rectos.",
+                f"Atornillá los 4 tramos del marco de ángulo ({bs[1]} mm) sobre la base, con el ala parada hacia "
+                f"arriba y {bs[0]} mm de juego con el case de cada lado. Las esquinas quedan libres para las "
+                "cantoneras: presentá el case antes de atornillar el último tramo.",
+                "El piso del case no se perfora: el case se apoya en la base y se saca levantándolo.",
+                f"Las {frenos} ruedas con freno van del mismo lado (normalmente el frente)." if 0 < frenos < 4 else "",
+                txt_fijas,
+            ]
+        elif ruedas and "base_ruedas" in d["paneles"]:
             bp = d["paneles"]["base_ruedas"]
             mat_b = d["panelmat"].get("base_ruedas", {}).get("material", "")
             pas = any(m["tipo"] == "agujero" for m in d["calados"].get(base_id_piso, []))
@@ -739,6 +762,17 @@ def armar_pasos(d, piezas):
                  "con bulón, arandela y tuerca autofrenante (16 en total)."),
                 f"Las {frenos} ruedas con freno van del mismo lado (normalmente el frente)."
                 if 0 < frenos < 4 else "",
+                txt_fijas,
+            ]
+        elif ruedas and "cazoletas" in info:
+            cz = info["cazoletas"]
+            txt += [
+                f"Cazoletas: con el case dado vuelta, meté una cazoleta en cada calado del piso ({base_txt}), "
+                f"con el reborde de {cz[1]} mm apoyado por fuera, y remachala ({cz[2]} remaches cada una).",
+                "Atornillá cada rueda dentro de su cazoleta, sobre los 4 agujeros que trae, con bulón, "
+                "arandela y tuerca autofrenante (16 en total).",
+                f"Las {frenos} ruedas con freno van del mismo lado (normalmente el frente)." if 0 < frenos < 4 else "",
+                txt_fijas,
             ]
         elif ruedas:
             txt += [
@@ -748,6 +782,7 @@ def armar_pasos(d, piezas):
                 "arandela y tuerca autofrenante (16 en total).",
                 f"Las {frenos} ruedas con freno van del mismo lado (normalmente el frente)."
                 if 0 < frenos < 4 else "",
+                txt_fijas,
             ]
         if encastres:
             txt += [f"Platos de apilado: insertá los 4 platos en los calados del techo "

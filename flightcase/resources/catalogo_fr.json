@@ -502,6 +502,283 @@
   "verificado": true
  },
  {
+  "ref": "LBD-R75G",
+  "categoria": "rueda",
+  "nombre": "Rueda giratoria 75 mm (genérica)",
+  "datos": {
+   "diametro": 75,
+   "alto": 100,
+   "placa": [
+    100,
+    85
+   ],
+   "agujeros": [
+    80,
+    60
+   ],
+   "agujero_d": 9,
+   "freno": 0,
+   "tipo": "giratoria"
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-R75GF",
+  "categoria": "rueda",
+  "nombre": "Rueda giratoria 75 mm con freno (genérica)",
+  "datos": {
+   "diametro": 75,
+   "alto": 100,
+   "placa": [
+    100,
+    85
+   ],
+   "agujeros": [
+    80,
+    60
+   ],
+   "agujero_d": 9,
+   "freno": 1,
+   "tipo": "giratoria"
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-R75F",
+  "categoria": "rueda",
+  "nombre": "Rueda fija 75 mm (genérica)",
+  "datos": {
+   "diametro": 75,
+   "alto": 100,
+   "placa": [
+    100,
+    85
+   ],
+   "agujeros": [
+    80,
+    60
+   ],
+   "agujero_d": 9,
+   "freno": 0,
+   "tipo": "fija"
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-R100F",
+  "categoria": "rueda",
+  "nombre": "Rueda fija 100 mm (genérica)",
+  "datos": {
+   "diametro": 100,
+   "alto": 125,
+   "placa": [
+    100,
+    85
+   ],
+   "agujeros": [
+    80,
+    60
+   ],
+   "agujero_d": 9,
+   "freno": 0,
+   "tipo": "fija"
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-R100GT",
+  "categoria": "rueda",
+  "nombre": "Rueda giratoria 100 mm con freno total (genérica): traba el giro y la rueda",
+  "datos": {
+   "diametro": 100,
+   "alto": 125,
+   "placa": [
+    100,
+    85
+   ],
+   "agujeros": [
+    80,
+    60
+   ],
+   "agujero_d": 9,
+   "freno": 2,
+   "tipo": "giratoria"
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-R125G",
+  "categoria": "rueda",
+  "nombre": "Rueda giratoria 125 mm (genérica)",
+  "datos": {
+   "diametro": 125,
+   "alto": 155,
+   "placa": [
+    135,
+    110
+   ],
+   "agujeros": [
+    105,
+    80
+   ],
+   "agujero_d": 11,
+   "freno": 0,
+   "tipo": "giratoria"
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-R125GF",
+  "categoria": "rueda",
+  "nombre": "Rueda giratoria 125 mm con freno (genérica)",
+  "datos": {
+   "diametro": 125,
+   "alto": 155,
+   "placa": [
+    135,
+    110
+   ],
+   "agujeros": [
+    105,
+    80
+   ],
+   "agujero_d": 11,
+   "freno": 1,
+   "tipo": "giratoria"
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-R125F",
+  "categoria": "rueda",
+  "nombre": "Rueda fija 125 mm (genérica)",
+  "datos": {
+   "diametro": 125,
+   "alto": 155,
+   "placa": [
+    135,
+    110
+   ],
+   "agujeros": [
+    105,
+    80
+   ],
+   "agujero_d": 11,
+   "freno": 0,
+   "tipo": "fija"
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-R150G",
+  "categoria": "rueda",
+  "nombre": "Rueda giratoria 150 mm (genérica)",
+  "datos": {
+   "diametro": 150,
+   "alto": 190,
+   "placa": [
+    135,
+    110
+   ],
+   "agujeros": [
+    105,
+    80
+   ],
+   "agujero_d": 11,
+   "freno": 0,
+   "tipo": "giratoria"
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-R150GF",
+  "categoria": "rueda",
+  "nombre": "Rueda giratoria 150 mm con freno (genérica)",
+  "datos": {
+   "diametro": 150,
+   "alto": 190,
+   "placa": [
+    135,
+    110
+   ],
+   "agujeros": [
+    105,
+    80
+   ],
+   "agujero_d": 11,
+   "freno": 1,
+   "tipo": "giratoria"
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-R150F",
+  "categoria": "rueda",
+  "nombre": "Rueda fija 150 mm (genérica)",
+  "datos": {
+   "diametro": 150,
+   "alto": 190,
+   "placa": [
+    135,
+    110
+   ],
+   "agujeros": [
+    105,
+    80
+   ],
+   "agujero_d": 11,
+   "freno": 0,
+   "tipo": "fija"
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-CZ100",
+  "categoria": "cazoleta",
+  "nombre": "Cazoleta de acero para rueda de 75 a 100 mm, placa hasta 100x85 (genérica)",
+  "datos": {
+   "exterior": [
+    194,
+    184
+   ],
+   "corte": [
+    170,
+    160
+   ],
+   "radio": 10,
+   "prof": 35,
+   "remaches": 8,
+   "placa_max": [
+    100,
+    85
+   ]
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-CZ125",
+  "categoria": "cazoleta",
+  "nombre": "Cazoleta de acero para rueda de 125 a 150 mm, placa hasta 135x110 (genérica)",
+  "datos": {
+   "exterior": [
+    234,
+    224
+   ],
+   "corte": [
+    210,
+    200
+   ],
+   "radio": 12,
+   "prof": 45,
+   "remaches": 10,
+   "placa_max": [
+    135,
+    110
+   ]
+  },
+  "verificado": false
+ },
+ {
   "ref": "08-38083",
   "categoria": "plato",
   "nombre": "Base empotrable de acero galvanizado (plato para ruedas)",

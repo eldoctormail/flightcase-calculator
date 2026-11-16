@@ -602,6 +602,21 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
                 cota_v(ax, 0, y0, x0 + m["w"] + paso * 0.5, x0 + m["w"], col=MARCA)
             notas.append(f"Placas de rueda (rojo, por la cara exterior): {fmt(m['w'])} x "
                          f"{fmt(m['h'])} mm, simétricas en las 4 esquinas.")
+            fijas = [q for q in ruedas if q["texto"] == "fija"]
+            if fijas:
+                for q in ruedas:
+                    et = {"fija": "FIJA", "freno": "FRENO"}.get(q["texto"], "GIRATORIA")
+                    ax.text(q["x"], q["y"] - q["h"] / 2 - paso * 0.15, et, ha="center", va="top", fontsize=6.5,
+                            color=MARCA)
+                nf = sum(1 for q in ruedas if q["texto"] == "freno")
+                notas.append(f"{len(fijas)} ruedas fijas (sin giro) de un lado y {len(ruedas) - len(fijas)} giratorias "
+                             f"del otro" + (f", {nf} de ellas con freno" if nf else "") + ": respetá el rótulo de cada placa.")
+        cazs = [c for c in pz["calados"] if c["tipo"] == "cazoleta"]
+        if cazs:
+            cz = d["info"].get("cazoletas", ["35", "12", "8"])
+            notas.append(f"Cazoletas de rueda: la cazoleta entra por la cara exterior, apoya su reborde de "
+                         f"{cz[1]} mm y se remacha ({cz[2]} remaches cada una); la rueda se atornilla dentro, "
+                         f"{cz[0]} mm hacia adentro del case. Los agujeros de la rueda los trae la cazoleta.")
         if agujeros:
             # acotar el grupo de agujeros de la esquina inferior izquierda
             a0 = min(agujeros, key=lambda c: (c["cx"] + c["cy"]))
@@ -655,6 +670,11 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
             bj = d["bandejas"][pz["ids"][0]]
             vista = (f"Bandeja interna: cara de arriba a {fmt(bj['altura'])} mm del piso interior, "
                      f"centrada en el cuerpo y apoyada en {bj['soportes']} escuadras atornilladas a los costados.")
+        elif "base_ruedas" in pz["ids"] and "base_suelta" in d["info"]:
+            bs = d["info"]["base_suelta"]
+            vista = ("Base suelta (wheel board), vista desde abajo: el case se apoya encima, dentro de un marco "
+                     f"de ángulo atornillado por arriba con {bs[0]} mm de juego por lado; las esquinas del marco "
+                     "quedan libres para las cantoneras. Agujeros avellanados por arriba (bulón de cabeza fresada).")
         elif "base_ruedas" in pz["ids"]:
             vista = ("Base de ruedas, vista desde abajo: va atornillada bajo el piso del case, "
                      "centrada, y las ruedas se montan en ella.")

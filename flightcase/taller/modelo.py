@@ -201,6 +201,10 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     rueda_frenos = g("rueda_frenos"); rueda_placa = g("rueda_placa"); rueda_agujeros = g("rueda_agujeros")
     rueda_agujero_d = g("rueda_agujero_d"); rueda_margen = g("rueda_margen")
     base_ruedas = g("base_ruedas"); base_material = g("base_material"); base_pasantes = g("base_pasantes")
+    # tipos de rueda, cazoletas y base suelta: no están en flightcase.scad (por defecto no cambian nada)
+    rueda_fijas = int(g("rueda_fijas", 0) or 0); ref_rueda_fija = g("ref_rueda_fija", "") or ""
+    cazoletas = bool(g("cazoletas", False)); ref_cazoleta = g("ref_cazoleta", "") or ""
+    base_suelta = bool(g("base_suelta", False)); base_holgura = g("base_holgura", 4)
     bandejas = g("bandejas"); bandeja_soportes = g("bandeja_soportes"); ref_escuadra = g("ref_escuadra")
     encastres = g("encastres"); encastre_corte = g("encastre_corte"); encastre_radio = g("encastre_radio")
     encastre_ala = g("encastre_ala"); encastre_profundidad = g("encastre_profundidad")
@@ -254,6 +258,32 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     E_rueda_placa = cd(_rueda_ref_geo, "placa", rueda_placa)
     E_rueda_agujeros = cd(_rueda_ref_geo, "agujeros", rueda_agujeros)
     E_rueda_agujero_d = 0 if rueda_agujero_d == 0 else cd(_rueda_ref_geo, "agujero_d", rueda_agujero_d)
+
+    # cuáles de las 4 ruedas son fijas (las últimas, del lado opuesto a las de freno)
+    _fijas_pedidas = max(0, min(4, rueda_fijas)) if ruedas == 4 else 0
+    _n_fijas = min(_fijas_pedidas, 4 - max(0, min(4, rueda_frenos)))
+
+    def _tipo_rueda(i):
+        return "fija" if i >= 4 - _n_fijas else ("freno" if i < rueda_frenos else "giratoria")
+
+    def _ref_tipo(tipo):
+        if tipo == "fija":
+            return ref_rueda_fija if ref_rueda_fija != "" else ref_rueda
+        return (ref_rueda_freno if ref_rueda_freno != "" else ref_rueda) if tipo == "freno" else ref_rueda
+
+    _rueda_dims = {t_: [cd(_ref_tipo(t_), "diametro", E_rueda_diametro), cd(_ref_tipo(t_), "alto", E_rueda_alto)]
+                   for t_ in ("giratoria", "freno", "fija")}
+
+    # cazoletas: la rueda va metida en una cubeta embutida en el piso
+    _caz_pedida = cazoletas and ruedas == 4
+    _caz = _caz_pedida and not (len(base_ruedas) >= 2 or base_suelta)
+    E_caz_corte = cd(ref_cazoleta, "corte", g("cazoleta_corte", [170, 160]))
+    E_caz_ala = ((cd(ref_cazoleta, "exterior", E_caz_corte)[0] - E_caz_corte[0]) / 2) if ce(ref_cazoleta) \
+        else g("cazoleta_ala", 12)
+    E_caz_prof = cd(ref_cazoleta, "prof", g("cazoleta_prof", 35))
+    E_caz_radio = cd(ref_cazoleta, "radio", g("cazoleta_radio", 10))
+    E_caz_remaches = cd(ref_cazoleta, "remaches", g("cazoleta_remaches", 8))
+    _caz_ext = [E_caz_corte[0] + 2 * E_caz_ala, E_caz_corte[1] + 2 * E_caz_ala] if _caz else [0, 0]
 
     _pla_cat = ce(ref_plato)
     E_encastre_corte = cd(ref_plato, "corte", encastre_corte)
@@ -415,7 +445,10 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
                     ["tapa2_trasera", "tapa2", w_frente, h_pared_tapa2],
                     ["tapa2_izq", "tapa2", w_lateral, h_pared_tapa2],
                     ["tapa2_der", "tapa2", w_lateral, h_pared_tapa2]]
-    if len(base_ruedas) >= 2:
+    if base_suelta and not _acost:
+        _g_s = 2 * (base_holgura + E_angulo_esp)
+        filas_p.append(["base_ruedas", "cuerpo", ext_ancho + _g_s, ext_prof + _g_s])
+    elif len(base_ruedas) >= 2:
         filas_p.append(["base_ruedas", "cuerpo", base_ruedas[0], base_ruedas[1]])
     for i, b in enumerate(bandejas):
         filas_p.append([f"bandeja{i}", "cuerpo", b[0], b[1]])
@@ -458,9 +491,13 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     _piso_ox = (ext_ancho - w_piso) / 2
     _piso_oy = (ext_prof - d_piso) / 2
     _pb = por_id.get(_panel_base)
-    _base = len(base_ruedas) >= 2
-    _bx = base_ruedas[0] if _base else 0
-    _by = base_ruedas[1] if _base else 0
+    # base suelta (wheel board): tabla con marco de ángulo en la que se apoya el case parado
+    _suelta = base_suelta and not _acost
+    _marco_ala, _marco_esp = E_angulo_ala, E_angulo_esp
+    _marco_g = base_holgura + _marco_esp          # del canto de la base a la cara del case
+    _base = len(base_ruedas) >= 2 or _suelta
+    _bx = (ext_ancho + 2 * _marco_g) if _suelta else (base_ruedas[0] if _base else 0)
+    _by = (ext_prof + 2 * _marco_g) if _suelta else (base_ruedas[1] if _base else 0)
     _bt = (base_ruedas[2] if len(base_ruedas) > 2 else 18) if _base else 0
     _bgap = hibrido_pared if _hib else E_angulo_esp
     _bo = [_pb.ancho / 2 - _bx / 2, _pb.alto / 2 - _by / 2] if _base else [0, 0]
@@ -470,17 +507,20 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     _bl_ylo = (((cierre_m_alto - cierre_m_sup) if _2t else _ala_arista - z0_cuerpo) + 10) if _acost else _ala_arista - _piso_oy + 10
     _bl_yhi = (cierre_m_alto - cierre_m_sup) + 10 if _acost else _ala_arista - _piso_oy + 10
     _bh = [E_rueda_agujeros[0] / 2 + E_rueda_agujero_d / 2, E_rueda_agujeros[1] / 2 + E_rueda_agujero_d / 2]
-    _bp = _base and base_pasantes
-    _rx0 = max(_bo[0] + _bm + E_rueda_placa[0] / 2, _bl_x + _bh[0] if _bp else -1e9)
-    _rx1 = min(_bo[0] + _bx - _bm - E_rueda_placa[0] / 2, _pb.ancho - _bl_x - _bh[0] if _bp else 1e9)
-    _ry0 = max(_bo[1] + _bm + E_rueda_placa[1] / 2, _bl_ylo + _bh[1] if _bp else -1e9)
-    _ry1 = min(_bo[1] + _by - _bm - E_rueda_placa[1] / 2, _pb.alto - _bl_yhi - _bh[1] if _bp else 1e9)
+    _bp = _base and base_pasantes and not _suelta
+    _mf = [_marco_ala + 5 + _bh[0], _marco_ala + 5 + _bh[1]] if _suelta else [-1e9, -1e9]   # bulones fuera del marco
+    _rx0 = max(_bo[0] + _bm + E_rueda_placa[0] / 2, _bl_x + _bh[0] if _bp else -1e9, _bo[0] + _mf[0])
+    _rx1 = min(_bo[0] + _bx - _bm - E_rueda_placa[0] / 2, _pb.ancho - _bl_x - _bh[0] if _bp else 1e9, _bo[0] + _bx - _mf[0])
+    _ry0 = max(_bo[1] + _bm + E_rueda_placa[1] / 2, _bl_ylo + _bh[1] if _bp else -1e9, _bo[1] + _mf[1])
+    _ry1 = min(_bo[1] + _by - _bm - E_rueda_placa[1] / 2, _pb.alto - _bl_yhi - _bh[1] if _bp else 1e9, _bo[1] + _by - _mf[1])
     ruedas_en_base = ([[(_rx0 if sx == 0 else _rx1) - _bo[0], (_ry0 if sy == 0 else _ry1) - _bo[1]]
                        for sx in (0, 1) for sy in (0, 1)] if (_base and ruedas == 4) else [])
     _enc_ext = [E_encastre_corte[0] + 2 * E_encastre_ala, E_encastre_corte[1] + 2 * E_encastre_ala]
     _enc_m = max(E_esq_pata, _ala_arista) + rueda_margen
-    _off_rx = max(_rueda_m + E_rueda_placa[0] / 2, _enc_m + _enc_ext[0] / 2 if encastres else 0)
-    _off_ry = max(_rueda_m + E_rueda_placa[1] / 2, _enc_m + _enc_ext[1] / 2 if encastres else 0)
+    _off_rx = max(_rueda_m + E_rueda_placa[0] / 2, _enc_m + _enc_ext[0] / 2 if encastres else 0,
+                  _enc_m + _caz_ext[0] / 2 if _caz else 0)
+    _off_ry = max(_rueda_m + E_rueda_placa[1] / 2, _enc_m + _enc_ext[1] / 2 if encastres else 0,
+                  _enc_m + _caz_ext[1] / 2 if _caz else 0)
     if _base and not _acost and ruedas == 4:
         pos_ruedas = [[c[0] + _bo[0] + _piso_ox, c[1] + _bo[1] + _piso_oy] for c in ruedas_en_base]
     else:
@@ -506,7 +546,7 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     elif _base:
         ruedas_base = [[c[0] + _bo[0], c[1] + _bo[1]] for c in ruedas_en_base]
     elif _acost:
-        ruedas_base = _base_pos(E_rueda_placa[0], E_rueda_placa[1])
+        ruedas_base = _base_pos(max(E_rueda_placa[0], _caz_ext[0]), max(E_rueda_placa[1], _caz_ext[1]))
     else:
         ruedas_base = [[c[0] - _piso_ox, c[1] - _piso_oy] for c in ruedas_centros]
 
@@ -561,7 +601,7 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
             marcas.append(Marca("cuerpo_trasera", "bisagra", x - ofc, _y_cierre_cuerpo, 0, 0, "c1"))
             marcas.append(Marca("tapa_trasera", "bisagra", x - off_frente, _y_cierre_tapa, 0, 0, "c1"))
     for i in range(len(ruedas_base)):
-        txt = "freno" if i < rueda_frenos else "placa rueda"
+        txt = "fija" if _tipo_rueda(i) == "fija" else ("freno" if i < rueda_frenos else "placa rueda")
         if _base:
             marcas.append(Marca("base_ruedas", "rueda", ruedas_en_base[i][0], ruedas_en_base[i][1], E_rueda_placa[0], E_rueda_placa[1], txt))
         else:
@@ -607,7 +647,7 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
             if m.tipo == "cierre" and por_id[m.panel].grupo == "cuerpo":
                 cy = m.y - 2 - _cie_corte[1] / 2 if m.texto == "c1" else m.y + 2 + _cie_corte[1] / 2
                 calados.append(Calado(m.panel, "cierre", m.x, cy, _cie_corte[0], _cie_corte[1], _cie_radio))
-    if E_rueda_agujero_d > 0 and (not _base or base_pasantes):
+    if E_rueda_agujero_d > 0 and (not _base or _bp) and not _caz:
         for c in ruedas_base:
             for ax in (-1, 1):
                 for ay in (-1, 1):
@@ -619,6 +659,9 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
                 for ay in (-1, 1):
                     calados.append(Calado("base_ruedas", "agujero", c[0] + ax * E_rueda_agujeros[0] / 2,
                                           c[1] + ay * E_rueda_agujeros[1] / 2, E_rueda_agujero_d, E_rueda_agujero_d, E_rueda_agujero_d / 2))
+    if _caz:
+        for c in ruedas_base:
+            calados.append(Calado(_panel_base, "cazoleta", c[0], c[1], E_caz_corte[0], E_caz_corte[1], E_caz_radio))
     calados += _rebajes
     for c in encastres_centros:
         calados.append(Calado("techo", "encastre", c[0] - _piso_ox, c[1] - _piso_oy, E_encastre_corte[0], E_encastre_corte[1], E_encastre_radio))
@@ -676,7 +719,23 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     _rem_cierre = sum(remaches_tramo(p.largo) * p.cantidad for p in perfiles if p.corte != "recto")
     _rem_total = (_rem_aristas + _rem_cierre + 8 * _esq_remaches + _n_cierres * _cie_remaches
                   + (len(_man_paneles) * _man_n * _man_remaches if manijas else 0) + (4 * E_encastre_remaches if encastres else 0)
-                  + _bis_rem + _tope_rem + _ref_rem)
+                  + _bis_rem + _tope_rem + _ref_rem + (4 * E_caz_remaches if _caz else 0))
+
+    # marco de la base suelta: 4 tramos de ángulo, uno por lado, que dejan libres las esquinas
+    # (ahí van las cantoneras del case); se atornillan a la base, sin remaches
+    _marco = []
+    if _suelta:
+        _mlx = ext_ancho - 2 * (E_esq_pata + 10)
+        _mly = ext_prof - 2 * (E_esq_pata + 10)
+        _mx0, _my0 = _marco_g + E_esq_pata + 10, _marco_g + E_esq_pata + 10
+        _marco = [dict(x0=_mx0, x1=_mx0 + _mlx, y0=0, y1=_marco_ala, borde="y0"),
+                  dict(x0=_mx0, x1=_mx0 + _mlx, y0=_by - _marco_ala, y1=_by, borde="y1"),
+                  dict(x0=0, x1=_marco_ala, y0=_my0, y1=_my0 + _mly, borde="x0"),
+                  dict(x0=_bx - _marco_ala, x1=_bx, y0=_my0, y1=_my0 + _mly, borde="x1")]
+        _perfil_marco = cat.nombre(ref_angulo) if ce(ref_angulo) else s("Ángulo ", _marco_ala, "x", _marco_ala, "x", _marco_esp)
+        perfiles.append(Perfil(_perfil_marco, "Marco de la base suelta, a lo ancho", _mlx, 2, "recto", ref_angulo))
+        perfiles.append(Perfil(_perfil_marco, "Marco de la base suelta, a lo profundo", _mly, 2, "recto", ref_angulo))
+        _marco_tornillos = 2 * (math.floor(_mlx / 150) + 2) + 2 * (math.floor(_mly / 150) + 2)
     _espuma_area = 2 * (E_int_ancho * E_int_prof + E_int_ancho * (E_int_alto_cuerpo + E_int_alto_tapa)
                         + E_int_prof * (E_int_alto_cuerpo + E_int_alto_tapa)) / 1e6
     _espuma_planchas = math.ceil(_espuma_area * 1.2 / 2)
@@ -702,14 +761,29 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     if ruedas == 4 and rueda_frenos > 0:
         H.append([nom(ref_rueda_freno, s("Rueda giratoria Ø", E_rueda_diametro, " con freno")), rueda_frenos,
                   s("agujeros ", E_rueda_agujeros[0], "x", E_rueda_agujeros[1]), ref_rueda_freno])
-    if ruedas == 4 and rueda_frenos < 4:
-        H.append([nom(ref_rueda, s("Rueda giratoria Ø", E_rueda_diametro, " sin freno")), 4 - rueda_frenos,
+    if ruedas == 4 and 4 - rueda_frenos - _n_fijas > 0:
+        H.append([nom(ref_rueda, s("Rueda giratoria Ø", E_rueda_diametro, " sin freno")), 4 - rueda_frenos - _n_fijas,
                   s("agujeros ", E_rueda_agujeros[0], "x", E_rueda_agujeros[1]), ref_rueda])
-    if ruedas == 4:
-        largo_bulon = (_bt + (E_placa_esp + _bgap if base_pasantes else 0) if _base else E_placa_esp) + 15
+    if _n_fijas > 0:
+        H.append([nom(ref_rueda_fija, s("Rueda fija Ø", _rueda_dims["fija"][0], " (sin giro)")), _n_fijas,
+                  s("agujeros ", E_rueda_agujeros[0], "x", E_rueda_agujeros[1], ", del lado opuesto a las de freno"),
+                  ref_rueda_fija])
+    if _caz:
+        H.append([nom(ref_cazoleta, "Cazoleta de acero para rueda"), 4,
+                  s("calado ", E_caz_corte[0], "x", E_caz_corte[1], ", prof. ", E_caz_prof, ", remachada por el reborde"),
+                  ref_cazoleta])
+    if ruedas == 4 and _suelta:
+        H.append([s("Bulón M", math.floor(E_rueda_agujero_d - 0.5), " cabeza fresada + arandela + tuerca autofrenante"), 16,
+                  s("para agujero Ø", E_rueda_agujero_d, " avellanado por arriba de la base, largo ≥ ", _bt + 15, " mm"), ""])
+    elif ruedas == 4:
+        largo_bulon = 20 if _caz else (_bt + (E_placa_esp + _bgap if base_pasantes else 0) if _base else E_placa_esp) + 15
         H.append([s("Bulón M", math.floor(E_rueda_agujero_d - 0.5), " + arandela + tuerca autofrenante"), 16,
-                  s("para agujero Ø", E_rueda_agujero_d, ", largo ≥ ", largo_bulon, " mm"), ""])
-    if _base and not base_pasantes:
+                  s("para agujero Ø", E_rueda_agujero_d, ", largo ≥ ", largo_bulon, " mm")
+                  + (" (en la cazoleta)" if _caz else ""), ""])
+    if _suelta:
+        H.append(["Tornillo para madera (marco de la base suelta)", _marco_tornillos,
+                  s("cada 150 mm, que no atraviesen la base de ", _bt, " mm"), ""])
+    if _base and not base_pasantes and not _suelta:
         H.append(["Tornillo para fijar la base al piso", 8, "o tuerca de clavar + bulón", ""])
     if bandejas:
         H.append([nom(ref_escuadra, "Escuadra para bandeja"), len(bandejas) * bandeja_soportes,
@@ -750,7 +824,7 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         [ref_placa, "placa"], [ref_angulo, "angulo"], [ref_hibrido, "hibrido"],
         [ref_cierre_macho, "hibrido" if cierre_hibrido else "tapa_m"], [ref_cierre_hembra, "hibrido" if cierre_hibrido else "tapa_h"],
         [ref_esquinero, "esquinero"], [ref_cierre, "cierre"], [ref_manija, "manija"], [ref_rueda, "rueda"],
-        [ref_rueda_freno, "rueda"], [ref_plato, "plato"], [ref_pie, "pie"], [ref_bisagra, "bisagra"], [ref_tope, "tope"],
+        [ref_rueda_freno, "rueda"], [ref_rueda_fija, "rueda"], [ref_cazoleta, "cazoleta"], [ref_plato, "plato"], [ref_pie, "pie"], [ref_bisagra, "bisagra"], [ref_tope, "tope"],
         [ref_espuma, "espuma"], [ref_remache, "remache"]]
     _int_mx = ext_alto_cuerpo if _hz else E_int_ancho
     _int_my = ext_alto_cuerpo - 2 * (cierre_m_alto - cierre_m_sup) if _fr else E_int_prof
@@ -774,14 +848,14 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         A.append("Hay base de ruedas pero ruedas = 0: la base va igual a la lista, sin ruedas.")
     fx = ext_prof if _hz else ext_ancho
     fy = ext_alto if _acost else ext_prof
-    if _base and (_bx > fx or _by > fy):
+    if _base and not _suelta and (_bx > fx or _by > fy):
         A.append(s("La base de ruedas (", _bx, " x ", _by, ") es más grande que la planta del case (", fx, " x ", fy,
                    "): revisá base_ruedas (orden: ancho y alto del plano del piso)."))
     if _base and ruedas == 4 and (_rx1 - _rx0 < E_rueda_placa[0] + 10 or _ry1 - _ry0 < E_rueda_placa[1] + 10):
         A.append("Las ruedas no entran en la base sin pisarse o sin que los bulones choquen con ángulos o perfiles de cierre.")
     if _base and _acost and _by > ext_alto_cuerpo + 2:
         A.append(s("La base de ruedas asoma ", (_by - ext_alto_cuerpo) / 2, " mm bajo cada tapa: las tapas se apoyan en ella al cerrar."))
-    if _base and (fx - _bx) / 2 < E_esq_pata and (fy - _by) / 2 < E_esq_pata:
+    if _base and not _suelta and (fx - _bx) / 2 < E_esq_pata and (fy - _by) / 2 < E_esq_pata:
         A.append("Con base de ruedas, revisá las cantoneras de abajo: una cantonera de bola choca con la base en las esquinas. Usá cantoneras planas abajo o recortá las esquinas de la base.")
     if _acc and _a_acc >= wlc - _j_acc - 60:
         A.append("La tapa de acceso es casi tan alta como el lateral: revisá acceso_lateral.")
@@ -798,7 +872,12 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         if ce(r[0]) and cat.categoria(r[0]) != r[1]:
             A.append(s("La referencia ", r[0], " (", cat.nombre(r[0]), ") no es del tipo esperado (", r[1], ")."))
     est = [r[0] for r in _refs_usadas if ce(r[0]) and not cat.verificado(r[0])
-           and r[1] in ("angulo", "esquinero", "cierre", "manija", "rueda", "plato")]
+           and r[1] in ("angulo", "esquinero", "cierre", "manija", "rueda", "plato", "cazoleta")]
+    _gen = [r for r in est if r.startswith("LBD-")]
+    est = [r for r in est if not r.startswith("LBD-")]
+    if _gen:
+        A.append("Medidas genéricas para " + ", ".join(_gen)
+                 + ": confirmalas con el herraje que compres antes de cortar o calar.")
     if est:
         A.append("Medidas estimadas (no figuran en el catálogo) para " + ", ".join(est)
                  + ": confirmalas con el herraje real o con su plano 2D en adamhall.com antes de cortar o calar.")
@@ -827,6 +906,38 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         A.append(s("La rueda ", _rueda_ref_geo, " se monta en la esquina o en ángulo: el generador no la ubica; queda solo en la lista."))
     if usar_catalogo_remaches and ref_remache == "" and not _rem_cands:
         A.append(s("No hay remache de Ø", remache_d, " con largo ≥ ", _rem_l_min, " mm en el catálogo."))
+    # ---- tipos de rueda, cazoletas y base suelta ----
+    if _fijas_pedidas > _n_fijas:
+        A.append(s("Con ", rueda_frenos, " ruedas con freno sólo pueden ser fijas ", _n_fijas, " de las 4."))
+    if ruedas == 4 and cd(ref_rueda, "tipo", "giratoria") == "fija":
+        A.append(s("La rueda ", ref_rueda, " es fija: elegila en ref_rueda_fija y poné una giratoria en ref_rueda."))
+    if _n_fijas > 0 and cd(ref_rueda_fija, "tipo", "fija") != "fija":
+        A.append(s("La rueda ", ref_rueda_fija, " elegida como fija es giratoria."))
+    _tipos_usados = {_tipo_rueda(i) for i in range(4)} if ruedas == 4 else set()
+    _altos = [_rueda_dims[t_][1] for t_ in _tipos_usados]
+    if _altos and max(_altos) - min(_altos) > 3:
+        A.append(s("Las ruedas elegidas tienen distinto alto (", min(_altos), " y ", max(_altos),
+                   " mm): el case queda inclinado. Usá ruedas de la misma serie."))
+    if _caz_pedida and not _caz:
+        A.append("Con base de ruedas no se usan cazoletas: las ruedas van en la base y se ignoran las cazoletas.")
+    if _caz:
+        _pmax = cd(ref_cazoleta, "placa_max", [E_caz_corte[0] - 6, E_caz_corte[1] - 6])
+        if E_rueda_placa[0] > _pmax[0] or E_rueda_placa[1] > _pmax[1]:
+            A.append(s("La placa de la rueda (", E_rueda_placa[0], " x ", E_rueda_placa[1], ") no entra en la cazoleta (hasta ",
+                       _pmax[0], " x ", _pmax[1], "): usá una cazoleta más grande."))
+        for t_ in sorted(_tipos_usados - {"fija"}):
+            d_, a_ = _rueda_dims[t_]
+            if E_caz_prof > a_ - d_ and 2 * (0.35 * d_ / 2 + d_ / 2) + 6 > min(E_caz_corte):
+                A.append(s("La rueda de Ø", d_, " entra ", E_caz_prof - (a_ - d_), " mm en la cazoleta y al girar choca con "
+                           "sus paredes: usá una cazoleta más grande o menos profunda."))
+                break
+        _intr = E_caz_prof + 1.5 - E_placa_esp
+        if _intr > 0:
+            A.append(s("Las cazoletas entran ", _intr, " mm dentro del case en las 4 esquinas del ",
+                       "piso" if not _acost else "lado de abajo", ": dejá ese lugar libre en la espuma o el interior."))
+    if base_suelta and _acost:
+        A.append(s("La base suelta sólo se calcula para cases parados (orientación vertical): en orientación ",
+                   orientacion, " se usa la base atornillada de base_ruedas", "." if len(base_ruedas) >= 2 else " (está vacía)."))
     if ruedas == 4 and pies == 4:
         A.append("Elegiste ruedas y pies a la vez: van los dos en el piso, verificá que no se crucen.")
     if _cie_emb and _y_cierre_cuerpo - 2 - _cie_corte[1] < (_y_cierre2_cuerpo + 2 + _cie_corte[1] + 10 if _2t else _ala_arista + 10):
@@ -901,7 +1012,8 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
                                      1 if _lat_cierres else 0, _n_cierres, 1 if _cie_emb else 0, _n_bisagras,
                                      1 if pies == 4 else 0, 1 if _man_emb else 0)],
         "encastres": [fmt(1 if encastres else 0), fmt(E_encastre_profundidad)],
-        "ruedas": [fmt(ruedas), fmt((E_rueda_alto if ruedas == 4 else (_pie_h if pies == 4 else 0)) + (_bt + _bgap if _base else 0)),
+        "ruedas": [fmt(ruedas), fmt((E_rueda_alto - (E_caz_prof if _caz else 0) if ruedas == 4 else (_pie_h if pies == 4 else 0))
+                                    + (_bt + _bgap + (_marco_esp if _suelta else 0) if _base else 0)),
                    fmt(E_rueda_agujero_d), fmt(E_rueda_agujeros[0]), fmt(E_rueda_agujeros[1])],
         "placa": [fmt(E_placa_largo), fmt(E_placa_ancho), fmt(placa_kerf), fmt(placa_margen), ref_placa],
         "cantidad": [fmt(cantidad_cases)],
@@ -911,6 +1023,12 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     }
     if _rebajes:
         info["rebaje"] = [fmt(refuerzo_esp), fmt(rebaje_holgura)]
+    if _n_fijas:
+        info["ruedas_fijas"] = [fmt(_n_fijas)]
+    if _caz:
+        info["cazoletas"] = [fmt(E_caz_prof), fmt(E_caz_ala), fmt(E_caz_remaches), fmt(E_caz_corte[0]), fmt(E_caz_corte[1])]
+    if _suelta:
+        info["base_suelta"] = [fmt(base_holgura), fmt(_marco_ala), fmt(_marco_esp)]
 
     extras_p = [[e[0], e[1], e[2], e[3], e[4] if len(e) > 4 else 1, e[5] if len(e) > 5 else s("Placa ", e[3], " mm")]
                 for e in piezas_extra]
@@ -977,8 +1095,12 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         colocaciones=colocaciones, espesor=_t, horizontal=_hz, frontal=_fr, dos_tapas=_2t,
         z_cierre=z_cierre, z_cierre2=z_cierre2, cierre_m_alto=cierre_m_alto, cierre_h_alto=cierre_h_alto,
         cierre_saliente=cierre_saliente, ala_arista=_ala_arista, hibrido=_hib,
-        base=dict(panel=_panel_base, x=_bo[0], y=_bo[1], ancho=_bx, alto=_by, esp=_bt, separacion=_bgap)
+        base=dict(panel=_panel_base, x=_bo[0], y=_bo[1], ancho=_bx, alto=_by, esp=_bt,
+                  separacion=_bgap + (_marco_esp if _suelta else 0), suelta=_suelta, marco=_marco,
+                  marco_ala=_marco_ala, marco_esp=_marco_esp)
         if _base else None,
+        ruedas_tipos=[_tipo_rueda(i) for i in range(4)], rueda_dims=_rueda_dims,
+        cazoleta=dict(prof=E_caz_prof, ala=E_caz_ala) if _caz else None,
         ruedas=[list(c) for c in ruedas_centros], rueda_alto=E_rueda_alto if ruedas == 4 else 0,
         esq_descuento=E_esq_descuento, esq_pata=E_esq_pata, L_x=_L_x, L_y=_L_y, L_zc=_L_zc, L_zt=_L_zt,
         L_zt2=_L_zt2, arista_esp=hibrido_pared if _hib else E_angulo_esp, ala=15 if _hib else E_angulo_ala,
