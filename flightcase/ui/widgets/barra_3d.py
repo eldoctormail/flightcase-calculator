@@ -111,8 +111,8 @@ class BarraVista3D(QFrame):
             b.setAutoExclusive(True)
         self.botones[canvas.modo_raton].setChecked(True)
         separador()
-        boton("girar_izq", "rotate", "Girar 90° a la izquierda", lambda: canvas.girar(90))
-        boton("girar_der", "rotate-clockwise", "Girar 90° a la derecha", lambda: canvas.girar(-90))
+        boton("girar_izq", "girar-izq", "Girar 90° a la izquierda", lambda: canvas.girar(90))
+        boton("girar_der", "girar-der", "Girar 90° a la derecha", lambda: canvas.girar(-90))
         vistas = boton("vistas", "box", "Vistas: isométrica, frente, atrás, lados, arriba, abajo")
         menu = QMenu(vistas)
         for clave, texto in (("iso", "Isométrica"), ("frente", "Frente"), ("atras", "Atrás"),
