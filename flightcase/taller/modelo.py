@@ -1131,6 +1131,23 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         _hm.unir_herrajes(herrajes, manuales.herrajes, Herraje)
         A += manuales.avisos
 
+    def _datos_ref(ref):
+        return dict(cat.fila(ref)["datos"]) if ce(ref) else {}
+
+    # ---- datos para la capa de perforaciones de los DXF (perforaciones.py) ----
+    perforacion = dict(
+        remache_d=E_remache_d, paso=remache_paso, esq_remaches=_esq_remaches,
+        cierre=dict(_datos_ref(ref_cierre), remaches=_cie_remaches, tipo=_cie_tipo, corte=list(_cie_corte)),
+        bisagra=dict(_datos_ref(ref_bisagra), remaches=cd(ref_bisagra, "remaches", 6)),
+        piano=_largo_piano if (_con_bisagras and _piano) else 0,
+        manija=dict(_datos_ref(ref_manija), remaches=_man_remaches),
+        cazoleta=dict(_datos_ref(ref_cazoleta), remaches=E_caz_remaches, ala=E_caz_ala),
+        plato=dict(_datos_ref(ref_plato), remaches=E_encastre_remaches, ala=E_encastre_ala),
+        marco_ala=_marco_ala,
+        # perfil híbrido: el remache va en el medio del ala que cubre el panel metido en el canal
+        hibrido_ala=cd(ref_hibrido, "ala_corta", 20) if _hib else 0, hibrido_descuento=_d,
+    )
+
     return ResultadoTaller(
         info=info, paneles=paneles, calados=calados, marcas=marcas, perfiles=perfiles, extras=extras_p,
         herrajes=herrajes, panelmat=panelmat, bandejas=bandejas_out, avisos=A,
@@ -1138,7 +1155,8 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
                  "placa_largo": E_placa_largo, "placa_ancho": E_placa_ancho, "placa_esp": E_placa_esp,
                  "placa_material": E_placa_material, "placa_kerf": placa_kerf, "placa_margen": placa_margen,
                  "barra_largo": barra_largo, "sierra_kerf": sierra_kerf, "cantidad_cases": cantidad_cases,
-                 "remache_ref": E_remache_ref, "materiales_paneles": _mat_pan, "geo": geo, "interiores": interior, "manuales": manuales},
+                 "remache_ref": E_remache_ref, "materiales_paneles": _mat_pan, "geo": geo, "interiores": interior, "manuales": manuales,
+                 "perforacion": perforacion},
     )
 
 
