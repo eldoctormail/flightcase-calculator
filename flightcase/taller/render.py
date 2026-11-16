@@ -124,21 +124,36 @@ def renderizar(malla: Malla3D, ruta: str, camara: str = "0,0,0,62,0,32,0", tam: 
     """Dibuja la malla y la guarda en `ruta` (PNG). Devuelve True si pudo. `colores` reemplaza
     colores de grupos (por ejemplo el color de la placa: base, lid, wall). Con `transparente`,
     el fondo queda transparente en lugar de blanco."""
+    img = imagen(malla, camara, tam, colores, transparente)
+    return img is not None and img.save(ruta)
+
+
+def ejes_camara(camara: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """(hacia la cámara, derecha, arriba) de una cámara de OpenSCAD."""
+    rx, rz = (math.radians(a) for a in _camara(camara))
+    ojo = np.array(_norm((math.sin(rz) * math.sin(rx), -math.cos(rz) * math.sin(rx), math.cos(rx))))
+    der = np.array(_norm((-ojo[1], ojo[0], 0.0)) if abs(ojo[2]) < 0.999 else (1.0, 0.0, 0.0))
+    return ojo, der, np.cross(ojo, der)
+
+
+def imagen(malla: Malla3D, camara: str = "0,0,0,62,0,32,0", tam: str = "1400,1050",
+           colores: Optional[Dict[str, str]] = None, transparente: bool = False,
+           orto: Optional[float] = None, centro_vista: Optional[Sequence[float]] = None) -> Optional[QImage]:
+    """Como renderizar(), pero devuelve la imagen. Con `orto` (píxeles por mm) la vista es paralela,
+    sin perspectiva, a esa escala y centrada en `centro_vista` (o en el centro del case): así cada
+    píxel corresponde a una medida conocida y se puede acotar encima."""
     paleta = dict(COLORES, **(colores or {}))
     if QGuiApplication.instance() is None:
         QGuiApplication([])
     w, h = (int(x) for x in tam.split(","))
     W, H = w * SUPER, h * SUPER
-    rx, rz = (math.radians(a) for a in _camara(camara))
-    ojo = np.array(_norm((math.sin(rz) * math.sin(rx), -math.cos(rz) * math.sin(rx), math.cos(rx))))
-    der = np.array(_norm((-ojo[1], ojo[0], 0.0)) if abs(ojo[2]) < 0.999 else (1.0, 0.0, 0.0))
-    arriba = np.cross(ojo, der)
+    ojo, der, arriba = ejes_camara(camara)
     luz = np.array(_norm(-0.35 * der + 0.55 * arriba + 0.75 * ojo))   # luz fija respecto de la cámara, como OpenSCAD
     base = np.stack([der, arriba, ojo], axis=1)          # (p - centro) · base = (x, y, hacia la cámara)
 
     caras = [f for f in malla.faces if len(f.vertices) >= 3]
     if not caras:
-        return False
+        return None
     # perspectiva como OpenSCAD con --viewall --autocenter --projection=p (campo visual de 22,5°)
     todos = np.array([(p.x, p.y, p.z) for f in caras for p in f.vertices])
     centro = (todos.max(axis=0) + todos.min(axis=0)) / 2
@@ -146,11 +161,16 @@ def renderizar(malla: Malla3D, ruta: str, camara: str = "0,0,0,62,0,32,0", tam: 
     medio = math.radians(FOV / 2)
     dist = radio / math.sin(medio)
     focal = (min(W, H) / 2) / math.tan(medio)
+    k_orto = orto * SUPER if orto else None
+    if k_orto and centro_vista is not None:
+        centro = np.asarray(centro_vista, dtype=float)
     camara_pos = centro + ojo * dist
 
     def pantalla(pts: np.ndarray) -> np.ndarray:
         q = (pts - centro) @ base
-        zc = dist - q[:, 2]
+        zc = dist - q[:, 2]          # la profundidad es 1/distancia también en la vista paralela
+        if k_orto:
+            return np.stack([W / 2 + k_orto * q[:, 0], H / 2 - k_orto * q[:, 1], 1.0 / zc], axis=1)
         return np.stack([W / 2 + focal * q[:, 0] / zc, H / 2 - focal * q[:, 1] / zc, 1.0 / zc], axis=1)
 
     lienzo = _Lienzo(W, H)
@@ -178,6 +198,8 @@ def renderizar(malla: Malla3D, ruta: str, camara: str = "0,0,0,62,0,32,0", tam: 
         return ident
 
     def mira(n: np.ndarray, p0: np.ndarray) -> bool:
+        if k_orto:
+            return float(n @ ojo) > 1e-6
         return float(n @ (camara_pos - p0)) > 1e-6
 
     # calados pasantes: se recortan de las dos caras grandes del panel, así se ve lo que hay detrás
@@ -201,7 +223,7 @@ def renderizar(malla: Malla3D, ruta: str, camara: str = "0,0,0,62,0,32,0", tam: 
 
     # rótulos como en rotulo(): placa blanca redondeada apoyada sobre el panel, con el texto encima
     textos = []
-    for r in malla.rotulos:
+    for r in getattr(malla, "rotulos", []):
         n = np.array(_norm(r.normal))
         c = np.array([r.centro.x, r.centro.y, r.centro.z])
         if not mira(n, c):
@@ -215,7 +237,7 @@ def renderizar(malla: Malla3D, ruta: str, camara: str = "0,0,0,62,0,32,0", tam: 
         textos.append((ident, r, c + n * 0.3, ex_, ey_))
 
     _texturas(lienzo, np.array(normales + [(0, 0, 1)]), np.array(tangentes + [(1, 0, 0)]),
-              np.array(materiales + [MAT_NINGUNO]), luz, camara_pos, centro, base, dist, focal)
+              np.array(materiales + [MAT_NINGUNO]), luz, camara_pos, centro, base, dist, focal, k_orto)
     lienzo.contornos(np.array(normales + [(0, 0, 1)]), np.array(colores_id + [-1]), grosor=SUPER)
 
     if textos:
@@ -243,14 +265,15 @@ def renderizar(malla: Malla3D, ruta: str, camara: str = "0,0,0,62,0,32,0", tam: 
         lienzo.col *= (1 - alfa)[:, :, None]
 
     if transparente:     # premultiplicado, para que al achicar no quede un borde blanco
-        alfa = np.any(np.abs(lienzo.col - np.asarray(FONDO, dtype=np.float32)) > 0.5, axis=2)
+        # opaco donde hay una pieza o su contorno (aunque la pieza sea blanca, como un rótulo)
+        alfa = (lienzo.ident >= 0) | np.any(np.abs(lienzo.col - np.asarray(FONDO, dtype=np.float32)) > 0.5, axis=2)
         rgba = np.concatenate([lienzo.col * alfa[:, :, None], alfa[:, :, None] * 255.0], axis=2)
         rgba = np.ascontiguousarray(np.clip(rgba, 0, 255).astype(np.uint8))
         img = QImage(rgba.data, W, H, 4 * W, QImage.Format_RGBA8888_Premultiplied).copy()
-        return img.scaled(w, h, Qt.IgnoreAspectRatio, Qt.SmoothTransformation).save(ruta)
+        return img.scaled(w, h, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
     rgb = np.ascontiguousarray(np.clip(lienzo.col, 0, 255).astype(np.uint8))
     img = QImage(rgb.data, W, H, 3 * W, QImage.Format_RGB888).copy()
-    return img.scaled(w, h, Qt.IgnoreAspectRatio, Qt.SmoothTransformation).save(ruta)
+    return img.scaled(w, h, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
 
 
 MAT_NINGUNO, MAT_MADERA, MAT_CANTO, MAT_ALUMINIO, MAT_METAL, MAT_GOMA = range(6)
@@ -289,7 +312,7 @@ def _ruido(x: np.ndarray, y: np.ndarray) -> np.ndarray:
 
 def _texturas(lienzo: "_Lienzo", normales: np.ndarray, tangentes: np.ndarray, materiales: np.ndarray,
               luz: np.ndarray, camara_pos: np.ndarray, centro: np.ndarray, base: np.ndarray,
-              dist: float, focal: float) -> None:
+              dist: float, focal: float, k_orto: Optional[float] = None) -> None:
     """Veta de madera, aluminio cepillado y brillo de los metales, píxel por píxel."""
     ys, xs = np.nonzero(lienzo.ident >= 0)
     if len(xs) == 0:
@@ -301,8 +324,12 @@ def _texturas(lienzo: "_Lienzo", normales: np.ndarray, tangentes: np.ndarray, ma
     H, W = lienzo.h, lienzo.w
     # posición en el mundo de cada píxel a partir de su profundidad (z = 1/distancia a la cámara)
     zc = 1.0 / lienzo.z[ys, xs]
-    cx = (xs + 0.5 - W / 2) * zc / focal
-    cy = -(ys + 0.5 - H / 2) * zc / focal
+    if k_orto:
+        cx = (xs + 0.5 - W / 2) / k_orto
+        cy = -(ys + 0.5 - H / 2) / k_orto
+    else:
+        cx = (xs + 0.5 - W / 2) * zc / focal
+        cy = -(ys + 0.5 - H / 2) * zc / focal
     pos = centro + cx[:, None] * base[:, 0] + cy[:, None] * base[:, 1] + (dist - zc)[:, None] * base[:, 2]
     n, tg = normales[ident], tangentes[ident]
     bt = np.cross(n, tg)
@@ -327,8 +354,11 @@ def _texturas(lienzo: "_Lienzo", normales: np.ndarray, tangentes: np.ndarray, ma
 
     # brillo especular (Blinn) según el material
     brillo = np.zeros(len(xs), dtype=np.float32)
-    vista = camara_pos - pos
-    vista /= np.linalg.norm(vista, axis=1)[:, None]
+    if k_orto:          # vista paralela: todos los rayos miran igual
+        vista = np.broadcast_to(base[:, 2], pos.shape).copy()
+    else:
+        vista = camara_pos - pos
+        vista /= np.linalg.norm(vista, axis=1)[:, None]
     medio = vista + luz
     medio /= np.linalg.norm(medio, axis=1)[:, None]
     nh = np.clip((n * medio).sum(axis=1), 0, 1)
