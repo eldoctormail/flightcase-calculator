@@ -71,6 +71,7 @@ class Cuerpo:
     vertices: List[Vec]
     caras: List[Cara]
     cerrado: bool = True
+    color_hex: str = ""      # color que pidió el usuario para esa pieza (piezas.py)
 
     def volumen(self) -> float:
         V = self.vertices
@@ -243,7 +244,7 @@ def cuerpo_de_solido(malla: Malla3D, so: Solido3D, avisos: Optional[List[str]] =
         return None
     if so.agujeros:
         _agujeros_del_panel(V, caras, [[(p.x, p.y, p.z) for p in ag] for ag in so.agujeros], so.nombre, avisos)
-    cuerpo = Cuerpo(so.nombre or "Pieza", so.color, V.lista, caras)
+    cuerpo = Cuerpo(so.nombre or "Pieza", so.color, V.lista, caras, color_hex=getattr(so, "color_hex", ""))
     _orientar(cuerpo)
     return cuerpo
 
@@ -417,7 +418,7 @@ def texto_step(lista: Sequence[Cuerpo], titulo: str = "Flightcase", archivo: str
 
     def estilo(color: str) -> int:
         if color not in colores:
-            r, g, b = _rgb(COLORES.get(color, COLORES["base"]))
+            r, g, b = _rgb(color if color.startswith("#") else COLORES.get(color, COLORES["base"]))
             col = w(f"COLOUR_RGB('{color}',{_num(r, 4)},{_num(g, 4)},{_num(b, 4)})")
             fas = w(f"FILL_AREA_STYLE('',(#{w(f'FILL_AREA_STYLE_COLOUR({chr(39)}{chr(39)},#{col})')}))")
             sss = w(f"SURFACE_SIDE_STYLE('',(#{w(f'SURFACE_STYLE_FILL_AREA(#{fas})')}))")
@@ -428,7 +429,7 @@ def texto_step(lista: Sequence[Cuerpo], titulo: str = "Flightcase", archivo: str
         pd = producto(nombre)
         items = [_solido(w, c) for c in cs]
         for it, c in zip(items, cs):
-            estilos.append(w(f"STYLED_ITEM('color',(#{estilo(c.color)}),#{it})"))
+            estilos.append(w(f"STYLED_ITEM('color',(#{estilo(c.color_hex or c.color)}),#{it})"))
         ej = ejes()
         tipo = "ADVANCED_BREP_SHAPE_REPRESENTATION" if all(c.cerrado for c in cs) else "SHAPE_REPRESENTATION"
         rep = w(f"{tipo}({_txt(nombre)},{w.refs(items + [ej])},#{ctx})")

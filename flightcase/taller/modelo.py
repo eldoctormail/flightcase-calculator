@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from ..paths import bundled_resource
 from . import materiales as _mat
+from . import piezas as _piezas
 
 TRAMO_MINIMO = 30.0  # tramos de perfil más cortos se omiten (el esquinero llega al cierre)
 
@@ -206,6 +207,11 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     from . import formulas as _formulas
     _fx = _formulas.aplicar(P, parametros_por_defecto(), ENTEROS)
     cat = catalogo or catalogo_actual()
+    # ---- piezas sueltas (piezas.py): la placa de un panel elegido en el 3D va como material por panel ----
+    _pan_pz = [[c.pieza, c.ref, 0, ""] for c in _piezas.cambios(P).values()
+               if _piezas.tipo_de(c.pieza) == "panel" and c.ref]
+    if _pan_pz:
+        P["paneles_material"] = list(P.get("paneles_material") or []) + _pan_pz
     # ---- medida interior de metal a metal (medida_interior.py); no está en flightcase.scad ----
     from . import medida_interior as _mi
     pedido = {k: P[k] for k in ("int_ancho", "int_prof", "int_alto_cuerpo", "int_alto_tapa")}
@@ -222,7 +228,13 @@ def _calcular(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
     g = P.get
     from . import formas as _formas
     if _formas.es_forma(P):     # rack inclinado, funda de rack, baúl plegable (formas.py)
-        return _formas.calcular(P, cat)
+        res = _formas.calcular(P, cat)
+        res.valores["geo"]["colores_paneles"] = {k_: c_.hex for k_, c_ in _piezas.cambios(P).items()
+                                                 if _piezas.tipo_de(k_) == "panel" and c_.hex}
+        if any(_piezas.tipo_de(k) != "panel" for k in _piezas.cambios(P)):
+            res.avisos.append("En este tipo de case todavía no se cambian esquineros ni ángulos sueltos: "
+                              "esos cambios no se aplican.")
+        return res
 
     int_ancho = g("int_ancho"); int_prof = g("int_prof")
     int_alto_cuerpo = g("int_alto_cuerpo"); int_alto_tapa = g("int_alto_tapa")
@@ -777,6 +789,18 @@ def _calcular(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
         [_perfil_macho, "Junta tapa de acceso lateral", _L_zc + (2 * cierre_m_alto if _ing_junta else 0) if _acc else 0, 2, "45L/45L" if _ing_junta else "recto", _ref_cm],
         [_perfil_hembra, "Junta tapa de acceso lateral", _L_zc + (2 * cierre_h_alto if _ing_junta else 0) if _acc else 0, 2, "45L/45L" if _ing_junta else "recto", _ref_ch],
     ]
+    # ---- piezas sueltas (piezas.py): cada esquinero y cada ángulo, con lo que le cambie el usuario ----
+    _pz_geo = dict(horizontal=_hz, frontal=_fr, dos_tapas=_2t, z_cierre=z_cierre, z_cierre2=z_cierre2,
+                   cierre_m_alto=cierre_m_alto, cierre_h_alto=cierre_h_alto, L_zc=_L_zc, L_zt=_L_zt, L_zt2=_L_zt2,
+                   colocaciones=[dict(id=p_.id) for p_ in paneles])
+    _pz_gen = _piezas.General(
+        ref_esq=ref_esquinero, nombre_esq=cat.nombre(ref_esquinero) if ce(ref_esquinero) else "Esquinero bola", pata=E_esq_pata,
+        remaches_esq=_esq_remaches, descuento=E_esq_descuento, ref_ar=_ref_arista, nombre_ar=_perfil_arista,
+        ala=15 if _hib else E_angulo_ala, esp=hibrido_pared if _hib else E_angulo_esp, hibrido=_hib)
+    _pz_esq, _pz_ar, _pz_avisos = _piezas.armar(
+        _pz_geo, ext_ancho, ext_prof, ext_alto, _pz_gen, P, cat,
+        {"x": _n_ax, "y": _n_ay, "zc": _n_vz + " cuerpo", "zt": _n_vz + _t1, "zt2": _n_vz + _t2})
+    candidatos[:5] = _piezas.filas_perfiles(_pz_ar)
     perfiles = [Perfil(*p) for p in candidatos if p[2] >= TRAMO_MINIMO]
 
     # ---- herrajes ----
@@ -794,7 +818,7 @@ def _calcular(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
 
     _rem_aristas = sum(2 * remaches_tramo(p.largo) * p.cantidad for p in perfiles if p.corte == "recto")
     _rem_cierre = sum(remaches_tramo(p.largo) * p.cantidad for p in perfiles if p.corte != "recto")
-    _rem_total = (_rem_aristas + _rem_cierre + 8 * _esq_remaches + _n_cierres * _cie_remaches
+    _rem_total = (_rem_aristas + _rem_cierre + _piezas.remaches_esquineros(_pz_esq) + _n_cierres * _cie_remaches
                   + (len(_man_paneles) * _man_n * _man_remaches if manijas else 0) + (4 * E_encastre_remaches if encastres else 0)
                   + _bis_rem + _tope_rem + _ref_rem + (4 * E_caz_remaches if _caz else 0))
 
@@ -831,7 +855,7 @@ def _calcular(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
     _cie_detalle = cara_txt + (s(", embutido: calado ", _cie_corte[0], "x", _cie_corte[1]) if _cie_emb else "")
 
     H = []
-    H.append([nom(ref_esquinero, "Esquinero bola"), 8, s("pata ", E_esq_pata, " mm"), ref_esquinero])
+    H.extend(_piezas.filas_esquineros(_pz_esq))
     if _n_cierres > 0:
         H.append([nom(ref_cierre, "Cierre mariposa"), _n_cierres, _cie_detalle, ref_cierre])
     if manijas:
@@ -1080,6 +1104,7 @@ def _calcular(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
         L_pl, A_pl = _m.largo - 2 * placa_margen, _m.ancho - 2 * placa_margen
         if not ((p.ancho <= L_pl and p.alto <= A_pl) or (p.alto <= L_pl and p.ancho <= A_pl)):
             A.append(s("El panel ", p.nombre, " no entra en una placa de ", _m.largo, "x", _m.ancho, "."))
+    A += _pz_avisos
     A += _mat.lista_avisos(_mat_pan, paneles, _t, _hib, cat, [ref_hibrido] if _hib else [ref_cierre_macho, ref_cierre_hembra], _general)
     for _k in _mat.claves_desconocidas(P, paneles):
         A.append(s("Material por panel: \"", _k, "\" no es un panel de este case; esa fila no se usa."))
@@ -1211,6 +1236,9 @@ def _calcular(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
         ruedas_tipos=[_tipo_rueda(i) for i in range(4)], rueda_dims=_rueda_dims,
         cazoleta=dict(prof=E_caz_prof, ala=E_caz_ala) if _caz else None,
         ruedas=[list(c) for c in ruedas_centros], rueda_alto=E_rueda_alto if ruedas == 4 else 0,
+        esquineros_case=_pz_esq, aristas_case=_pz_ar,
+        colores_paneles={k_: c_.hex for k_, c_ in _piezas.cambios(P).items()
+                         if _piezas.tipo_de(k_) == "panel" and c_.hex},
         esq_descuento=E_esq_descuento, esq_pata=E_esq_pata, L_x=_L_x, L_y=_L_y, L_zc=_L_zc, L_zt=_L_zt,
         L_zt2=_L_zt2, arista_esp=hibrido_pared if _hib else E_angulo_esp, ala=15 if _hib else E_angulo_ala,
         puertas=dict(lado=puerta_lado) if _door else None,

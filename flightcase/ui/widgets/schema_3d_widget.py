@@ -50,6 +50,8 @@ class Schema3DCanvas(QOpenGLWidget):
     view_changed = Signal()
     medicion_cambiada = Signal(str)    # texto de la medida (vacío = sin medida)
     projection_changed = Signal(bool)  # True = Perspective, False = Parallel
+    pieza_elegida = Signal(str)        # clic sobre una pieza (id de piezas.py; vacío = clic en el vacío)
+    MOVIMIENTO_CLIC = 4                # píxeles: si el mouse se movió más, fue un arrastre y no un clic
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -94,6 +96,9 @@ class Schema3DCanvas(QOpenGLWidget):
         # Highlight state for selected elements
         self.highlighted_wall_indices: set[int] = set()
         self.highlighted_labels: set[str] = set()
+        self.piezas_resaltadas: set[str] = set()   # piezas elegidas con un clic
+        self._caras_np = None                      # (vértices, desde, cuántos, piezas) para elegir con un clic
+        self._apreto_en: Optional[QPointF] = None
 
         # Mouse interaction state
         self._last_mouse_pos: Optional[QPoint] = None
@@ -106,7 +111,61 @@ class Schema3DCanvas(QOpenGLWidget):
         """Sets flightcase 3D mesh and triggers a redraw."""
         self.mesh = mesh
         self._vertices = None
+        self._caras_np = None
         self.update()
+
+    def set_piezas_resaltadas(self, piezas) -> None:
+        self.piezas_resaltadas = set(piezas or [])
+        self.update()
+
+    def pieza_en(self, pos: QPointF) -> str:
+        """La pieza (id) de la cara más de adelante bajo el mouse; "" si no hay ninguna."""
+        if self.mesh is None or not self.mesh.faces:
+            return ""
+        if self._caras_np is None:
+            pts, desde, cuantos, piezas = [], [], [], []
+            for f in self.mesh.faces:
+                if len(f.vertices) < 3:
+                    continue
+                desde.append(len(pts))
+                cuantos.append(len(f.vertices))
+                pts.extend((p.x, p.y, p.z) for p in f.vertices)
+                piezas.append(f.pieza)
+            self._caras_np = (np.array(pts, dtype=float).reshape(-1, 3), np.array(desde), np.array(cuantos), piezas)
+        pts, desde, cuantos, piezas = self._caras_np
+        pr = self._proyectar_np(pts)
+        if pr is None:
+            return ""
+        x, y = pos.x(), pos.y()
+        # descarte rápido: caras cuyo rectángulo en pantalla no contiene el punto
+        idx = np.repeat(np.arange(len(desde)), cuantos)
+        xmin = np.full(len(desde), np.inf); xmax = np.full(len(desde), -np.inf)
+        ymin = np.full(len(desde), np.inf); ymax = np.full(len(desde), -np.inf)
+        np.minimum.at(xmin, idx, pr[:, 0]); np.maximum.at(xmax, idx, pr[:, 0])
+        np.minimum.at(ymin, idx, pr[:, 1]); np.maximum.at(ymax, idx, pr[:, 1])
+        cand = np.nonzero((xmin <= x) & (x <= xmax) & (ymin <= y) & (y <= ymax))[0]
+        mejor, prof = "", math.inf
+        for i in cand:
+            q = pr[desde[i]:desde[i] + cuantos[i]]
+            dentro, n = False, len(q)
+            for j in range(n):          # punto en polígono (pares e impares)
+                (x0, y0, _), (x1, y1, _) = q[j], q[(j + 1) % n]
+                if (y0 > y) != (y1 > y) and x < x0 + (y - y0) * (x1 - x0) / (y1 - y0):
+                    dentro = not dentro
+            if not dentro:
+                continue
+            # profundidad en el punto: el plano de la cara (con sus tres primeros vértices)
+            (ax, ay, az), (bx, by, bz), (cx, cy, cz) = q[0], q[1], q[2]
+            det = (bx - ax) * (cy - ay) - (cx - ax) * (by - ay)
+            if abs(det) > 1e-9:
+                u = ((x - ax) * (cy - ay) - (cx - ax) * (y - ay)) / det
+                v = ((bx - ax) * (y - ay) - (x - ax) * (by - ay)) / det
+                z = az + u * (bz - az) + v * (cz - az)
+            else:
+                z = float(q[:, 2].min())
+            if z < prof - 1e-7:
+                mejor, prof = piezas[i], z
+        return mejor
 
     def set_perspective(self, is_perspective: bool) -> None:
         """Sets projection mode: True for Perspective, False for Parallel (Orthographic)."""
@@ -176,6 +235,8 @@ class Schema3DCanvas(QOpenGLWidget):
 
     def is_face_highlighted(self, face: PolygonFace3D) -> bool:
         """Determines whether a given 3D polygon face is currently selected/highlighted."""
+        if face.pieza and face.pieza in self.piezas_resaltadas:
+            return True
         if not self.highlighted_wall_indices and not self.highlighted_labels:
             return False
 
@@ -670,6 +731,7 @@ class Schema3DCanvas(QOpenGLWidget):
                 return
             if self.modo_medir and self._clic_medir(event.position()):
                 return
+            self._apreto_en = event.position()
         self._last_mouse_pos = event.position().toPoint()
         self._mouse_button_down = event.button()
         self._poner_cursor(arrastrando=True)
@@ -700,6 +762,11 @@ class Schema3DCanvas(QOpenGLWidget):
             self.zoom(1.01 ** (-delta.y()))
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        apreto, self._apreto_en = self._apreto_en, None
+        if event.button() == Qt.MouseButton.LeftButton and apreto is not None and not self.modo_medir:
+            d = event.position() - apreto
+            if abs(d.x()) + abs(d.y()) <= self.MOVIMIENTO_CLIC:      # un clic, no un arrastre
+                self.pieza_elegida.emit(self.pieza_en(event.position()))
         self._last_mouse_pos = None
         self._mouse_button_down = None
         self._poner_cursor()
@@ -1040,6 +1107,12 @@ class Schema3DCanvas(QOpenGLWidget):
             edge_color = QColor(base_edge_hex)
             return fill_color, edge_color, line_width
 
+        if face.color:                     # color que el usuario le puso a esa pieza
+            c = QColor(face.color)
+            brillo = (0.35 + 0.75 * shade) if self.realista else shade
+            fill = QColor(max(0, min(255, int(c.red() * brillo))), max(0, min(255, int(c.green() * brillo))),
+                          max(0, min(255, int(c.blue() * brillo))))
+            return fill, c.darker(220), 1.0 if self.realista else 1.6
         if self.realista:
             return self._estilo_realista(face, shade)
         base_fill_hex = COLORS.get(f"{face.color_group}_fill", COLORS["base_fill"])

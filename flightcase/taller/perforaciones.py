@@ -352,39 +352,31 @@ def calcular(res: ResultadoTaller) -> Dict[str, List[Agujero]]:
         else:
             d_ar = ala / 2
 
-        def arista(o: Vec, a: Vec, b: Vec, c: Vec, L: float) -> None:
+        def arista(o: Vec, a: Vec, b: Vec, c: Vec, L: float, d: float = d_ar) -> None:
             if L < 30:
                 return
             for z in _filas(L, paso):
                 base = _sum(o, _mul(c, z))
-                proyectar(_sum(base, _mul(b, -d_ar)), a, "perfil")
-                proyectar(_sum(base, _mul(a, -d_ar)), b, "perfil")
+                proyectar(_sum(base, _mul(b, -d)), a, "perfil")
+                proyectar(_sum(base, _mul(a, -d)), b, "perfil")
 
-        for z, sz in ((0.0, -1), (Z, 1)):
-            for y0, sy in ((0.0, -1), (Y, 1)):
-                arista((ed, y0, z), (0, sy, 0), (0, 0, sz), (1, 0, 0), geo["L_x"])
-            for x0, sx in ((0.0, -1), (X, 1)):
-                arista((x0, ed, z), (sx, 0, 0), (0, 0, sz), (0, 1, 0), geo["L_y"])
-        for x0, sx in ((0.0, -1), (X, 1)):
-            for y0, sy in ((0.0, -1), (Y, 1)):
-                z_c = zc2 + m_alto if dos else ed
-                arista((x0, y0, z_c), (sx, 0, 0), (0, sy, 0), (0, 0, 1), geo["L_zc"])
-                arista((x0, y0, zc1 + h_alto), (sx, 0, 0), (0, sy, 0), (0, 0, 1), geo["L_zt"])
-                if dos:
-                    arista((x0, y0, ed), (sx, 0, 0), (0, sy, 0), (0, 0, 1), geo["L_zt2"])
+        # cada ángulo con su largo y su ala (piezas.py: el usuario puede cambiar o sacar uno)
+        for ar in geo["aristas_case"]:
+            if not ar["quitar"]:
+                arista(ar["o"], ar["a"], ar["b"], ar["c"], ar["L"], d_ar if geo["hibrido"] else ar["ala"] / 2)
 
-        # esquineros: 1, 2 o 3 agujeros por pata
-        p_ = geo["esq_pata"]
-        por_pata = max(1, min(3, round(float(pf["esq_remaches"]) / 3)))
-        fr = {1: [(0.5, 0.5)], 2: [(0.35, 0.72), (0.72, 0.35)], 3: [(0.35, 0.72), (0.72, 0.35), (0.72, 0.72)]}[por_pata]
-        for z, sz in ((0.0, -1), (Z, 1)):
-            for x0, sx in ((0.0, -1), (X, 1)):
-                for y0, sy in ((0.0, -1), (Y, 1)):
-                    o, a, b, c = (x0, y0, z), (sx, 0, 0), (0, sy, 0), (0, 0, sz)
-                    for f1, f2 in fr:
-                        proyectar(_sum(o, _mul(b, -p_ * f1), _mul(c, -p_ * f2)), a, "esquinero")
-                        proyectar(_sum(o, _mul(a, -p_ * f1), _mul(c, -p_ * f2)), b, "esquinero")
-                        proyectar(_sum(o, _mul(a, -p_ * f1), _mul(b, -p_ * f2)), c, "esquinero")
+        # esquineros: 1, 2 o 3 agujeros por pata, según los remaches de cada uno
+        fr_por = {1: [(0.5, 0.5)], 2: [(0.35, 0.72), (0.72, 0.35)], 3: [(0.35, 0.72), (0.72, 0.35), (0.72, 0.72)]}
+        for es in geo["esquineros_case"]:
+            if es["quitar"]:
+                continue
+            p_ = es["pata"]
+            fr = fr_por[max(1, min(3, round(float(es["remaches"]) / 3)))]
+            o, a, b, c = es["o"], es["a"], es["b"], es["c"]
+            for f1, f2 in fr:
+                proyectar(_sum(o, _mul(b, -p_ * f1), _mul(c, -p_ * f2)), a, "esquinero")
+                proyectar(_sum(o, _mul(a, -p_ * f1), _mul(c, -p_ * f2)), b, "esquinero")
+                proyectar(_sum(o, _mul(a, -p_ * f1), _mul(b, -p_ * f2)), c, "esquinero")
 
         # aros de cierre: una fila en el medio de lo que el perfil cubre del panel
         s_ = geo["cierre_saliente"]

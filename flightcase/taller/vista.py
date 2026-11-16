@@ -11,7 +11,7 @@ cajón no recalcula el case.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from .geometria import Malla3D
@@ -288,11 +288,9 @@ class VistaCase:
             for f in m.faces[g.desde:g.hasta]:
                 if mov is not None:
                     mover, normal = mov
-                    f = PolygonFace3D(tuple(mover(p) for p in f.vertices), normal(f.normal), f.color_group,
-                                      f.label, f.is_endgrain, f.layer_order, f.wall_index)
+                    f = replace(f, vertices=tuple(mover(p) for p in f.vertices), normal=normal(f.normal))
                 elif dy:
-                    f = PolygonFace3D(tuple(Point3D(p.x, p.y + dy, p.z) for p in f.vertices), f.normal,
-                                      f.color_group, f.label, f.is_endgrain, f.layer_order, f.wall_index)
+                    f = replace(f, vertices=tuple(Point3D(p.x, p.y + dy, p.z) for p in f.vertices))
                 caras.append(f)
         segmentos: List[Segment3D] = []
         if "paneles" not in estado.ocultos:
