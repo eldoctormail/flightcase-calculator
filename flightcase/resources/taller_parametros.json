@@ -5,6 +5,7 @@
  "int_alto_tapa": 80,
  "tapas": 1,
  "int_alto_tapa2": -1,
+ "formulas": [],
  "orientacion": "vertical",
  "forma": "caja",
  "puertas": false,

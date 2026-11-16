@@ -41,7 +41,7 @@ from PySide6.QtWidgets import (
 
 from ...paths import bundled_resource
 from ...taller import estilos
-from ...taller.modelo import CatalogoTaller, ResultadoTaller, calcular, catalogo_actual, fmt, parametros_por_defecto
+from ...taller.modelo import ENTEROS, CatalogoTaller, ResultadoTaller, calcular, catalogo_actual, fmt, parametros_por_defecto
 from ...taller.scad import escribir_proyecto, leer_proyecto, literal, valor_literal
 
 # Opciones fijas de los parámetros de texto que las tienen
@@ -59,9 +59,6 @@ OPCIONES: Dict[str, List[str]] = {
     "cierres_laterales": ["auto", "si", "no"],
 }
 # Números que sólo toman valores enteros
-ENTEROS = {"tapas", "pleg_cierres_esquina", "acceso_cierres_n", "cantidad_cases", "manijas_n", "cierres_frente_n",
-           "cierres_lateral_n", "ruedas", "rueda_frenos", "rueda_fijas", "cazoleta_remaches", "bandeja_soportes", "encastre_remaches",
-           "pies", "bisagras", "topes", "refuerzos", "refuerzo_remaches"}
 
 
 # Listas que se cargan en una tabla: columnas (título, "texto" o "num", valor si queda un hueco
@@ -79,6 +76,7 @@ TABLAS: Dict[str, List[tuple]] = {
     "rack_equipos": [("Nombre", "texto", ""), ("U", "num", None), ("Fondo", "num", None), ("Peso kg", "num", 0),
                      ("Desde U", "num", 0), ("Sobresale adelante", "num", 0)],
     "extras": [("Artículo del catálogo", "ref", None), ("Cantidad", "num", 1)],
+    "formulas": [("Medida o variable", "texto", None), ("Fórmula", "texto", None)],
     "paneles_material": [("Panel o grupo", "panel", None), ("Placa del catálogo", "placa", ""),
                          ("Espesor", "num", 0), ("Material", "texto", "")],
     "forro": [("Cara o grupo", "cara", None), ("Material", "forro_tipo", "alfombra"), ("Espesor", "num", 0),
@@ -600,7 +598,7 @@ class TallerWidget(QWidget):
     # Grupos de la barra lateral: clave, texto, y qué secciones de parámetros entran
     # (por el comienzo del título). Las que no entran en ninguno van a «Accesorios».
     GRUPOS_LATERAL = (
-        ("medidas", "Medidas", ()),
+        ("medidas", "Medidas", ("Fórmulas",)),
         ("armado", "Armado", ("Tipo de case", "Placa", "Sistema de armado", "Corte y compra")),
         ("herrajes", "Herrajes", ("Esquineros", "Perfil de cierre", "Manijas", "Cierres", "Encastres",
                                   "Herrajes del catálogo")),
@@ -795,6 +793,12 @@ class TallerWidget(QWidget):
                     ed.widget.setToolTip(_ayuda(_con_codigo(p["ayuda"], nombre)))
                     form.addRow(etiqueta)
                     form.addRow(ed.widget)
+                    if nombre == "formulas":      # lo que dio cada fórmula, debajo de la tabla
+                        self.lbl_formulas = QLabel()
+                        self.lbl_formulas.setObjectName("notaMedidas")
+                        self.lbl_formulas.setWordWrap(True)
+                        self.lbl_formulas.setTextFormat(Qt.RichText)
+                        form.addRow(self.lbl_formulas)
                 else:
                     ed = _Editor(nombre, self.defectos[nombre], self._programar)
                     ed.widget.setToolTip(_ayuda(_con_codigo(p["ayuda"], nombre)))
@@ -1443,9 +1447,50 @@ class TallerWidget(QWidget):
             self.lbl_avisos.setText(f"No se pudo calcular con estos parámetros: {e}")
             return
         self.resultado = res
+        self._marcar_formulas(res.valores.get("formulas"))
         self._mostrar(res)
         self._mostrar_exterior()
         self.resultado_cambiado.emit(res)
+
+    # campo de Medidas -> parámetro que mueve (el alto total mueve el cuerpo)
+    MEDIDA_PARAMETRO = {"ancho": "int_ancho", "largo": "int_prof", "alto": "int_alto_cuerpo",
+                        "cuerpo": "int_alto_cuerpo", "tapa": "int_alto_tapa"}
+
+    def _marcar_formulas(self, fx) -> None:
+        """Los parámetros que salen de una fórmula muestran el valor calculado y no se editan a mano."""
+        calculados = dict(fx.valores) if fx is not None else {}
+        expresiones = fx.expresiones if fx is not None else {}
+        antes = getattr(self, "_por_formula", {})
+        for nombre, valor in calculados.items():
+            self.params[nombre] = valor
+            ed = self.editores.get(nombre)
+            if ed is None:
+                continue
+            if nombre not in antes:
+                antes[nombre] = ed.widget.toolTip()
+            ed.poner(valor)
+            ed.widget.setEnabled(False)
+            ed.widget.setToolTip(_ayuda(f"Calculado con la fórmula: {nombre} = {expresiones.get(nombre, '')}\n"
+                                        "Para cambiarlo a mano, borrá esa fórmula (Medidas → Fórmulas)."))
+        for nombre in [n for n in antes if n not in calculados]:
+            ed = self.editores.get(nombre)
+            if ed is not None:
+                ed.widget.setEnabled(True)
+                ed.widget.setToolTip(antes[nombre])
+            del antes[nombre]
+        self._por_formula = antes
+        if hasattr(self, "medidas"):
+            if not hasattr(self, "_ayuda_medidas"):
+                self._ayuda_medidas = {c: sp.toolTip() for c, sp in self.medidas.items()}
+            for clave, sp in self.medidas.items():
+                nombre = self.MEDIDA_PARAMETRO[clave]
+                bloqueado = nombre in calculados
+                sp.setEnabled(not bloqueado)
+                sp.setToolTip(_ayuda(f"Calculado con la fórmula: {nombre} = {expresiones.get(nombre, '')}")
+                              if bloqueado else self._ayuda_medidas[clave])
+        if getattr(self, "lbl_formulas", None) is not None:
+            todo = {**calculados, **(fx.variables if fx is not None else {})}
+            self.lbl_formulas.setText(" &nbsp;·&nbsp; ".join(f"<b>{n}</b> = {fmt(v)}" for n, v in todo.items()))
 
     def _mostrar(self, res: ResultadoTaller) -> None:
         v = res.valores
