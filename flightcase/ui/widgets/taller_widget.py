@@ -457,6 +457,8 @@ class TallerWidget(QWidget):
     """Editor de un case con las reglas del taller (las del generador de OpenSCAD)."""
 
     resultado_cambiado = Signal(object)
+    ruta_cambiada = Signal(str)          # se abrió o se guardó un .scad (vacío = case nuevo)
+    proyectos_pedidos = Signal()         # botón «Mis cases…»
     historial_cambiado = Signal()          # cambió lo que se puede deshacer o rehacer
 
     MAX_HISTORIAL = 200
@@ -498,7 +500,8 @@ class TallerWidget(QWidget):
         self.btn_rehacer.clicked.connect(self.rehacer)
         barra.addWidget(self.btn_deshacer)
         barra.addWidget(self.btn_rehacer)
-        for texto, slot in (("Nuevo", self.nuevo), ("Asistente…", lambda: self.asistente()),
+        for texto, slot in (("Mis cases…", self.proyectos_pedidos.emit),
+                            ("Nuevo", self.nuevo), ("Asistente…", lambda: self.asistente()),
                             ("Abrir .scad…", self.abrir),
                             ("Guardar .scad…", self.guardar), ("Planos PDF…", lambda: self.exportar_planos()),
                             ("Exportar paquete…", self.exportar),
@@ -863,6 +866,7 @@ class TallerWidget(QWidget):
         self.params["_carpeta"] = os.path.dirname(os.path.abspath(ruta)) if ruta else ""
         self.ruta = ruta
         self.lbl_archivo.setText(os.path.basename(ruta) if ruta else "Proyecto nuevo")
+        self.ruta_cambiada.emit(ruta or "")
         self.cmb_estilo.setCurrentIndex(0)
         self._mostrar_estilo()
         self._cargar_en_editores()
@@ -1053,7 +1057,7 @@ class TallerWidget(QWidget):
     def guardar(self, ruta: Optional[str] = None) -> None:
         if not ruta:
             ruta, _ = QFileDialog.getSaveFileName(self, "Guardar proyecto del taller",
-                                                  self.ruta or "mi_case.scad", "Proyecto OpenSCAD (*.scad)")
+                                                  self.ruta or self._ruta_sugerida(), "Proyecto OpenSCAD (*.scad)")
         if not ruta:
             return
         if not ruta.lower().endswith(".scad"):
@@ -1064,6 +1068,33 @@ class TallerWidget(QWidget):
             f.write(self.texto_proyecto())
         self.ruta = ruta
         self.lbl_archivo.setText(os.path.basename(ruta))
+        self.ruta_cambiada.emit(ruta)
+
+    @staticmethod
+    def _ruta_sugerida() -> str:
+        """Un case nuevo se guarda por defecto en la carpeta de cases (la de «Mis cases»)."""
+        from ...taller.proyectos import nombre_libre
+        from .proyectos_widget import carpeta_proyectos
+        carpeta = carpeta_proyectos()
+        try:
+            os.makedirs(carpeta, exist_ok=True)
+        except OSError:
+            return "mi_case.scad"
+        return nombre_libre(carpeta, "mi_case")
+
+    def renombrado(self, vieja: str, nueva: str) -> None:
+        """El archivo abierto cambió de nombre desde «Mis cases»."""
+        if self.ruta and os.path.normcase(os.path.abspath(self.ruta)) == os.path.normcase(os.path.abspath(vieja)):
+            self.ruta = nueva
+            self.lbl_archivo.setText(os.path.basename(nueva))
+            self.ruta_cambiada.emit(nueva)
+
+    def borrado(self, ruta: str) -> None:
+        """El archivo abierto se mandó a la papelera: el case queda en la ventana, sin guardar."""
+        if self.ruta and os.path.normcase(os.path.abspath(self.ruta)) == os.path.normcase(os.path.abspath(ruta)):
+            self.ruta = None
+            self.lbl_archivo.setText("Proyecto nuevo (el archivo se borró)")
+            self.ruta_cambiada.emit("")
 
     def _mudar_logos(self, carpeta: str) -> None:
         """Al guardar en otra carpeta, los logos con ruta relativa siguen apuntando al mismo archivo."""

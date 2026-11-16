@@ -13,6 +13,7 @@ Programa de escritorio (Python + PySide6 + OpenGL) para diseñar y fabricar flig
 - **Estilos de case** (rack, mixer, utilitario, tapa superior, cajonera, etc.) y estilos propios guardados.
 - **Interiores**: espuma en capas con calados rectangulares, redondos o con el contorno de un dibujo, huecos para los dedos, cajones, rack 19" y chequeos de choques.
 - **Herrajes a mano** en cada cara, en 2D, con imán, y placas de logo desde `.svg` / `.dxf`.
+- **Mis cases** (`Ctrl+Shift+O` o el botón **Mis cases…**): tus proyectos guardados con miniatura, nombre, medidas exteriores y fecha. Se buscan por nombre, carpeta, medidas o material, se ordenan por fecha, nombre o tamaño, y se abren, duplican, renombran o mandan a la papelera. Lista los `.scad` de la carpeta de cases (por defecto `Documentos/LBD Flightcase Maker`, con dos niveles de subcarpetas) y los abiertos hace poco. Un case nuevo se guarda ahí por defecto.
 - **Asistente de case nuevo** (`Ctrl+Shift+N` o el botón **Asistente…**): estilo, qué va adentro (vacío, espuma con equipos o rack), medidas sugeridas a partir de los equipos (o exteriores a mano), terminaciones y un resumen antes de abrirlo en el Taller.
 - **Biblioteca de equipos** (`Ctrl+B`, menú **Editar**): tus equipos con sus medidas, peso, U de rack y forma del calado, guardados una vez para cualquier case. Se buscan, se editan en la tabla y se pasan a una planilla CSV de Excel y desde ella. Las tablas de equipos de la espuma y del rack tienen **Desde la biblioteca…** y **Guardar en la biblioteca**.
 - **Vista 3D** con las tapas abiertas o cerradas.
@@ -109,8 +110,15 @@ La pestaña **Placas** del Taller acomoda todas las piezas del pedido (todos los
 
 **Guardar DXF de las placas…** escribe un DXF por placa con cada pieza en su lugar, lista para la router CNC: borde de la placa en la capa `PLACA`, contornos y calados pasantes en `0`, rebajes en `REBAJE`, marcas de herrajes en `MARCA`, logos en `GRABADO` y el número de pieza en `TEXTO` (para apagar en el CAM). También va `placas.csv` con las piezas de cada placa. Lo mismo sale en el paquete de producción.
 
+### Mis cases
+
+![Mis cases](captura-mis-cases.png)
+
+Las miniaturas se dibujan con la misma vista 3D del instructivo y quedan guardadas en la carpeta de datos de la app; solo se vuelven a dibujar cuando cambia el `.scad`. **Duplicar** copia el case en la misma carpeta (los logos y contornos con ruta relativa siguen funcionando), ideal para hacer una variante. Si renombrás o borrás el case que tenés abierto, la ventana lo sigue: con el nombre nuevo, o como case sin guardar.
+
 ### Atajos del Taller
 
+- `Ctrl+Shift+O` **Mis cases** (dentro: `Ctrl+F` buscar, `F2` renombrar, `Ctrl+D` duplicar, `Supr` borrar, doble clic abre)
 - `Ctrl+N` nuevo case, `Ctrl+O` abrir `.scad`, `Ctrl+S` guardar (sin preguntar si ya tiene archivo), `Ctrl+Shift+S` guardar como
 - `Ctrl+Shift+N` case nuevo con el asistente, `Ctrl+B` biblioteca de equipos
 - `Ctrl+P` exportar el paquete del taller (planos, DXF, instructivo)

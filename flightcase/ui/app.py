@@ -36,6 +36,8 @@ class FlightCaseMainWindow(QMainWindow):
         self.status_bar = QStatusBar(self)
         self.setStatusBar(self.status_bar)
         self.taller_widget.resultado_cambiado.connect(self._estado_taller)
+        self.taller_widget.ruta_cambiada.connect(self._ruta_cambiada)
+        self.taller_widget.proyectos_pedidos.connect(self.proyectos)
         self._init_menus()
         QApplication.instance().installEventFilter(self)
         if restore_settings:
@@ -60,6 +62,8 @@ class FlightCaseMainWindow(QMainWindow):
         self._accion(m, "&Nuevo case", "Ctrl+N", self._taller_nuevo, "Case nuevo con las reglas del taller")
         self._accion(m, "Nuevo case con el a&sistente...", "Ctrl+Shift+N", self._asistente,
                      "Case nuevo paso a paso: estilo, equipos, medidas y terminaciones")
+        self._accion(m, "&Mis cases...", "Ctrl+Shift+O", self.proyectos,
+                     "Tus cases guardados con miniatura y medidas: buscar, abrir, duplicar, renombrar o borrar")
         self._accion(m, "&Abrir case (.scad)...", "Ctrl+O", self._taller_abrir, "Abrir un proyecto del taller")
         self.recent_menu = m.addMenu("Abrir &reciente")
         m.addSeparator()
@@ -138,10 +142,26 @@ class FlightCaseMainWindow(QMainWindow):
         self.recent_menu.setEnabled(bool(recientes))
 
     # -------------------------------------------------------------- acciones
+    def _ruta_cambiada(self, ruta: str) -> None:
+        """Abrir o guardar, desde el menú o desde los botones del Taller."""
+        if ruta:
+            self._add_recent_file(ruta)
+        self._actualizar()
+
     def abrir(self, ruta: Optional[str] = None) -> None:
         self.taller_widget.abrir(ruta)
-        if self.taller_widget.ruta:
-            self._add_recent_file(self.taller_widget.ruta)
+        self._actualizar()
+
+    def dialogo_proyectos(self):
+        from .widgets.proyectos_widget import ProyectosDialog
+        t = self.taller_widget
+        return ProyectosDialog(self, recientes=self._get_recent_files, abrir=self.abrir,
+                               ruta_actual=lambda: t.ruta, al_renombrar=t.renombrado, al_borrar=t.borrado)
+
+    def proyectos(self) -> None:
+        """«Mis cases»: la lista de proyectos guardados."""
+        self.dialogo_proyectos().exec()
+        self._update_recent_files_menu()
         self._actualizar()
 
     def _taller_nuevo(self) -> None:
@@ -157,13 +177,9 @@ class FlightCaseMainWindow(QMainWindow):
 
     def _taller_guardar(self) -> None:
         self.taller_widget.guardar(self.taller_widget.ruta)
-        self._add_recent_file(self.taller_widget.ruta)
-        self._actualizar()
 
     def _taller_guardar_como(self) -> None:
         self.taller_widget.guardar()
-        self._add_recent_file(self.taller_widget.ruta)
-        self._actualizar()
 
     def _taller_exportar(self) -> None:
         self.taller_widget.exportar()
