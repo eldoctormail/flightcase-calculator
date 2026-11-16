@@ -49,6 +49,10 @@ COLORS = {
     "rack_frente_fill": "#404040",
     "espuma_edge": "#4b5563",     # Espuma con calados
     "espuma_fill": "#1f2937",
+    "forro_alfombra_edge": "#52525b",   # Forro interior de alfombra
+    "forro_alfombra_fill": "#27272a",
+    "forro_espuma_edge": "#6b7280",     # Forro interior de espuma
+    "forro_espuma_fill": "#374151",
     "cajon_edge": "#d6a35c",      # Cajones y suplementos de madera
     "cajon_fill": "#6b4a26",
     "resalte_edge": "#fde047",    # Lo que se agrega en un paso del instructivo

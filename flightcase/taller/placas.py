@@ -209,12 +209,15 @@ def _texto(capa: str, x: float, y: float, alto: float, texto: str, angulo: float
 
 
 def placa_dxf(pl: Dict[str, Any], piezas_por_num: Dict[int, Dict[str, Any]],
-              trazos_por_num: Optional[Dict[int, List[tuple]]] = None, rotulos: bool = True) -> str:
+              trazos_por_num: Optional[Dict[int, List[tuple]]] = None, rotulos: bool = True,
+              agujeros_por_num: Optional[Dict[int, List[tuple]]] = None) -> str:
     """DXF de una placa: el borde de la placa en la capa PLACA, cada pieza en su lugar con el
     contorno y los calados pasantes en la capa 0, rebajes en REBAJE, marcas de herrajes en MARCA,
-    logos en GRABADO y el número de pieza en TEXTO (para apagar en el CAM)."""
-    from .produccion import _dxf_linea, _dxf_polilinea, _rect_redondeado
+    logos en GRABADO, agujeros de remaches y tornillos en PERFORACIONES y TORNILLOS y el número
+    de pieza en TEXTO (para apagar en el CAM)."""
+    from .produccion import _color_capa, _dxf_circulo, _dxf_linea, _dxf_polilinea, _rect_redondeado
     trazos_por_num = trazos_por_num or {}
+    agujeros_por_num = agujeros_por_num or {}
     ent: List[str] = []
     L, A = pl["L"], pl["A"]
     borde = [(0, 0), (L, 0), (L, A), (0, A)]
@@ -239,7 +242,11 @@ def placa_dxf(pl: Dict[str, Any], piezas_por_num: Dict[int, Dict[str, Any]],
             q = [t(*a) for a in pts]
             ent += [_dxf_linea(capa, q[i], q[i + 1]) for i in range(len(q) - 1)]
             if capa not in [c[0] for c in capas]:
-                capas.append((capa, 5 if capa == "MARCA" else 3))
+                capas.append((capa, _color_capa(capa)))
+        for capa, x, y, dm in agujeros_por_num.get(p["num"], []):
+            ent.append(_dxf_circulo(capa, t(x, y), dm / 2))
+            if capa not in [c[0] for c in capas]:
+                capas.append((capa, _color_capa(capa)))
         if rotulos:
             cx, cy = p["x"] + p["dw"] / 2, p["y"] + p["dh"] / 2
             alto_txt = max(min(25.0, min(p["dw"], p["dh"]) / 4), 4.0)
@@ -263,7 +270,8 @@ def _nombre_archivo(i: int, material: str) -> str:
 
 
 def escribir_dxf_placas(placas: List[Dict[str, Any]], piezas: List[Dict[str, Any]], carpeta: str,
-                        trazos_por_num: Optional[Dict[int, List[tuple]]] = None) -> List[str]:
+                        trazos_por_num: Optional[Dict[int, List[tuple]]] = None,
+                        agujeros_por_num: Optional[Dict[int, List[tuple]]] = None) -> List[str]:
     """Un DXF por placa en `carpeta`. Devuelve las rutas."""
     os.makedirs(carpeta, exist_ok=True)
     por_num = {pz["num"]: pz for pz in piezas}
@@ -271,7 +279,7 @@ def escribir_dxf_placas(placas: List[Dict[str, Any]], piezas: List[Dict[str, Any
     for i, pl in enumerate(placas, 1):
         ruta = os.path.join(carpeta, _nombre_archivo(i, pl["material"]))
         with open(ruta, "w", encoding="utf-8", newline="\n") as f:
-            f.write(placa_dxf(pl, por_num, trazos_por_num))
+            f.write(placa_dxf(pl, por_num, trazos_por_num, agujeros_por_num=agujeros_por_num))
         pl["dxf"] = os.path.basename(ruta)
         rutas.append(ruta)
     return rutas

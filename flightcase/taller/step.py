@@ -287,7 +287,7 @@ def _vec(v: Sequence[float], dec: int = 6) -> str:
 
 
 _CATEGORIAS = ({"base", "lid", "wall", "base_ruedas", "resalte"}, {"profile", "profile_h", "aluminio"}, set(),
-               {"equipo", "rack_frente", "espuma", "cajon"})
+               {"equipo", "rack_frente", "espuma", "cajon", "forro_alfombra", "forro_espuma"})
 
 
 def _categoria(color: str) -> int:

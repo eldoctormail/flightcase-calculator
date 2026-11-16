@@ -106,7 +106,8 @@ def parsear_datos(lineas):
             d["panelmat"][resto[0]] = dict(material=resto[1], esp=float(resto[2]))
             if len(resto) > 4:      # material por panel de la app: medida de la placa entera y ref
                 d["panelmat"][resto[0]].update(largo=float(resto[3]), ancho=float(resto[4]),
-                                               ref=resto[5] if len(resto) > 5 else "")
+                                               ref=resto[5] if len(resto) > 5 else "",
+                                               clase=resto[6] if len(resto) > 6 else "")
         elif tipo == "EXTRA":
             d["extras"].append(dict(nombre=resto[0], w=float(resto[1]), h=float(resto[2]),
                                     esp=float(resto[3]), cant=int(float(resto[4])), material=resto[5]))
@@ -402,6 +403,13 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
     if esp_espuma > 0:
         lineas.insert(4, ("Espuma interior",
                           f"{fmt(esp_espuma)} mm (el interior indicado es el espacio útil)"))
+    forro_info = info.get("forro")
+    if forro_info:
+        forro_info = [forro_info] if isinstance(forro_info, str) else forro_info
+        lineas.insert(4, ("Forro interior", f"{len(forro_info)} caras (el interior indicado es el espacio útil)"))
+    if d.get("peso") is not None:
+        lineas.append(("Peso de un case", d["peso"].resumen() + (" (con valores estimados)"
+                                                                 if d["peso"].estimado > 0.005 else "")))
     lineas += [
         ("Placas", "; ".join(f"{n} de {m}" for m, n in contar_placas(placas).items())),
     ]
@@ -664,7 +672,11 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
         es_pared = not any(i in ("piso", "techo", "base2", "base_ruedas") for i in pz["ids"]) \
             and not pz.get("extra") and not es_bandeja
         vista = "Vista desde afuera."
-        if pz.get("extra"):
+        if pz.get("forro"):
+            vista = ("Forro interior, vista desde adentro del case. Se pega con adhesivo de contacto: "
+                     "primero los pisos y techos, después frente y trasera, por último los laterales."
+                     + (" Los huecos son para los herrajes embutidos." if pz["calados"] else ""))
+        elif pz.get("extra"):
             vista = "Pieza adicional (no forma parte de la caja)."
         elif es_bandeja:
             bj = d["bandejas"][pz["ids"][0]]
@@ -868,8 +880,13 @@ def lista_materiales(d, placas, barras):
     N = cantidad_cases(d)
     kerf = float(info["barra"][1])
     filas = []
+    forro = {m["material"] for m in d.get("panelmat", {}).values() if m.get("clase") == "forro"}
     for mat, n in contar_placas(placas).items():
         L, A, ref = medidas_placa(d, mat)
+        if mat in forro:
+            filas.append(dict(ref=ref, material=f"Forro: {mat}", cant=str(n),
+                              detalle=f"planchas de {L:g} x {A:g} mm"))
+            continue
         filas.append(dict(ref=ref, material=f"Placa {mat}", cant=str(n),
                           detalle=f"{L:g} x {A:g} mm"))
     for tipo, bs in barras.items():
