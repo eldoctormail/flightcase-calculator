@@ -195,7 +195,7 @@ def _pos_n(L: float, n: int, margen: float) -> List[float]:
 # parámetros que son cantidades (van sin decimales)
 ENTEROS = {"tapas", "pleg_cierres_esquina", "acceso_cierres_n", "cantidad_cases", "manijas_n", "cierres_frente_n",
            "cierres_lateral_n", "ruedas", "rueda_frenos", "rueda_fijas", "cazoleta_remaches", "bandeja_soportes", "encastre_remaches",
-           "pies", "bisagras", "topes", "refuerzos", "refuerzo_remaches"}
+           "pies", "bisagras", "topes", "refuerzos", "refuerzo_remaches", "slam_hojas", "incl_rack_frente"}
 
 
 def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[CatalogoTaller] = None) -> ResultadoTaller:

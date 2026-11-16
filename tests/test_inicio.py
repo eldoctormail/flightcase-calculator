@@ -37,7 +37,7 @@ def test_elegir_estilo_con_chips_y_plantilla(qapp, tmp_path):
     racks.chips["rack_puertas"].click()
     assert d.estilo.id == "rack_puertas" and racks.property("elegida")
     assert racks.chips["rack_puertas"].isChecked() and not racks.chips["rack_una_tapa"].isChecked()
-    assert d.lbl_familia.text() == 'RACKS 19"' and "puertas" in d.lbl_nombre.text()
+    assert d.lbl_familia.text() == 'RACKS' and "puertas" in d.lbl_nombre.text()
     todos = {t.valor.id: t for t in d.tarjetas["todos"]}
     assert todos["rack_puertas"].property("elegida") and len(todos) == len(d.lista_estilos)
     assert [t.valor for t in d.tarjetas["plantillas"]] == [str(case)]    # sólo los que existen

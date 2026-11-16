@@ -9,13 +9,18 @@ Claves especiales de un estilo (empiezan con "_", no son parámetros del .scad):
 - ``_base_ruedas: "auto"``: base de ruedas bajo el cuerpo, 10 mm más chica que el piso.
 - ``_mitades: true``: reparte el alto interior total en cuerpo y tapa iguales.
 - ``_acceso: fracción``: tapa de acceso lateral de esa fracción del alto del case.
+- ``_tapa_baja: mm``: la tapa queda de ese alto interior y el resto pasa al cuerpo (el total no cambia).
+- ``_guitarras: n``: n guitarras paradas entre tabiques de espuma, si el proyecto todavía
+  no tiene equipos ni espumas.
+- ``_cajones: mm``: llena el alto interior con cajones (bandejas con correderas) de ese paso,
+  si el proyecto todavía no tiene cajones.
 """
 
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..paths import bundled_resource, user_resource
 
@@ -24,7 +29,7 @@ ARCHIVO_PROPIOS = "taller_estilos_propios.json"
 # Lo que un estilo incluido vuelve a su valor por defecto antes de aplicarse, para que
 # no queden restos del estilo anterior (por ejemplo, bisagras en un rack de dos tapas).
 CLAVES_ESTILO = (
-    "forma", "puertas", "puerta_lado", "incl_rieles", "pleg_base_esp", "pleg_base_material", "pleg_cierres_esquina",
+    "forma", "slam_caras", "slam_hojas", "slam_rack", "tapa_plana", "basemaker", "incl_rack_frente", "tabla_borde", "puertas", "puerta_lado", "incl_rieles", "pleg_base_esp", "pleg_base_material", "pleg_cierres_esquina",
     "tapas", "int_alto_tapa2", "orientacion", "descuento_entre",
     "acceso_lateral", "acceso_junta", "acceso_cierres_n", "acceso_tipo",
     "paredes_enteras", "paredes_enteras_cuerpo", "extremos_cubren",
@@ -108,6 +113,22 @@ def base_ruedas_auto(p: Dict[str, Any]) -> List[float]:
     return [round(ancho - BASE_RETIRO, 1), round(largo - BASE_RETIRO, 1), BASE_ESPESOR]
 
 
+def _guitarras(p: Dict[str, Any], n: int) -> Tuple[List[list], List[list]]:
+    """Guitarras paradas una al lado de la otra, separadas por tabiques de espuma de todo el alto y el fondo.
+    Las medidas de cada guitarra salen del case (ancho repartido, fondo y alto del cuerpo): se ajustan después
+    en la tabla de equipos."""
+    W = float(p["int_ancho"])
+    D = float(p["int_alto_cuerpo"]) if p.get("orientacion") == "frontal" else float(p["int_prof"])
+    H = _alto_case(p)
+    sep = 30.0                                       # tabique de espuma entre guitarras y contra los costados
+    hueco = (W - (n + 1) * sep) / n
+    gw = max(20.0, hueco - 10)
+    espumas = [[sep, 0, 0, round(i * (hueco + sep), 1)] for i in range(n + 1)]
+    equipos = [[f"Guitarra {i + 1}", round(gw, 1), round(max(50.0, D - 20), 1), round(max(50.0, H - 20), 1), 4,
+                round(sep + i * (hueco + sep) + 5, 1)] for i in range(n)]
+    return equipos, espumas
+
+
 def aplicar(params: Dict[str, Any], estilo: Estilo, defectos: Dict[str, Any]) -> Dict[str, Any]:
     """Devuelve los parámetros con el estilo aplicado (no modifica los recibidos)."""
     nuevo = dict(params)
@@ -121,6 +142,18 @@ def aplicar(params: Dict[str, Any], estilo: Estilo, defectos: Dict[str, Any]) ->
         total = float(nuevo["int_alto_cuerpo"]) + float(nuevo["int_alto_tapa"])
         mitad = round(total / 2)
         nuevo["int_alto_cuerpo"], nuevo["int_alto_tapa"] = mitad, total - mitad
+    baja = estilo.params.get("_tapa_baja")
+    if baja:
+        total = float(nuevo["int_alto_cuerpo"]) + float(nuevo["int_alto_tapa"])
+        tapa = min(float(baja), total / 3)
+        nuevo["int_alto_cuerpo"], nuevo["int_alto_tapa"] = round(total - tapa), round(tapa)
+    paso = estilo.params.get("_cajones")
+    if paso and not nuevo.get("cajones"):
+        n = max(1, int(_alto_case(nuevo) // float(paso)))
+        nuevo["cajones"] = [[float(paso) - 4, i * float(paso)] for i in range(n)]
+    n_g = int(estilo.params.get("_guitarras", 0) or 0)
+    if n_g and not nuevo.get("equipos") and not nuevo.get("espumas"):
+        nuevo["equipos"], nuevo["espumas"] = _guitarras(nuevo, n_g)
     frac = estilo.params.get("_acceso")
     if frac:
         nuevo["acceso_lateral"] = round(float(frac) * _alto_case(nuevo))

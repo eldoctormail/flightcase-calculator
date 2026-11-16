@@ -51,7 +51,8 @@ def test_agujeros_dentro_del_panel_y_fuera_de_los_calados(estilo):
     e = next(x for x in estilos_incluidos() if x.id == estilo)
     res = calcular(aplicar(dict(D), e, D))
     ag = PF.calcular(res)
-    assert ag
+    # la base de ruedas suelta sólo se remacha por el canto de la tabla: no tiene agujeros en las caras
+    assert ag or res.valores.get("forma") == "tabla"
     for pid, lista in ag.items():
         p = res.panel(pid)
         cal = [c for c in res.calados if c.panel == pid and c.tipo != "rebaje"]

@@ -116,5 +116,143 @@
   "nombre": "Case liviano con perfil híbrido",
   "descripcion": "Armado con perfil híbrido en lugar de ángulo: más liviano y prolijo, para cases chicos y medianos que se llevan a mano.",
   "params": {"orientacion": "vertical", "tapas": 1, "sistema": "hibrido", "ruedas": 0, "pies": 4}
+ },
+ {
+  "id": "baul_tapa_baja",
+  "nombre": "Baúl con tapa baja",
+  "descripcion": "Baúl de gira con la tapa suelta y baja (50 mm por dentro): casi todo el alto queda en el cuerpo y el equipo se saca por arriba. Ruedas abajo y platos de apilado en el techo.",
+  "params": {"orientacion": "vertical", "tapas": 1, "ruedas": 4, "encastres": true, "_tapa_baja": 50}
+ },
+ {
+  "id": "baul_50_50",
+  "nombre": "Baúl 50/50",
+  "descripcion": "Baúl de gira partido por la mitad: la tapa suelta tiene el mismo alto que el cuerpo, así el equipo queda a la vista al sacarla. Ruedas abajo y platos de apilado en el techo.",
+  "params": {"orientacion": "vertical", "tapas": 1, "ruedas": 4, "encastres": true, "refuerzos": 1, "_mitades": true}
+ },
+ {
+  "id": "broadcast_produccion",
+  "nombre": "Broadcast de producción",
+  "descripcion": "Case de producción parado: tapa adelante y atrás, rieles de rack adelante y atrás, y una tapa removible arriba de cada costado para llegar a los cables. Base de ruedas.",
+  "params": {"orientacion": "frontal", "tapas": 2, "paredes_enteras": "laterales", "paredes_enteras_cuerpo": "frente", "extremos_cubren": true, "_acceso": 0.31, "acceso_cierres_n": 2, "acceso_tipo": "paneles", "rack_traseros": true, "manijas_n": 2, "manija_pos": 0.55, "cierres_frente_n": 1, "cierres_lateral_n": 2, "refuerzos": 1, "ruedas": 4, "_base_ruedas": "auto"}
+ },
+ {
+  "id": "broadcast_trasera_cerrada",
+  "nombre": "Broadcast con trasera cerrada",
+  "descripcion": "Case de producción parado con tapa sólo adelante: la trasera queda fija y el techo con los dos costados de arriba forman una cubierta en U que sale entera para llegar a los equipos y los cables. Base de ruedas.",
+  "params": {"orientacion": "frontal", "tapas": 1, "paredes_enteras": "laterales", "extremos_cubren": true, "_acceso": 0.31, "acceso_cierres_n": 2, "acceso_tipo": "cubierta", "manijas_n": 2, "manija_pos": 0.45, "refuerzos": 1, "ruedas": 4, "_base_ruedas": "auto"}
+ },
+ {
+  "id": "broadcast_trasera_cerrada_2",
+  "nombre": "Broadcast con trasera cerrada 2",
+  "descripcion": "Como el de trasera cerrada, pero en lugar de la cubierta tiene una tapa de acceso suelta arriba de cada costado y el techo queda fijo. Base de ruedas.",
+  "params": {"orientacion": "frontal", "tapas": 1, "paredes_enteras": "laterales", "extremos_cubren": true, "_acceso": 0.31, "acceso_cierres_n": 2, "acceso_tipo": "paneles", "manijas_n": 2, "manija_pos": 0.45, "refuerzos": 1, "ruedas": 4, "_base_ruedas": "auto"}
+ },
+ {
+  "id": "clamshell_izq_der",
+  "nombre": "Clamshell izquierda/derecha",
+  "descripcion": "Case de dos mitades iguales que se abre hacia los costados: la junta es vertical y las bisagras van en un lateral. Apoyado sobre pies.",
+  "params": {"orientacion": "horizontal", "tapas": 1, "bisagras": 3, "topes": 1, "ruedas": 0, "pies": 4, "_mitades": true}
+ },
+ {
+  "id": "apertura_frontal",
+  "nombre": "Apertura frontal",
+  "descripcion": "Case parado con la tapa adelante, sin rieles de rack: para equipos o cajas que se sacan de frente. Ruedas abajo.",
+  "params": {"orientacion": "frontal", "tapas": 1, "extremos_cubren": true, "ruedas": 4, "refuerzos": 1}
+ },
+ {
+  "id": "bandejas_euro",
+  "nombre": "Case con bandejas euro",
+  "descripcion": "Case parado con la tapa adelante y bandejas que salen de frente sobre correderas, una cada 120 mm de alto (para cajas euro de 600 x 400 o repuestos). Ruedas abajo.",
+  "params": {"orientacion": "frontal", "tapas": 1, "extremos_cubren": true, "ruedas": 4, "refuerzos": 1, "_cajones": 120}
+ },
+ {
+  "id": "baul_slam_hd",
+  "nombre": "Baúl HD con tapa slam",
+  "descripcion": "Baúl reforzado con la tapa plana arriba: apoya a ras en un marco de perfil slam, gira sobre una bisagra de piano atrás y cierra sola con cierres slam embutidos adelante. Sin paredes de tapa, así el equipo se carga desde arriba sin obstáculos. Ruedas abajo.",
+  "params": {"forma": "slam", "orientacion": "vertical", "slam_caras": "arriba", "slam_hojas": 1, "topes": 2, "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "tapa_slam_doble",
+  "nombre": "Tapa slam doble",
+  "descripcion": "Tapa plana arriba partida en dos hojas que abren hacia los costados, cada una con su bisagra de piano: una se traba con pasadores y la otra cierra sobre ella con cierres slam. Para cases anchos donde una sola tapa sería muy grande.",
+  "params": {"forma": "slam", "orientacion": "vertical", "slam_caras": "arriba", "slam_hojas": 2, "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "tapa_slam_adelante",
+  "nombre": "Tapa slam adelante",
+  "descripcion": "Case parado con una puerta plana adelante, en marco de perfil slam: gira sobre una bisagra de piano al costado y cierra sola con cierres slam. Sin tapa que sacar y guardar.",
+  "params": {"forma": "slam", "orientacion": "frontal", "slam_caras": "frente", "slam_hojas": 1, "puerta_lado": "izq", "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "tapas_slam_adelante_atras",
+  "nombre": "Tapas slam adelante y atrás",
+  "descripcion": "Case parado con puertas planas adelante y atrás, cada una en su marco slam con bisagra de piano y cierres slam: se llega al equipo y a las conexiones sin sacar tapas.",
+  "params": {"forma": "slam", "orientacion": "frontal", "slam_caras": "frente_trasera", "slam_hojas": 1, "puerta_lado": "izq", "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "rack_slam",
+  "nombre": "Rack slam",
+  "descripcion": "Rack 19\" parado con puertas planas adelante y atrás en marco de perfil slam (bisagra de piano y cierres slam) y rieles de rack a todo el alto, adelante y atrás.",
+  "params": {"forma": "slam", "orientacion": "frontal", "slam_caras": "frente_trasera", "slam_hojas": 1, "slam_rack": true, "rack_traseros": true, "puerta_lado": "izq", "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "tapa_lidmaker",
+  "nombre": "Tapa lidmaker",
+  "descripcion": "Baúl con la tapa plana suelta arriba: apoya a ras en un marco de perfil lidmaker y la traban cierres mariposa en las paredes. Sin paredes de tapa ni bisagras, se saca entera para cargar. Ruedas abajo.",
+  "params": {"forma": "slam", "orientacion": "vertical", "slam_caras": "arriba", "tapa_plana": "lidmaker", "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "piso_basemaker",
+  "nombre": "Piso basemaker",
+  "descripcion": "Baúl con el piso encastrado en un marco de perfil basemaker, a ras de los cantos y sin ángulos abajo, y la tapa plana slam arriba con bisagra de piano. Ruedas atornilladas al piso.",
+  "params": {"forma": "slam", "orientacion": "vertical", "slam_caras": "arriba", "basemaker": true, "topes": 2, "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "lidmaker_basemaker",
+  "nombre": "Lidmaker y basemaker",
+  "descripcion": "Caja plana arriba y abajo: tapa suelta en marco lidmaker con cierres mariposa y piso en marco basemaker. Liviana y sin cantos salientes, se apila bien.",
+  "params": {"forma": "slam", "orientacion": "vertical", "slam_caras": "arriba", "tapa_plana": "lidmaker", "basemaker": true, "ruedas": 0, "manijas": true}
+ },
+ {
+  "id": "apertura_frontal_puerta_doble",
+  "nombre": "Apertura frontal con puerta doble",
+  "descripcion": "Case parado con dos puertas planas adelante que abren hacia los costados, en marco de perfil slam: una se traba con pasadores y la otra cierra sobre ella con cierres slam. Ruedas abajo.",
+  "params": {"forma": "slam", "orientacion": "frontal", "slam_caras": "frente", "slam_hojas": 2, "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "puertas_dobles_y_tapa",
+  "nombre": "Puertas dobles adelante y tapa arriba",
+  "descripcion": "Case parado con puerta doble adelante y una tapa plana arriba, todo en marco de perfil slam: se abre de frente y por arriba sin sacar nada. Ruedas abajo.",
+  "params": {"forma": "slam", "orientacion": "frontal", "slam_caras": "arriba_frente", "slam_hojas": 2, "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "tapa_adelante_y_arriba",
+  "nombre": "Tapa adelante y arriba",
+  "descripcion": "Case parado con una puerta plana adelante y una tapa plana arriba, en marco de perfil slam con bisagras de piano y cierres slam. Ruedas abajo.",
+  "params": {"forma": "slam", "orientacion": "frontal", "slam_caras": "arriba_frente", "slam_hojas": 1, "puerta_lado": "izq", "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "case_partido",
+  "nombre": "Case partido con tapas partidas",
+  "descripcion": "Case parado que se abre adelante y atrás, con cada lado cerrado por dos hojas planas que abren hacia los costados (marco slam, bisagra de piano, pasadores y cierres slam). Se llega a todo el equipo desde los dos lados sin sacar tapas.",
+  "params": {"forma": "slam", "orientacion": "frontal", "slam_caras": "frente_trasera", "slam_hojas": 2, "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "rack_mezcladora_2",
+  "nombre": "Rack para mezcladora 2",
+  "descripcion": "Rack para consola con el cuerpo en cuña y, abajo adelante, un rack de 19\" de 3 U con boca en el frente para procesadores o la potencia. La tapa cierra sobre la pendiente.",
+  "params": {"forma": "inclinado", "orientacion": "vertical", "incl_rieles": true, "incl_alto_frente": 200, "incl_rack_frente": 3, "tapas": 1, "ruedas": 0, "pies": 4, "manijas": true}
+ },
+ {
+  "id": "base_ruedas_suelta",
+  "nombre": "Base de ruedas suelta",
+  "descripcion": "Tabla gruesa con cuatro ruedas y un borde de ángulo alrededor, sin case: arriba se apoya uno o más cases (o una pila) y viajan juntos. Las medidas interiores son la planta de lo que apoya.",
+  "params": {"forma": "tabla", "orientacion": "vertical", "ruedas": 4, "rueda_frenos": 2, "tabla_borde": 40, "manijas": false}
+ },
+ {
+  "id": "baul_guitarras",
+  "nombre": "Baúl chico para guitarras",
+  "descripcion": "Case parado con la tapa adelante para cuatro guitarras de pie, una al lado de la otra, separadas por tabiques de espuma de todo el alto y el fondo. Poné de alto interior el de la guitarra más alta más 60 mm y ajustá cada guitarra en la tabla de equipos.",
+  "params": {"orientacion": "frontal", "tapas": 1, "extremos_cubren": true, "bisagras": 3, "puerta_lado": "izq", "ruedas": 4, "manijas": true, "_guitarras": 4}
  }
 ]
