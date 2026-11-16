@@ -156,3 +156,49 @@ def test_cubo_de_vistas(qapp):
     assert c.vista_en_cubo(QPointF(10, 390)) is None
     c.set_vista("frente")
     assert {v for _, v, _, _ in c._armar_cubo()} == {"frente"}
+
+
+def test_cotas_del_case_y_de_la_tapa():
+    res, v = _vista(VALIJA)
+    v_ = res.valores
+    cotas = v.aplicar(EstadoVista()).dimensions
+    valores = sorted(round(c.value_mm, 1) for c in cotas[:3])
+    assert valores == sorted(round(x, 1) for x in (v_["ext_ancho"], v_["ext_prof"], v_["ext_alto"]))
+    tapa = [c for c in cotas if c.label.startswith("Tapa:")]
+    assert len(tapa) == 1 and tapa[0].value_mm == pytest.approx(v_["ext_alto"] - res.valores["geo"]["z_cierre"])
+    # con la tapa abierta su cota no va (no está en su lugar)
+    assert not [c for c in v.aplicar(EstadoVista(tapas=[1.0, 0.0])).dimensions if c.label.startswith("Tapa")]
+    _, r = _vista(RACK)
+    assert [c.label.split(":")[0] for c in r.aplicar(EstadoVista()).dimensions[3:]] == ["Tapa delantera", "Tapa trasera"]
+
+
+def test_medir_entre_dos_vertices(qapp):
+    import numpy as np
+    from PySide6.QtCore import QPointF
+    from flightcase.taller.malla import Point3D
+    from flightcase.ui.widgets.schema_3d_widget import Schema3DCanvas
+    res, v = _vista(VALIJA)
+    c = Schema3DCanvas()
+    c.resize(1000, 1000)
+    c.set_mesh(v.aplicar(EstadoVista()))
+    # vista de arriba, 1 mm = 1 px desde la esquina de abajo a la izquierda (como deja OpenGL)
+    esc = 2.0 / 1000.0
+    mv = np.diag([1.0, 1.0, 1.0, 1.0])
+    pr = np.diag([esc, esc, -0.0001, 1.0])
+    pr[3, 0] = pr[3, 1] = -1.0
+    c._matrices = (mv, pr)
+    texto = []
+    c.medicion_cambiada.connect(texto.append)
+    a, b = v._caja
+    c.set_modo_medir(True)
+    assert c._clic_medir(QPointF(a.x + 3, 1000 - a.y - 2))       # cerca de la esquina: se engancha
+    p0 = c.medicion[0]
+    assert abs(p0.x - (a.x + 3)) <= 14 and abs(p0.y - (a.y + 2)) <= 14     # un vértice de esa esquina
+    assert not c._clic_medir(QPointF(990, 20))                   # lejos de todo: no marca
+    assert c._clic_medir(QPointF(b.x, 1000 - a.y))
+    p1 = c.medicion[1]
+    assert abs(p1.x - b.x) <= 14 and texto[-1] == Schema3DCanvas.texto_medida(p0, p1)
+    assert 0.9 * (b.x - a.x) < float(texto[-1].split(" mm")[0].replace(",", ".")) < 1.1 * (b.x - a.x)
+    assert Schema3DCanvas.texto_medida(Point3D(0, 0, 0), Point3D(300, 400, 0)) == "500 mm  (Δx 300 · Δy 400 · Δz 0)"
+    c.set_modo_medir(False)
+    assert c.medicion == [] and texto[-1] == ""

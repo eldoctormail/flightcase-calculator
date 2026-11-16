@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from .geometria import Malla3D
-from .malla import Point3D, PolygonFace3D, Segment3D, WireframeMesh3D
+from .malla import DimensionCallout3D, Point3D, PolygonFace3D, Segment3D, WireframeMesh3D
 from .modelo import ResultadoTaller
 
 # Qué se puede ocultar, en el orden en que aparece en el panel «Vista»
@@ -152,6 +152,7 @@ class VistaCase:
                 c = _centro(f.vertices)
                 self.grupos.append(_Grupo(j, j + 1, _de_que_tapa(c, self.tapas),
                                           _categoria(f.color_group, f.label, False)))
+        self._caja = self.caja_paneles()
         self.tapa_segmento = [_de_que_tapa(_centro((s.p1, s.p2)), self.tapas) for s in malla.segments]
         # bisagra de cada tapa: arriba (o atrás, en un case parado), en el borde de la propia tapa
         self.bisagras: Dict[int, Tuple[int, float]] = {}
@@ -161,6 +162,46 @@ class VistaCase:
                     for f in malla.faces[g.desde:g.hasta] for p in f.vertices]
             if vals:
                 self.bisagras[t.numero] = (b, max(vals))
+
+    def caja_paneles(self) -> Tuple[Point3D, Point3D]:
+        """Caja de los paneles del case cerrado (sin ruedas ni herrajes que sobresalen)."""
+        pts = [p for g in self.grupos if g.categoria == "paneles"
+               for f in self.malla.faces[g.desde:g.hasta] for p in f.vertices] or \
+            [self.malla.bounding_box[0], self.malla.bounding_box[1]]
+        return (Point3D(min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)),
+                Point3D(max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
+
+    def cotas(self, estado: EstadoVista) -> List[DimensionCallout3D]:
+        """Cotas del case: ancho, fondo y alto por fuera (sin ruedas), y el alto de cada tapa
+        cerrada, separadas del case para que no tapen nada."""
+        a, b = self._caja
+        dx, dy, dz = b.x - a.x, b.y - a.y, b.z - a.z
+        sep = max(40.0, 0.12 * max(dx, dy, dz))
+        P = Point3D
+        fmt_ = lambda v: f"{v:.1f}".rstrip("0").rstrip(".").replace(".", ",")
+        out = [
+            DimensionCallout3D(P(a.x, a.y, a.z), P(b.x, a.y, a.z), f"{fmt_(dx)} mm", dx, (0.0, -sep, 0.0), "length"),
+            DimensionCallout3D(P(b.x, a.y, a.z), P(b.x, b.y, a.z), f"{fmt_(dy)} mm", dy, (sep, 0.0, 0.0), "width"),
+            DimensionCallout3D(P(b.x, a.y, a.z), P(b.x, a.y, b.z), f"{fmt_(dz)} mm", dz, (sep * 0.7, -sep * 0.7, 0.0),
+                               "height"),
+        ]
+        lo, hi = (a.x, a.y, a.z), (b.x, b.y, b.z)
+        for t in self.tapas:
+            i = t.numero - 1
+            if t.numero not in self.bisagras or estado.tapas[i] > 0 or estado.tapas_ocultas[i] \
+                    or estado.seccion == "cuerpo":
+                continue
+            borde = hi[t.eje] if t.signo > 0 else lo[t.eje]
+            h = abs(borde - t.plano)
+            k = 0.7 * sep
+            # sobre una arista que no use la cota del alto total, y corrida hacia afuera
+            base, off = {2: ([a.x, a.y, 0.0], (-k, -k, 0.0)),     # case parado: arista de adelante a la izq.
+                         1: ([b.x, 0.0, b.z], (k, 0.0, k)),       # frontal: arista de arriba a la der.
+                         0: ([0.0, a.y, b.z], (0.0, -k, k))}[t.eje]  # acostado: arista de arriba adelante
+            p1, p2 = list(base), list(base)
+            p1[t.eje], p2[t.eje] = t.plano, borde
+            out.append(DimensionCallout3D(P(*p1), P(*p2), f"{t.nombre}: {fmt_(h)} mm", h, off, "lid_height"))
+        return out
 
     @property
     def nombres_tapas(self) -> List[str]:
@@ -259,5 +300,5 @@ class VistaCase:
                     s = Segment3D(mov[0](s.p1), mov[0](s.p2), s.style, s.color_group, s.label, s.wall_index)
                 segmentos.append(s)
         # la caja de referencia es la del case cerrado: la cámara no salta al abrir una tapa
-        return WireframeMesh3D(faces=caras, segments=segmentos, dimensions=list(m.dimensions),
+        return WireframeMesh3D(faces=caras, segments=segmentos, dimensions=list(m.dimensions) + self.cotas(estado),
                                bounding_box=m.bounding_box)

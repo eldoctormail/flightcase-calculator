@@ -46,63 +46,82 @@ def _lupa(signo: str):
     return d
 
 
-def _mano(p: QPainter) -> None:
-    """Puño agarrando (como el cursor de «arrastrar»): los cuatro nudillos arriba, la palma
-    y el pulgar doblado por delante; alrededor, flechas chicas de mover."""
-    camino = QPainterPath()
-    for x in (6.9, 10.0, 13.1, 16.2):                                        # dedos doblados
-        camino.addRoundedRect(QRectF(x - 1.45, 6.2, 2.9, 6.0), 1.45, 1.45)
-    camino.addRoundedRect(QRectF(5.45, 10.0, 12.2, 8.4), 3.4, 3.4)          # palma
-    p.drawPath(camino.simplified())
-    pulgar = QPainterPath()                                                  # pulgar doblado
-    pulgar.moveTo(5.6, 13.0)
-    pulgar.cubicTo(8.0, 12.2, 10.6, 12.6, 12.0, 14.6)
-    p.drawPath(pulgar)
-    pen = p.pen()
-    fina = QPen(pen)
-    fina.setWidthF(pen.widthF() * 0.8)
-    p.setPen(fina)
-    for punta, ang in ((QPointF(11.5, 2.4), -90), (QPointF(11.5, 21.2), 90),
-                       (QPointF(1.6, 14.2), 180), (QPointF(21.4, 14.2), 0)):
-        _flecha(p, punta, ang, 2.0)
+def _punta(p: QPainter, punta: QPointF, dx: float, dy: float, largo: float = 4.4, ancho: float = 3.0) -> None:
+    """Punta de flecha rellena con la punta en `punta`, apuntando en la dirección (dx, dy)."""
+    l = math.hypot(dx, dy) or 1.0
+    ux, uy = dx / l, dy / l
+    bx, by = punta.x() - ux * largo, punta.y() - uy * largo
+    tri = QPolygonF([punta, QPointF(bx - uy * ancho / 2, by + ux * ancho / 2),
+                     QPointF(bx + uy * ancho / 2, by - ux * ancho / 2)])
+    p.save()
+    p.setBrush(p.pen().color())
+    pen = QPen(p.pen())
+    pen.setWidthF(0.8)
     p.setPen(pen)
+    p.drawPolygon(tri)
+    p.restore()
 
 
 def _flecha(p: QPainter, punta: QPointF, angulo: float, largo: float = 4.0) -> None:
-    for da in (150, -150):
-        a = math.radians(angulo + da)
-        p.drawLine(punta, QPointF(punta.x() + largo * math.cos(a), punta.y() + largo * math.sin(a)))
+    """Punta rellena en `punta`, apuntando hacia `angulo` (grados, y hacia abajo)."""
+    a = math.radians(angulo)
+    _punta(p, punta, math.cos(a), math.sin(a), largo, largo * 0.75)
+
+
+def _recta_flecha(p: QPainter, desde: QPointF, hasta: QPointF, largo: float = 4.2) -> None:
+    """Recta que termina en una punta: la línea llega hasta la base de la punta, no la atraviesa."""
+    dx, dy = hasta.x() - desde.x(), hasta.y() - desde.y()
+    l = math.hypot(dx, dy) or 1.0
+    p.drawLine(desde, QPointF(hasta.x() - dx / l * (largo - 0.6), hasta.y() - dy / l * (largo - 0.6)))
+    _punta(p, hasta, dx, dy, largo, largo * 0.75)
+
+
+def _arco_flecha(p: QPainter, cx: float, cy: float, rx: float, ry: float, desde: float, giro: float,
+                 largo: float = 4.4) -> None:
+    """Arco de elipse (ángulos en grados, antihorario como Qt) con una punta al final que sigue
+    la tangente del arco; el arco termina en la base de la punta."""
+    corte = math.degrees(largo * 0.85 / max(rx, ry))
+    hasta = desde + giro
+    trazo = giro - math.copysign(corte, giro)
+    p.drawArc(QRectF(cx - rx, cy - ry, 2 * rx, 2 * ry), int(desde * 16), int(trazo * 16))
+    a = math.radians(hasta)
+    punta = QPointF(cx + rx * math.cos(a), cy - ry * math.sin(a))
+    sg = 1.0 if giro > 0 else -1.0
+    tx, ty = -rx * math.sin(a) * sg, -ry * math.cos(a) * sg     # tangente, en el sentido del giro
+    _punta(p, punta, tx, ty, largo, largo * 0.75)
+
+
+def _mano(p: QPainter) -> None:
+    """Mover (paneo): la cruz de cuatro flechas de los programas de CAD."""
+    for dx, dy in ((0, -1), (0, 1), (-1, 0), (1, 0)):
+        _recta_flecha(p, QPointF(11 + dx * 1.5, 11 + dy * 1.5), QPointF(11 + dx * 9.2, 11 + dy * 9.2), 4.6)
+    p.drawEllipse(QPointF(11, 11), 1.4, 1.4)
 
 
 def _orbitar(p: QPainter) -> None:
-    """Girar alrededor: un cubito con una flecha que le da la vuelta."""
+    """Girar alrededor: un cubito con una órbita que le da la vuelta."""
     frente = QPolygonF([QPointF(8, 9.5), QPointF(13, 9.5), QPointF(13, 14.5), QPointF(8, 14.5)])
     p.drawPolygon(frente)
     p.drawPolyline(QPolygonF([QPointF(8, 9.5), QPointF(10, 7.5), QPointF(15, 7.5), QPointF(15, 12.5),
                               QPointF(13, 14.5)]))
     p.drawLine(QPointF(13, 9.5), QPointF(15, 7.5))
-    p.drawArc(QRectF(2, 4, 18, 15), 200 * 16, 300 * 16)
-    _flecha(p, QPointF(3.2, 14.6), 115, 3.6)
+    _arco_flecha(p, 11, 11.5, 9.5, 5.2, 120, 270, 4.4)
 
 
 def _zoom_arrastre(p: QPainter) -> None:
     """Zoom arrastrando: lupa con una flecha para arriba y otra para abajo."""
-    p.drawEllipse(QPointF(8.5, 9.5), 5.2, 5.2)
-    p.drawLine(QPointF(12.3, 13.3), QPointF(15.5, 16.5))
-    p.drawLine(QPointF(19, 3.5), QPointF(19, 18.5))
-    _flecha(p, QPointF(19, 3.5), -90, 3.2)
-    _flecha(p, QPointF(19, 18.5), 90, 3.2)
+    p.drawEllipse(QPointF(8.0, 9.0), 5.0, 5.0)
+    p.drawLine(QPointF(11.7, 12.7), QPointF(14.6, 15.6))
+    _recta_flecha(p, QPointF(18.8, 11), QPointF(18.8, 2.4), 4.0)
+    _recta_flecha(p, QPointF(18.8, 11), QPointF(18.8, 19.6), 4.0)
 
 
 def _girar(sentido: int):
     def d(p: QPainter) -> None:
-        rect = QRectF(4, 4, 14, 14)
-        if sentido < 0:
-            p.drawArc(rect, 30 * 16, 260 * 16)
-            _flecha(p, QPointF(17.1, 7.5), -40)
-        else:
-            p.drawArc(rect, 150 * 16, -260 * 16)
-            _flecha(p, QPointF(4.9, 7.5), -140)
+        if sentido < 0:      # a la izquierda (antihorario)
+            _arco_flecha(p, 11, 11.5, 7.2, 7.2, -60, 290, 4.6)
+        else:                # a la derecha (horario)
+            _arco_flecha(p, 11, 11.5, 7.2, 7.2, 240, -290, 4.6)
     return d
 
 
@@ -128,9 +147,19 @@ def _perspectiva(p: QPainter) -> None:
 def _cotas(p: QPainter) -> None:
     p.drawLine(QPointF(3, 7), QPointF(3, 17))
     p.drawLine(QPointF(19, 7), QPointF(19, 17))
-    p.drawLine(QPointF(4, 12), QPointF(18, 12))
-    _flecha(p, QPointF(4, 12), 180, 3.5)
-    _flecha(p, QPointF(18, 12), 0, 3.5)
+    _recta_flecha(p, QPointF(11, 12), QPointF(4, 12), 3.8)
+    _recta_flecha(p, QPointF(11, 12), QPointF(18, 12), 3.8)
+
+
+def _regla(p: QPainter) -> None:
+    """Medir: una regla en diagonal con sus marcas."""
+    p.save()
+    p.translate(11, 11)
+    p.rotate(-35)
+    p.drawRoundedRect(QRectF(-9.5, -3.6, 19, 7.2), 1.2, 1.2)
+    for i, x in enumerate((-6.5, -3.5, -0.5, 2.5, 5.5)):
+        p.drawLine(QPointF(x, -3.6), QPointF(x, -0.6 if i % 2 else 0.6))
+    p.restore()
 
 
 def _ejes(p: QPainter) -> None:
@@ -204,8 +233,10 @@ class BarraVista3D(QFrame):
         separador()
         boton("perspectiva", _perspectiva, "Perspectiva (apagado: vista paralela, sin deformar)",
               canvas.set_perspective, marcable=True).setChecked(canvas.is_perspective)
-        boton("cotas", _cotas, "Mostrar las cotas", canvas.set_mostrar_cotas, marcable=True).setChecked(
+        boton("cotas", _cotas, "Acotar: medidas exteriores del case y alto de las tapas", canvas.set_mostrar_cotas, marcable=True).setChecked(
             canvas.show_dimensions)
+        boton("medir", _regla, "Medir: clic en dos puntos del case (se engancha a las esquinas). Esc borra",
+              canvas.set_modo_medir, marcable=True)
         boton("ejes", _ejes, "Mostrar los ejes", canvas.set_mostrar_ejes, marcable=True).setChecked(canvas.show_axes)
         fila.addStretch(1)
         canvas.projection_changed.connect(self._sincronizar_perspectiva)
