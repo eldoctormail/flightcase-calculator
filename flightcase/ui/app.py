@@ -97,6 +97,16 @@ class FlightCaseMainWindow(QMainWindow):
         self.help_menu = barra.addMenu("A&yuda")
         a = self._accion(self.help_menu, f"&Acerca de {TITULO}...", None, self.acerca_de, "Autor y versión")
         a.setMenuRole(QAction.MenuRole.AboutRole)     # en Mac va al menú de la app
+        from .actualizador import Actualizador
+        self.actualizador = Actualizador(
+            self, _settings, lambda: self.taller_widget.confirmar_cambios("Actualizar", "cerrar para actualizar"))
+        a = self._accion(self.help_menu, "&Buscar actualizaciones...", None, lambda: self.actualizador.buscar(),
+                         "Ver si hay una versión nueva en GitHub e instalarla")
+        a.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)   # en Mac, en el menú de la app
+        self.accion_buscar_al_abrir = a = QAction("Buscar actualizaciones al &abrir", self, checkable=True)
+        a.setChecked(self.actualizador.buscar_al_abrir)
+        a.toggled.connect(lambda v: setattr(self.actualizador, "buscar_al_abrir", v))
+        self.help_menu.addAction(a)
 
     def _actualizar_historial(self) -> None:
         t = self.taller_widget
@@ -314,4 +324,8 @@ def run_app() -> int:
     file_filter = _FileOpenFilter(app)
     app.installEventFilter(file_filter)
     window.show()
+
+    from ..actualizaciones import es_app_instalada
+    if es_app_instalada() and window.actualizador.buscar_al_abrir:   # desde el código no: la versión es otra
+        QTimer.singleShot(3000, lambda: window.actualizador.buscar(silencioso=True))
     return app.exec()
