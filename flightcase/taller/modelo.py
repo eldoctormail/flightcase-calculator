@@ -331,11 +331,25 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         E_remache_ref = None
     E_remache_d = cd(E_remache_ref or "", "d", remache_d)
 
+    # ---- forro interior por cara (forro.py, no está en flightcase.scad) ----
+    from . import forro as _fo
+    _forro = _fo.resolver(P, cat, tapas == 2, _espuma, ref_espuma if ce(ref_espuma) else "") \
+        if _fo.hay_forro(P) else None
+    _e_t2 = _espuma
+
     # ---- medidas interiores (con espuma crece el case) ----
-    E_int_ancho = int_ancho + 2 * _espuma
-    E_int_prof = int_prof + 2 * _espuma
-    E_int_alto_cuerpo = int_alto_cuerpo + _espuma
-    E_int_alto_tapa = int_alto_tapa + _espuma
+    if _forro is None:
+        E_int_ancho = int_ancho + 2 * _espuma
+        E_int_prof = int_prof + 2 * _espuma
+        E_int_alto_cuerpo = int_alto_cuerpo + _espuma
+        E_int_alto_tapa = int_alto_tapa + _espuma
+    else:   # cada cara crece lo que mide su forro; las paredes de la tapa no cambian el exterior
+        _fe_ = _forro.esp
+        E_int_ancho = int_ancho + _fe_("izq") + _fe_("der")
+        E_int_prof = int_prof + _fe_("frente") + _fe_("trasera")
+        E_int_alto_cuerpo = int_alto_cuerpo + (0 if tapas == 2 else _fe_("piso"))
+        E_int_alto_tapa = int_alto_tapa + _fe_("techo")
+        _espuma, _e_t2 = 0, _fe_("base2")
 
     _t = E_placa_esp
     _d = hibrido_descuento if _hib else 0
@@ -349,7 +363,7 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     _fe = paredes_enteras != "laterales"
     _fec = (paredes_enteras if paredes_enteras_cuerpo == "" else paredes_enteras_cuerpo) != "laterales"
     _ce = _t if (extremos_cubren and not _hib) else 0
-    E_int_alto_tapa2 = (int_alto_tapa if int_alto_tapa2 < 0 else int_alto_tapa2) + _espuma
+    E_int_alto_tapa2 = (int_alto_tapa if int_alto_tapa2 < 0 else int_alto_tapa2) + _e_t2
 
     ext_ancho = E_int_ancho + 2 * pared
     ext_prof = E_int_prof + 2 * pared
@@ -1064,6 +1078,21 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         bandejas_out.append([f"bandeja{i}", b[2], bandeja_soportes])
     panelmat += [[pid, m.material, m.esp, m.largo, m.ancho, m.ref] for pid, m in _mat_pan.items()]
 
+    # ---- forro interior: piezas, planchas y adhesivo ----
+    def _nombre_pieza_forro(pid):
+        # en un case acostado o frontal el "piso" del cuerpo es el fondo, opuesto a la tapa
+        return ("Fondo del cuerpo" if pid == "piso" and _acost else nombre_panel(pid)).replace(" (parte fija)", "")
+
+    _forro_caras: Dict[str, float] = {}
+    if _forro is not None:
+        def _nombre_cara(c):
+            return _nombre_forro(c, _2t, _nombre_pieza_forro)
+        _fo.calcular_piezas(_forro, dict(X=ext_ancho, Y=ext_prof, pared=pared, z_cierre=z_cierre, z_cierre2=z_cierre2,
+                                         ext_alto=ext_alto, dos_tapas=_2t), _nombre_pieza_forro)
+        _fo.chequear(_forro, P, _acc)
+        info["forro"] = _fo.resumen_caras(_forro, _nombre_cara)
+        _forro_caras = {c: _forro.esp(c) for c in _fo.CARAS}
+
     # ---- interiores (equipos, espuma, cajones, rack 19"): no están en flightcase.scad ----
     interior = None
     from . import interiores as _int
@@ -1071,7 +1100,7 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         interior = _int.calcular(P, dict(
             horizontal=_hz, frontal=_fr, dos_tapas=_2t, ext_ancho=ext_ancho, ext_prof=ext_prof, ext_alto=ext_alto,
             pared=pared, espuma=_espuma, z_cierre=z_cierre, z_cierre2=z_cierre2, bandejas=bandejas,
-            band_esp=_band_esp), cat)
+            band_esp=_band_esp, forro=_forro_caras or None), cat)
         extras_p += interior.extras
         herrajes += [Herraje(*h) for h in interior.herrajes]
         A += interior.avisos
@@ -1139,6 +1168,7 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
                        z=pared + b[2] - _band_esp(b), ancho=b[0], fondo=b[1], esp=_band_esp(b))
                   for b in bandejas],
         interior=interior,
+        forro=[],
     )
 
     # ---- herrajes puestos a mano (herrajes_manuales.py): no están en flightcase.scad ----
@@ -1155,6 +1185,19 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         _hm.unir_herrajes(herrajes, manuales.herrajes, Herraje)
         A += manuales.avisos
 
+    # ---- forro interior: huecos de los herrajes embutidos, piezas de corte, planchas y adhesivo ----
+    if _forro is not None:
+        _fo.agregar_huecos(_forro, calados, colocaciones, pared)
+        geo["forro"] = [dict(nombre=pz.nombre, tipo=pz.tipo, grupo=pz.grupo, caja=pz.caja,
+                             celdas=_fo.celdas(pz.caja, pz.huecos_3d)) for pz in _forro.piezas]
+        extras_p += _fo.extras(_forro)
+        panelmat += _fo.panelmat(_forro)
+        if _forro.piezas:
+            herrajes.append(Herraje("Adhesivo de contacto para el forro", 1,
+                                    s("para pegar ", round_os(_fo.superficie(_forro) * 100) / 100,
+                                      " m² de forro (a las dos caras: forro y placa)"), ""))
+        A += _forro.avisos
+
     res = ResultadoTaller(
         info=info, paneles=paneles, calados=calados, marcas=marcas, perfiles=perfiles, extras=extras_p,
         herrajes=herrajes, panelmat=panelmat, bandejas=bandejas_out, avisos=A,
@@ -1162,12 +1205,24 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
                  "placa_largo": E_placa_largo, "placa_ancho": E_placa_ancho, "placa_esp": E_placa_esp,
                  "placa_material": E_placa_material, "placa_kerf": placa_kerf, "placa_margen": placa_margen,
                  "barra_largo": barra_largo, "sierra_kerf": sierra_kerf, "cantidad_cases": cantidad_cases,
-                 "remache_ref": E_remache_ref, "materiales_paneles": _mat_pan, "geo": geo, "interiores": interior, "manuales": manuales},
+                 "remache_ref": E_remache_ref, "materiales_paneles": _mat_pan, "geo": geo, "interiores": interior, "manuales": manuales,
+                 "forro": _forro,
+                 "forro_opciones": _fo.opciones(_2t, lambda c: _nombre_forro(c, _2t, _nombre_pieza_forro))},
     )
     # ---- peso real (peso.py): no está en flightcase.scad ----
     from . import peso as _peso
     res.valores["peso"] = _peso.calcular(res, P, cat)
     return res
+
+
+def _nombre_forro(cara: str, dos_tapas: bool, nombre_panel) -> str:
+    """Nombre de una cara del forro, con los nombres de los paneles de este case."""
+    if cara == "tapa_paredes":
+        return "Paredes de la tapa" + (" 1" if dos_tapas else "")
+    if cara == "tapa2_paredes":
+        return "Paredes de la tapa 2"
+    pid = cara if cara in ("piso", "techo", "base2") else f"cuerpo_{cara}"
+    return nombre_panel(pid)
 
 
 def interior_para_exterior(params: Optional[Dict[str, Any]], ancho: float, prof: float, alto: float,

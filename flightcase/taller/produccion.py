@@ -334,13 +334,24 @@ def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool =
         pz["dxf"] = f"{pz['num']:02d}_{pz['ids'][0]}_x{pz['cant']}.dxf"
         escribir(pz["dxf"], panel_dxf(pz["w"], pz["h"], pz["calados"],
                                       trazos_manuales(d["manuales"].get(pz["ids"][0], []))))
+    forro = res.valores.get("forro")
+    huecos_forro = {}
+    if forro is not None:
+        from . import forro as _fo
+        huecos_forro = {j["nombre"]: j["huecos"] for j in _fo.juntar(forro)}
+    n_forro = 0
     for i, e in enumerate(d["extras"]):
         num_p = len(piezas) + 1
-        nombre = f"{num_p:02d}_extra{i + 1}_x{e['cant']}.dxf"
-        escribir(nombre, panel_dxf(e["w"], e["h"]))
+        es_forro = e["nombre"] in huecos_forro
+        if es_forro:
+            n_forro += 1
+        nombre = (f"{num_p:02d}_forro{n_forro}_x{e['cant']}.dxf" if es_forro
+                  else f"{num_p:02d}_extra{i + 1}_x{e['cant']}.dxf")
+        cal = huecos_forro.get(e["nombre"], [])
+        escribir(nombre, panel_dxf(e["w"], e["h"], cal))
         piezas.append(dict(num=num_p, ids=[f"extra{i + 1}"], cant=e["cant"], nombre=e["nombre"],
-                           w=e["w"], h=e["h"], calados=[], marcas=[], dxf=nombre, extra=True,
-                           material=e["material"], esp=e["esp"]))
+                           w=e["w"], h=e["h"], calados=cal, marcas=[], dxf=nombre, extra=True,
+                           material=e["material"], esp=e["esp"], forro=es_forro))
 
     _exportar_espuma(res, carpeta, paq)
 
@@ -404,7 +415,8 @@ def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool =
                 from .planos import instructivo as ins
                 pasos = ins.armar_pasos(d, piezas)
                 from .planos import interior as pl_int
-                p_int = pl_int.pasos_instructivo(res, piezas)
+                from . import forro as _fo
+                p_int = _fo.pasos_instructivo(res, piezas) + pl_int.pasos_instructivo(res, piezas)
                 from . import herrajes_manuales as hman
                 p_int += hman.pasos_instructivo(res, piezas)
                 if p_int:   # antes del paso final (el case terminado), si lo hay

@@ -176,6 +176,16 @@
  "rebaje_holgura": 2,
  "ref_tope": "",
  "espuma_esp": 0,
+ "forro": [],
+ "forro_alfombra_esp": 3,
+ "forro_alfombra_plancha": [
+  2000,
+  1500
+ ],
+ "forro_espuma_plancha": [
+  2000,
+  1000
+ ],
  "ref_espuma": "",
  "extras": [],
  "color_placa": "BurlyWood",
