@@ -1039,14 +1039,15 @@ class TallerWidget(QWidget):
             self.aplicar_estilo(id_estilo)
         self._mostrar_estilo()
 
-    def aplicar_estilo(self, id_estilo: str) -> None:
-        """Aplica un estilo sobre las medidas e interior actuales."""
+    def aplicar_estilo(self, id_estilo: str, con_medidas: bool = False) -> None:
+        """Aplica un estilo sobre las medidas e interior actuales (con ``con_medidas``, en un
+        proyecto nuevo, también pone las medidas propias del estilo, si trae)."""
         e = self._estilos.get(id_estilo) or estilos.buscar(id_estilo)
         if e is None:
             return
         self._leer_editores()
         try:
-            self.params = estilos.aplicar(self.params, e, self.defectos)
+            self.params = estilos.aplicar(self.params, e, self.defectos, con_medidas)
         except Exception as ex:   # base automática con medidas que el modelo no admite
             self.lbl_avisos.setText(f"No se pudo aplicar el estilo «{e.nombre}»: {ex}")
             return
@@ -1911,7 +1912,7 @@ class TallerWidget(QWidget):
         else:
             self.set_params({})
             if id_estilo:
-                self.aplicar_estilo(id_estilo)
+                self.aplicar_estilo(id_estilo, con_medidas=True)
         self._foto_guardada = self._foto()        # recién empezado: sin cambios
         if nombre:
             from ...taller.proyectos import nombre_libre, nombre_valido

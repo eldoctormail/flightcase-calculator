@@ -171,3 +171,25 @@ def test_tapa_baja_y_bandejas_euro():
     q = estilos.aplicar(p, por_id["bandejas_euro"], D)
     assert q["cajones"] == [[116.0, 0.0], [116.0, 120.0], [116.0, 240.0], [116.0, 360.0], [116.0, 480.0]]
     assert estilos.aplicar(dict(p, cajones=[[200, 0]]), por_id["bandejas_euro"], D)["cajones"] == [[200, 0]]
+
+
+def test_rack_de_audio_nuevo_sale_igual_al_del_generador():
+    """El estilo «Rack de audio» en un proyecto nuevo da exactamente el rack_audio.scad de Javier."""
+    from test_taller_golden import _filas
+    golden = json.loads((GOLDEN / "rack_audio.json").read_text(encoding="utf-8"))
+    q = estilos.aplicar(dict(D), estilos.buscar("rack_audio"), D, con_medidas=True)
+    esperado = dict(D)
+    esperado.update(golden["params"])
+    for k, v in golden["params"].items():
+        assert q[k] == v, k
+    assert _filas(calcular(q)) == _filas(calcular(esperado))
+
+
+def test_rack_de_audio_en_el_taller_respeta_las_medidas_del_proyecto():
+    p = dict(D)
+    p.update(MEDIDAS[1])
+    q = estilos.aplicar(p, estilos.buscar("rack_audio"), D)
+    for k, v in MEDIDAS[1].items():
+        assert q[k] == v
+    assert q["acceso_tipo"] == "cubierta" and q["ref_cierre_macho"] == "08-6203"
+    assert q["base_ruedas"] == estilos.base_ruedas_auto(q) and q["acceso_lateral"] == round(0.31 * 900)

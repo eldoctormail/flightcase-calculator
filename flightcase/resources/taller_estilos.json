@@ -78,6 +78,12 @@
              "ruedas": 4, "_base_ruedas": "auto"}
  },
  {
+  "id": "rack_audio",
+  "nombre": "Rack de audio",
+  "descripcion": "Tu rack de audio del generador de OpenSCAD: parado, con tapa adelante y atrás, cubierta en U que sale entera (techo y tapas de acceso de los costados), perfil híbrido 08-6203, base de ruedas de fenólico de 530x750 con 4 ruedas (2 con freno) y una bandeja interna de 15 mm. Desde la pantalla de inicio sale con sus medidas (interior 515x1100x720 y tapas de 105); elegido en el Taller, se arma sobre las medidas del proyecto.",
+  "params": {"tapas": 2, "orientacion": "frontal", "paredes_enteras": "laterales", "paredes_enteras_cuerpo": "frente", "extremos_cubren": true, "descuento_entre": 0, "placa_esp": 10, "placa_material": "Contrachapado 10 mm", "cierre_m_sup": 4, "cierre_h_sup": 4, "cierre_hibrido": true, "ref_cierre_macho": "08-6203", "cierre_m_alto": 25, "cierre_h_alto": 25, "cierre_saliente": 1.5, "angulo_ala": 32, "angulo_esp": 2, "acceso_junta": -1, "acceso_cierres_n": 2, "acceso_tipo": "cubierta", "manijas": true, "manijas_n": 2, "manija_pos": 0.55, "cierres_frente_n": 1, "cierres_lateral_n": 2, "color_placa": "Black", "refuerzos": 1, "ruedas": 4, "ref_rueda": "08-372151", "ref_rueda_freno": "08-372191", "rueda_frenos": 2, "base_material": "Fenólico 18 mm", "base_pasantes": true, "rebaje_refuerzos": true, "rebaje_holgura": 2, "ref_escuadra": "08-40403", "_acceso": 0.31, "_base_ruedas": "auto", "_medidas": {"int_ancho": 515, "int_prof": 1100, "int_alto_cuerpo": 720, "int_alto_tapa": 105, "acceso_lateral": 343, "base_ruedas": [530, 750, 18], "bandejas": [[515, 650, 698, 15, "Contrachapado 15 mm"]]}}
+ },
+ {
   "id": "rack_puertas",
   "nombre": "Rack 19\" con puertas adelante y atrás",
   "descripcion": "Rack parado con puertas en el frente y en la trasera que abren de costado sobre tres bisagras desmontables (se pueden sacar) y cierran con cierres del otro costado. Base de ruedas.",

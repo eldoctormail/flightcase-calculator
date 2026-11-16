@@ -34,9 +34,9 @@ FAMILIAS = (
      ("apertura_frontal", "apertura_frontal_puerta_doble", "puertas_dobles_y_tapa", "tapa_adelante_y_arriba",
       "bandejas_euro")),
     ("racks", "Racks", "Racks 19\" medidos en unidades: tapa adelante, adelante y atrás, puertas, tapas de acceso, "
-     "cubierta, inclinado para consola o funda abierta.",
-     ("rack_una_tapa", "rack_dos_tapas", "rack_puertas", "rack_acceso_paneles", "rack_cubierta", "rack_inclinado",
-      "rack_slam", "funda_rack")),
+     "cubierta, el rack de audio, inclinado para consola o funda abierta.",
+     ("rack_una_tapa", "rack_dos_tapas", "rack_puertas", "rack_acceso_paneles", "rack_cubierta", "rack_audio",
+      "rack_inclinado", "rack_slam", "funda_rack")),
     ("slam", "Tapas slam", "Tapas y puertas planas en marco de perfil slam, con bisagra de piano y cierres que "
      "traban solos al cerrar.", ("baul_slam_hd", "tapa_slam_doble", "tapa_slam_adelante", "tapas_slam_adelante_atras")),
     ("especiales", "Especiales", "Armados para un uso puntual: case partido, rack para mezcladora con rack abajo, "
@@ -57,6 +57,7 @@ CORTOS = {
     "apertura_frontal": "Tapa adelante", "bandejas_euro": "Bandejas euro",
     "rack_una_tapa": "Tapa adelante", "rack_dos_tapas": "Adelante y atrás", "rack_puertas": "Con puertas",
     "funda_rack": "Funda (sleeve)", "rack_acceso_paneles": "Tapas de acceso", "rack_cubierta": "Cubierta entera",
+    "rack_audio": "De audio",
     "rack_inclinado": "Para mezcladora", "rack_slam": "Slam",
     "baul_slam_hd": "Baúl HD", "tapa_slam_doble": "Doble", "tapa_slam_adelante": "Adelante",
     "tapas_slam_adelante_atras": "Adelante y atrás",
@@ -131,7 +132,7 @@ def dibujar_miniatura(estilo: Estilo, ruta: Optional[Path] = None) -> Optional[s
     ruta = Path(ruta or ruta_miniatura(estilo))
     try:
         d = parametros_por_defecto()
-        params = aplicar(dict(d), estilo, d)
+        params = aplicar(dict(d), estilo, d, con_medidas=True)
         ruta.parent.mkdir(parents=True, exist_ok=True)
         tmp = ruta.with_name(ruta.stem + f".{os.getpid()}.{id(params)}.png")
         if renderizar(malla_3d(calcular(params)), str(tmp), CAMARA, TAM, NEGRO, transparente=True):
