@@ -14,6 +14,7 @@ Programa de escritorio (Python + PySide6 + OpenGL) para diseñar y fabricar flig
 - **Tipos de case** en siete grupos (Estándar, Broadcast, Clamshell, Apertura frontal, Racks, Tapas slam y Especiales), cada uno con su armado: dónde se parte la tapa, cómo se juntan los perfiles y qué medidas van atadas. Más tus estilos propios guardados.
 - **Interiores**: espuma en capas con calados rectangulares, redondos o con el contorno de un dibujo, huecos para los dedos, cajones, rack 19" y chequeos de choques.
 - **Ruedas a elección**: giratorias, fijas, con freno o freno total de 75 a 150 mm (2 giratorias con freno + 2 fijas para que el case vaya derecho), **cazoletas** embutidas en el piso que bajan el case, o **base suelta** (wheel board) con marco de ángulo donde se apoya el case sin perforar el piso.
+- **Piezas sueltas desde el 3D**: un clic en un esquinero, un ángulo o un panel lo elige (queda resaltado) y abajo de la vista aparece un cuadro para cambiar esa pieza sola: otro modelo del catálogo (por ejemplo cantoneras apilables sólo en las 4 puntas de la tapa), otro color, o sacarla. «Cambiar» aplica lo mismo a las de la tapa, a las del otro lado o a todas. En un panel se elige la placa y el color. Los ángulos que llegan a un esquinero más grande o más chico se cortan a su medida, y la lista de corte, los herrajes, los remaches, las perforaciones del DXF, los planos, el peso y el STEP siguen a cada pieza. Queda guardado en el `.scad` como `piezas` (Herrajes → Piezas sueltas).
 - **Herrajes a mano** en cada cara, en 2D, con imán, y placas de logo desde `.svg` / `.dxf`.
 - **Paneles de conexión y energía**: conectores en cualquier cara (powerCON y powerCON TRUE1, XLR de 3 y 5 polos, etherCON, speakON, USB, BNC, tapa ciega, entrada IEC C14, salida IEC C13, toma Schuko y pasacables), uno por uno o varios en fila con **Panel de conexiones…**. Cada uno sale con su calado y los agujeros de los tornillos en el DXF, la brida y el cuerpo en la vista 3D, los tornillos en la lista y su peso.
 - **Mis cases** (`Ctrl+Shift+O` o el botón **Mis cases…**): tus proyectos guardados con miniatura, nombre, medidas exteriores y fecha. Se buscan por nombre, carpeta, medidas o material, se ordenan por fecha, nombre o tamaño, y se abren, duplican, renombran o mandan a la papelera. Lista los `.scad` de la carpeta de cases (por defecto `Documentos/LBD Flightcase Maker`, con dos niveles de subcarpetas) y los abiertos hace poco. Un case nuevo se guarda ahí por defecto.
@@ -188,6 +189,10 @@ La barra de arriba de la vista tiene: acercar y alejar, qué hace el botón izqu
 
 - Rueda del mouse: zoom hacia donde está el puntero. Botón derecho o rueda apretada: mover. Doble clic: encuadrar.
 - Teclado (con la vista seleccionada): flechas giran de a 5°, Mayús + flechas mueven, `+` y `-` hacen zoom, `Inicio` o `F` encuadran.
+
+**Cambiar una pieza sola**: clic en la pieza (sin arrastrar). Clic en el vacío o `✕` cierra el cuadro.
+
+![Esquineros apilables negros sólo arriba, la tapa en rojo](captura-piezas-sueltas.png)
 
 ### Ícono de la app
 

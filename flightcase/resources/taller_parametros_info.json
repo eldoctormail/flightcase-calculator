@@ -295,6 +295,16 @@
   ]
  },
  {
+  "seccion": "Piezas sueltas",
+  "parametros": [
+   {
+    "nombre": "piezas",
+    "etiqueta": "Piezas cambiadas una por una",
+    "ayuda": "Esquineros, ángulos y paneles que no son como el resto. Lo más cómodo es hacer clic en la pieza en la vista 3D y cambiarla en el cuadro que aparece abajo; acá quedan anotadas. Artículo: otro esquinero o ángulo del catálogo para esa pieza sola (por ejemplo, cantoneras apilables sólo arriba). Color: un nombre (negro, rojo, azul...) o #rrggbb, para la vista 3D, el STEP y la lista de corte. Sin la pieza = 1: esa pieza no va. Los ángulos que llegan a un esquinero más grande o más chico se acortan o alargan solos, y los remaches y las perforaciones de los DXF siguen a cada pieza."
+   }
+  ]
+ },
+ {
   "seccion": "Perfil de cierre macho (cuerpo) / hembra (tapa)",
   "parametros": [
    {

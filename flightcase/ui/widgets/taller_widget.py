@@ -81,12 +81,14 @@ TABLAS: Dict[str, List[tuple]] = {
     "formulas": [("Medida o variable", "texto", None), ("Fórmula", "texto", None)],
     "paneles_material": [("Panel o grupo", "panel", None), ("Placa del catálogo", "placa", ""),
                          ("Espesor", "num", 0), ("Material", "texto", "")],
+    "piezas": [("Pieza", "pieza", None), ("Artículo del catálogo", "pieza_ref", ""), ("Color", "texto", ""),
+               ("Sin la pieza", "num", 0)],
     "forro": [("Cara o grupo", "cara", None), ("Material", "forro_tipo", "alfombra"), ("Espesor", "num", 0),
               ("Artículo del catálogo", "forro_ref", "")],
 }
 
 # Tablas cuyas filas se completan con los valores por defecto de las columnas vacías
-COMPLETAR = {"extras", "paneles_material", "forro"}
+COMPLETAR = {"extras", "paneles_material", "forro", "piezas"}
 
 # Herrajes que se eligen del catálogo: categorías que se ofrecen en la lista (None = todas)
 REF_CATEGORIAS: Dict[str, Optional[tuple]] = {
@@ -366,11 +368,13 @@ class _DelegadoForma(QStyledItemDelegate):
 class _EditorTabla:
     """Editor de una lista de listas (bandejas, equipos, cajones...) como tabla con filas."""
 
-    def __init__(self, nombre: str, defecto: Any, al_cambiar, opciones_panel=None, opciones_cara=None) -> None:
+    def __init__(self, nombre: str, defecto: Any, al_cambiar, opciones_panel=None, opciones_cara=None,
+                 opciones_pieza=None) -> None:
         self.nombre, self.defecto = nombre, defecto
         self.columnas = TABLAS[nombre]
         self.opciones_panel = opciones_panel or (lambda: [])
         self.opciones_cara = opciones_cara or (lambda: [])
+        self.opciones_pieza = opciones_pieza or (lambda: [])
         self._al_cambiar = al_cambiar
         w = QWidget()
         lay = QVBoxLayout(w)
@@ -387,6 +391,8 @@ class _EditorTabla:
                         "forma": lambda: _DelegadoForma(self.tabla),
                         "panel": lambda: _DelegadoPanel(self.tabla, self.opciones_panel),
                         "cara": lambda: _DelegadoPanel(self.tabla, self.opciones_cara),
+                        "pieza": lambda: _DelegadoPanel(self.tabla, self.opciones_pieza),
+                        "pieza_ref": lambda: _DelegadoArticulo(self.tabla, ("esquinero", "angulo", "placa")),
                         "forro_tipo": lambda: _DelegadoOpciones(self.tabla, ["alfombra", "espuma", "no"]),
                         "forro_ref": lambda: _DelegadoArticulo(self.tabla, ("espuma", "alfombra"))}.get(tipo)
             if delegado:
@@ -466,7 +472,7 @@ class _EditorTabla:
         self.tabla.blockSignals(True)
         try:
             for c, (_, tipo, _r) in enumerate(self.columnas):
-                if tipo not in ("ref", "placa"):
+                if tipo not in ("ref", "placa", "pieza_ref"):
                     continue
                 for r in range(self.tabla.rowCount()):
                     it = self.tabla.item(r, c)
@@ -501,8 +507,10 @@ class _EditorTabla:
         for c, v in enumerate(celdas[:len(self.columnas)]):
             vacio = v == "c" or (v == -1 and self.columnas[c][2] == -1)   # relleno que se muestra vacío
             texto = "" if vacio else (fmt(v) if isinstance(v, (int, float)) else str(v))
-            if self.columnas[c][1] in ("ref", "placa", "forro_ref"):
+            if self.columnas[c][1] in ("ref", "placa", "forro_ref", "pieza_ref"):
                 texto = etiqueta_ref(texto)
+            elif self.columnas[c][1] == "pieza":
+                texto = etiqueta_panel(texto, self.opciones_pieza())
             elif self.columnas[c][1] == "panel":
                 texto = etiqueta_panel(texto, self.opciones_panel())
             elif self.columnas[c][1] == "cara":
@@ -529,7 +537,7 @@ class _EditorTabla:
                             item.setBackground(QColor("#ffd6d6"))
                             error = True
                             celdas.append(None)
-                    elif tipo in ("ref", "placa", "panel", "cara", "forro_ref"):
+                    elif tipo in ("ref", "placa", "panel", "cara", "forro_ref", "pieza", "pieza_ref"):
                         celdas.append(ref_de_texto(texto))
                     else:
                         celdas.append(texto)
@@ -602,7 +610,7 @@ class TallerWidget(QWidget):
     GRUPOS_LATERAL = (
         ("medidas", "Medidas", ("Fórmulas",)),
         ("armado", "Armado", ("Tipo de case", "Placa", "Sistema de armado", "Corte y compra")),
-        ("herrajes", "Herrajes", ("Esquineros", "Perfil de cierre", "Manijas", "Cierres", "Encastres",
+        ("herrajes", "Herrajes", ("Esquineros", "Piezas sueltas", "Perfil de cierre", "Manijas", "Cierres", "Encastres",
                                   "Herrajes del catálogo")),
         ("ruedas", "Ruedas", ("Ruedas",)),
         ("interior", "Interior", ("Interior", "Bandejas", "Forro")),
@@ -791,7 +799,7 @@ class TallerWidget(QWidget):
                 etiqueta.setToolTip(_ayuda(_con_codigo(p["ayuda"], nombre)))
                 if nombre in TABLAS:
                     ed = _EditorTabla(nombre, self.defectos[nombre], self._programar, self._opciones_panel,
-                                      self._opciones_cara)
+                                      self._opciones_cara, self._opciones_pieza)
                     ed.widget.setToolTip(_ayuda(_con_codigo(p["ayuda"], nombre)))
                     form.addRow(etiqueta)
                     form.addRow(ed.widget)
@@ -843,6 +851,12 @@ class TallerWidget(QWidget):
         self.barra_3d.layout().addLayout(self.barra_tapas)
         l3d.addWidget(self.barra_3d)
         l3d.addWidget(self.vista_3d, 1)
+        from .panel_pieza import PanelPieza
+        self.panel_pieza = PanelPieza(self)      # la pieza elegida con un clic en el 3D
+        self.panel_pieza.cambiado.connect(self._pieza_cambiada)
+        self.panel_pieza.cerrado.connect(lambda: self.elegir_pieza(""))
+        self.vista_3d.pieza_elegida.connect(self.elegir_pieza)
+        l3d.addWidget(self.panel_pieza)
         self.barra_datos = QFrame()
         self.barra_datos.setObjectName("barraDatos")
         bd = QHBoxLayout(self.barra_datos)
@@ -1268,6 +1282,102 @@ class TallerWidget(QWidget):
         from ...taller.forro import opciones
         return opciones(False, lambda c: c)
 
+    # ------------------------------------------------------- piezas sueltas
+    def _info_pieza(self, pid: str) -> Optional[Dict[str, Any]]:
+        """Lo que hay que mostrar de una pieza del case calculado (None si no existe)."""
+        from ...taller import piezas as PZ
+        res = self.resultado
+        if res is None or not pid:
+            return None
+        geo = res.valores.get("geo") or {}
+        cmb = PZ.cambios(self.params).get(pid)
+        tipo = PZ.tipo_de(pid)
+        cat = catalogo()
+        if tipo in ("esquinero", "arista"):
+            lista = geo.get("esquineros_case" if tipo == "esquinero" else "aristas_case") or []
+            d = next((e for e in lista if e["id"] == pid), None)
+            if d is None:
+                return None
+            ref_gen = self.params.get("ref_esquinero", "") if tipo == "esquinero" else \
+                (self.params.get("ref_hibrido", "") if geo.get("hibrido") else self.params.get("ref_angulo", ""))
+            nombre_gen = d["nombre"] if not d["cambiada"] or not cmb or not cmb.ref else (
+                cat.nombre(ref_gen) if cat.existe(ref_gen) else ("Esquinero bola" if tipo == "esquinero" else "el general"))
+            modelos = [("", f"Igual que el resto ({nombre_gen})")]
+            hibrido = tipo == "arista" and geo.get("hibrido")
+            if not hibrido:
+                categoria = "esquinero" if tipo == "esquinero" else "angulo"
+                modelos += [(f["ref"], f"{f['ref']}{SEPARADOR_REF}{f['nombre']}") for f in cat.filas
+                            if f["categoria"] == categoria]
+            if tipo == "esquinero":
+                nota = f"Pata {fmt(d['pata'])} mm, {d['remaches']} remaches."
+            else:
+                nota = f"Tramo de {fmt(d['L'])} mm, ala {fmt(d['ala'])} mm."
+                if hibrido:
+                    nota += " En el sistema híbrido sólo se cambia el color."
+            return dict(tipo=tipo, titulo=d["etiqueta"], modelos=modelos, ref=cmb.ref if cmb else "",
+                        color=cmb.color if cmb else "", quitar=bool(cmb and cmb.quitar), puede_quitar=not hibrido,
+                        nota=nota)
+        pan = res.panel(pid)
+        if pan is None:
+            return None
+        fila = next((f for f in reversed(self.params.get("paneles_material") or [])
+                     if isinstance(f, list) and f and f[0] == pid), None)
+        ref = str(fila[1] or "") if fila else ""
+        modelos = [("", f"Igual que el resto ({res.valores.get('placa_material', '')})")]
+        modelos += [(f["ref"], f"{f['ref']}{SEPARADOR_REF}{f['nombre']}") for f in cat.filas if f["categoria"] == "placa"]
+        mat = (res.valores.get("materiales_paneles") or {}).get(pid)
+        nota = f"{fmt(pan.ancho)} × {fmt(pan.alto)} mm" + (f", {mat.material}" if mat else "") + \
+            ". Espesor y material a mano: Armado → Material por panel."
+        return dict(tipo="panel", titulo=f"Panel: {pan.nombre}", modelos=modelos, ref=ref,
+                    color=cmb.color if cmb else "", quitar=False, puede_quitar=False, nota=nota)
+
+    def elegir_pieza(self, pid: str) -> None:
+        """Clic en el 3D: muestra el cuadro de esa pieza (vacío = lo cierra)."""
+        info = self._info_pieza(pid)
+        if info is None:
+            self.panel_pieza.pieza = ""
+            self.panel_pieza.setVisible(False)
+            self.vista_3d.set_piezas_resaltadas([])
+            return
+        self.panel_pieza.mostrar(pid, info["tipo"], info["titulo"], info["modelos"], info["ref"], info["color"],
+                                 info["quitar"], info["puede_quitar"], info["nota"])
+        self.vista_3d.set_piezas_resaltadas([pid])
+
+    def _pieza_cambiada(self) -> None:
+        from ...taller import piezas as PZ
+        pp = self.panel_pieza
+        pid = pp.pieza
+        if not pid or self.resultado is None:
+            return
+        self._leer_editores()
+        val = pp.valores()
+        limpiar = pp.restablecer_pedido
+        destinos = [pid] if val["alcance"] == "esta" else PZ.iguales(pid, val["alcance"], self.resultado)
+        filas = list(self.params.get("piezas") or [])
+        if pp.tipo == "panel":
+            mats = [list(f) for f in self.params.get("paneles_material") or []
+                    if not (isinstance(f, list) and f and f[0] == pid)]
+            if val["ref"] and not limpiar:
+                mats.append([pid, val["ref"], 0, ""])
+            self.params["paneles_material"] = mats
+            if "paneles_material" in self.editores:
+                self.editores["paneles_material"].poner(mats)
+            filas = PZ.poner(filas, PZ.Cambio(pid, "", "" if limpiar else val["color"]))
+        else:
+            for d in destinos:
+                c = PZ.Cambio(d) if limpiar else PZ.Cambio(d, val["ref"], val["color"], val["quitar"])
+                filas = PZ.poner(filas, c)
+        self.params["piezas"] = filas
+        if "piezas" in self.editores:
+            self.editores["piezas"].poner(filas)
+        self.recalcular()
+        self.elegir_pieza(pid)
+        self.vista_3d.set_piezas_resaltadas(destinos if pp.tipo != "panel" else [pid])
+
+    def _opciones_pieza(self) -> List[tuple]:
+        from ...taller.piezas import opciones
+        return opciones(self.resultado) if self.resultado is not None else []
+
     def _opciones_panel(self) -> List[tuple]:
         from ...taller.materiales import opciones_panel
         return opciones_panel(self.resultado.paneles) if self.resultado is not None else []
@@ -1512,7 +1622,8 @@ class TallerWidget(QWidget):
         mat = {m[0]: f"{m[1]}" for m in res.panelmat}
         self._llenar(self.tabla_paneles, [[p.nombre, fmt(p.ancho), fmt(p.alto), mat.get(p.id, v["placa_material"]),
                                            str(calados.get(p.id, ""))] for p in res.paneles])
-        for nombre_t, ops in (("paneles_material", self._opciones_panel), ("forro", self._opciones_cara)):
+        for nombre_t, ops in (("paneles_material", self._opciones_panel), ("forro", self._opciones_cara),
+                              ("piezas", self._opciones_pieza)):
             ed = self.editores.get(nombre_t)
             if isinstance(ed, _EditorTabla):      # nombres de los paneles (o caras) ya calculados
                 ops = ops()
