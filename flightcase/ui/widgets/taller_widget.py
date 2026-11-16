@@ -563,6 +563,7 @@ class TallerWidget(QWidget):
     ruta_cambiada = Signal(str)          # se abrió o se guardó un .scad (vacío = case nuevo)
     proyectos_pedidos = Signal()         # botón «Mis cases…»
     historial_cambiado = Signal()          # cambió lo que se puede deshacer o rehacer
+    pantalla_inicio = None                 # la ventana pone acá su pantalla de inicio (botón «Nuevo…»)
     case_nuevo = Signal()                  # se empezó un case nuevo (botón o menú «Nuevo»)
     guardado = Signal(bool)                # se escribió el .scad (True = autoguardado)
 
@@ -645,7 +646,7 @@ class TallerWidget(QWidget):
         barra.addWidget(self.btn_rehacer)
         barra.addSpacing(12)
         for texto, slot in (("Mis cases…", self.proyectos_pedidos.emit),
-                            ("Nuevo", self.nuevo), ("Asistente…", lambda: self.asistente()),
+                            ("Nuevo…", lambda: (self.pantalla_inicio or self.nuevo)()), ("Asistente…", lambda: self.asistente()),
                             ("Catálogo…", lambda: self.editar_catalogo()),
                             ("Abrir .scad…", self.abrir),
                             ("Guardar .scad…", self.guardar), ("Planos PDF…", lambda: self.exportar_planos()),
@@ -1631,6 +1632,40 @@ class TallerWidget(QWidget):
             return False
         self.set_params({})
         self.case_nuevo.emit()
+        return True
+
+    def crear(self, id_estilo: Optional[str] = None, plantilla: Optional[str] = None, nombre: str = "",
+              carpeta: Optional[str] = None) -> bool:
+        """Proyecto nuevo desde la pantalla de inicio: con un estilo sobre las medidas por defecto,
+        o copia de un case guardado (`plantilla`). Con nombre se guarda enseguida en la carpeta de
+        cases (o en `carpeta`), sin pisar otro archivo."""
+        if plantilla:
+            try:
+                params = leer_proyecto(plantilla)
+            except Exception as e:  # noqa: BLE001
+                QMessageBox.critical(self, "Proyecto nuevo", f"No se pudo leer {os.path.basename(plantilla)}:\n{e}")
+                return False
+            params["_carpeta"] = os.path.dirname(os.path.abspath(plantilla))   # logos y archivos a mano
+            self.set_params(params)
+        else:
+            self.set_params({})
+            if id_estilo:
+                self.aplicar_estilo(id_estilo)
+        self._foto_guardada = self._foto()        # recién empezado: sin cambios
+        if nombre:
+            from ...taller.proyectos import nombre_libre, nombre_valido
+            from .proyectos_widget import carpeta_proyectos
+            carpeta = carpeta or carpeta_proyectos()
+            try:
+                os.makedirs(carpeta, exist_ok=True)
+                ruta = nombre_libre(carpeta, nombre_valido(nombre))
+            except (OSError, ValueError) as e:
+                QMessageBox.warning(self, "Proyecto nuevo", f"No se pudo guardar «{nombre}»: {e}\n"
+                                    "El case quedó abierto sin guardar (Ctrl+S).")
+                return True
+            self.guardar(ruta)
+        else:
+            self.case_nuevo.emit()
         return True
 
     def _es_el_abierto(self, ruta: Optional[str]) -> bool:

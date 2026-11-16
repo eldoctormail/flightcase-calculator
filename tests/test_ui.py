@@ -219,7 +219,9 @@ def test_nuevo_pregunta_si_hay_cambios_y_avisa(qapp, tmp_path, monkeypatch):
     assert not t.hay_cambios()
     t.editores["int_ancho"].poner(700)
     assert t.hay_cambios()
-    nuevo = next(a for a in w.file_menu.actions() if a.text() == "&Nuevo case")
+    nuevo = next(a for a in w.file_menu.actions() if a.text() == "&Nuevo case…")
+    from flightcase.ui.widgets.inicio_widget import PantallaInicio      # la pantalla de inicio: «Crear»
+    monkeypatch.setattr(PantallaInicio, "exec", lambda self: (setattr(self, "accion", "crear"), 1)[1])
     monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.Cancel)
     nuevo.trigger()
     assert t.params["int_ancho"] == 700                       # canceló: sigue el case de antes

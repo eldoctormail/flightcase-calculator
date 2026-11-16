@@ -120,9 +120,10 @@ class _Lienzo:
 
 
 def renderizar(malla: Malla3D, ruta: str, camara: str = "0,0,0,62,0,32,0", tam: str = "1400,1050",
-               colores: Optional[Dict[str, str]] = None) -> bool:
+               colores: Optional[Dict[str, str]] = None, transparente: bool = False) -> bool:
     """Dibuja la malla y la guarda en `ruta` (PNG). Devuelve True si pudo. `colores` reemplaza
-    colores de grupos (por ejemplo el color de la placa: base, lid, wall)."""
+    colores de grupos (por ejemplo el color de la placa: base, lid, wall). Con `transparente`,
+    el fondo queda transparente en lugar de blanco."""
     paleta = dict(COLORES, **(colores or {}))
     if QGuiApplication.instance() is None:
         QGuiApplication([])
@@ -241,6 +242,12 @@ def renderizar(malla: Malla3D, ruta: str, camara: str = "0,0,0,62,0,32,0", tam: 
         alfa *= np.isin(lienzo.ident, [t_[0] for t_ in textos])
         lienzo.col *= (1 - alfa)[:, :, None]
 
+    if transparente:     # premultiplicado, para que al achicar no quede un borde blanco
+        alfa = np.any(np.abs(lienzo.col - np.asarray(FONDO, dtype=np.float32)) > 0.5, axis=2)
+        rgba = np.concatenate([lienzo.col * alfa[:, :, None], alfa[:, :, None] * 255.0], axis=2)
+        rgba = np.ascontiguousarray(np.clip(rgba, 0, 255).astype(np.uint8))
+        img = QImage(rgba.data, W, H, 4 * W, QImage.Format_RGBA8888_Premultiplied).copy()
+        return img.scaled(w, h, Qt.IgnoreAspectRatio, Qt.SmoothTransformation).save(ruta)
     rgb = np.ascontiguousarray(np.clip(lienzo.col, 0, 255).astype(np.uint8))
     img = QImage(rgb.data, W, H, 3 * W, QImage.Format_RGB888).copy()
     return img.scaled(w, h, Qt.IgnoreAspectRatio, Qt.SmoothTransformation).save(ruta)
