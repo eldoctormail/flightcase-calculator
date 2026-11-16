@@ -43,6 +43,46 @@
     "etiqueta": "Orientación"
    },
    {
+    "nombre": "forma",
+    "etiqueta": "Forma del case",
+    "ayuda": "\"caja\": el case de siempre (cuerpo y tapas rectos, con las reglas de flightcase.scad). \"inclinado\": rack para consola con el cuerpo en cuña: el frente es más bajo que la trasera y la tapa cierra sobre el plano inclinado, con rieles de rack a lo largo de la pendiente. \"funda\": funda de rack (sleeve), un tubo abierto adelante y atrás con los bordes terminados en ángulo, sin tapas. \"plegable\": baúl plegable: las cuatro paredes van con bisagra de piano a una base gruesa y se pliegan hacia adentro cuando está vacío; la tapa va arriba. En \"funda\", int_prof es el ALTO y int_alto_cuerpo la profundidad, como en un rack frontal."
+   },
+   {
+    "nombre": "puertas",
+    "etiqueta": "Tapas como puertas",
+    "ayuda": "true (sólo en racks, orientación frontal): las tapas delantera y trasera son puertas que abren girando sobre bisagras en un costado y cierran con cierres del costado opuesto. Las bisagras son \"bisagras\" por puerta (mejor desmontables, 08-2251, para poder sacar la puerta)."
+   },
+   {
+    "nombre": "puerta_lado",
+    "etiqueta": "Bisagras de las puertas",
+    "ayuda": "costado donde van las bisagras de las puertas, mirando el rack de frente: \"izq\" o \"der\""
+   },
+   {
+    "nombre": "incl_alto_frente",
+    "etiqueta": "Alto interior adelante (inclinado)",
+    "ayuda": "forma \"inclinado\": alto interior del cuerpo en el frente, del piso al plano de cierre. El alto interior del cuerpo (int_alto_cuerpo) es el de la trasera: la diferencia da la pendiente del plano de cierre."
+   },
+   {
+    "nombre": "incl_rieles",
+    "etiqueta": "Rieles sobre la pendiente",
+    "ayuda": "forma \"inclinado\": rieles de rack de 19\" paralelos al plano inclinado, para atornillar la consola por las orejas (rack_u = cantidad de U; 0 = las que entren)."
+   },
+   {
+    "nombre": "pleg_base_esp",
+    "etiqueta": "Espesor de la base (plegable)",
+    "ayuda": "forma \"plegable\": espesor de la base donde se abisagran las paredes y van las ruedas"
+   },
+   {
+    "nombre": "pleg_base_material",
+    "etiqueta": "Material de la base (plegable)",
+    "ayuda": "forma \"plegable\": material de la base"
+   },
+   {
+    "nombre": "pleg_cierres_esquina",
+    "etiqueta": "Cierres por esquina (plegable)",
+    "ayuda": "forma \"plegable\": cierres en cada esquina vertical que traban la pared del frente (y la trasera) contra el ángulo del lateral cuando está armado"
+   },
+   {
     "nombre": "descuento_entre",
     "ayuda": "mm extra que se descuentan a los paneles que van entre otros (juego de armado)",
     "etiqueta": "Descuento de armado"

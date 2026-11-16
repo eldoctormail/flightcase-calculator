@@ -87,6 +87,9 @@ def parsear_datos(lineas):
         elif tipo == "PANEL":
             d["paneles"][resto[0]] = dict(id=resto[0], nombre=resto[1], grupo=resto[2],
                                           w=float(resto[3]), h=float(resto[4]))
+        elif tipo == "CONTORNO":   # panel que no es rectángulo (lo agrega la app; OpenSCAD no lo imprime)
+            if resto[0] in d["paneles"]:
+                d["paneles"][resto[0]]["contorno"] = [tuple(float(v) for v in q.split(";")) for q in resto[1:]]
         elif tipo == "CALADO":
             d["calados"][resto[0]].append(dict(tipo=resto[1], cx=float(resto[2]), cy=float(resto[3]),
                                                w=float(resto[4]), h=float(resto[5]), r=float(resto[6])))
@@ -138,6 +141,7 @@ def agrupar_piezas(d):
         X = (lambda x: round(w - x if fx else x, 2))
         Y = (lambda y: round(h - y if fy else y, 2))
         return (round(w, 2), round(h, 2),
+                tuple(sorted((X(x), Y(y)) for x, y in p.get("contorno") or ())),
                 tuple(sorted((c["tipo"], X(c["cx"]), Y(c["cy"]), c["w"], c["h"])
                              for c in d["calados"].get(pid, []))),
                 tuple(sorted((m["tipo"], X(m["x"]), Y(m["y"]))
@@ -162,6 +166,8 @@ def agrupar_piezas(d):
         nombres = [d["paneles"][x]["nombre"] for x in g["ids"]]
         g.update(num=i, cant=len(g["ids"]), nombre=" / ".join(nombres),
                  w=g["panel"]["w"], h=g["panel"]["h"])
+        if g["panel"].get("contorno"):
+            g["contorno"] = g["panel"]["contorno"]
         piezas.append(g)
     return piezas
 
@@ -323,6 +329,12 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
     tipo_txt = ("Dos tapas (una en cada extremo)" if dos_tapas else "Cuerpo con tapa") + \
         (", acostado (tapas a los costados)" if horizontal else
          (", parado con tapas adelante y atrás" if frontal else ""))
+    if isinstance(info.get("forma"), list):     # rack inclinado, funda, plegable (formas.py de la app)
+        tipo_txt = info["forma"][1]
+        if "inclinado" in info:
+            tipo_txt += f", pendiente {info['inclinado'][0]}°"
+        if "plegable" in info:
+            tipo_txt += f"; plegado mide {info['plegable'][0]} mm de alto"
     material = info["material"]
     esp = float(info["espesor"])
     from matplotlib.colors import to_rgba
@@ -503,7 +515,14 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
         es_tapa_pz = any(d["paneles"].get(i, {}).get("grupo", "").startswith("tapa") for i in pz["ids"])
         base = color_tapa if es_tapa_pz else color_cuerpo
         relleno = tuple(0.35 * c + 0.65 for c in base[:3])  # tono claro para leer cotas
-        ax.add_patch(patches.Rectangle((0, 0), w, h, fc=relleno, ec="black", lw=1.2))
+        if pz.get("contorno"):    # panel en trapecio: el contorno y la cota de cada lado
+            ax.add_patch(patches.Polygon(pz["contorno"], closed=True, fc=relleno, ec="black", lw=1.2))
+            ax.add_patch(patches.Rectangle((0, 0), w, h, fc="none", ec="#999", lw=0.5, ls=":"))
+            for x_, y_ in pz["contorno"]:
+                if 0.5 < y_ < h - 0.5:
+                    cota_v(ax, 0, y_, (w + paso * 1.2) if x_ > w / 2 else -paso * 2.4, x_, f"{fmt(y_)}")
+        else:
+            ax.add_patch(patches.Rectangle((0, 0), w, h, fc=relleno, ec="black", lw=1.2))
 
         escala = max(w, h)
         paso = escala * 0.06
@@ -586,6 +605,16 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
                          + " (rojo): eje horizontal acotado desde abajo; "
                          f"el '+' marca el borde del perfil de la junta, a {fmt(acc[0]['x'])} mm del "
                          "borde izquierdo.")
+        esq_c = sorted([m for m in pz["marcas"] if m["tipo"] == "cierre_esquina"], key=lambda m: (m["x"], m["y"]))
+        for m in esq_c:     # baúl plegable: cierres acostados que traban la pared contra el lateral
+            ax.plot([0, w], [m["y"]] * 2, color=MARCA, lw=0.7, ls="-.")
+            ax.plot(m["x"], m["y"], marker="+", color=MARCA, ms=12, mew=1.2)
+        for i, y_ in enumerate(sorted({round(m["y"], 2) for m in esq_c})):
+            cota_v(ax, 0, y_, w + paso * (0.6 + 0.9 * i), w, col=MARCA)
+        if esq_c:
+            notas.append("Cierres de esquina (rojo, acostados): eje horizontal acotado desde abajo; el '+' es el "
+                         f"centro del cierre, a {fmt(min(m['x'] for m in esq_c))} mm de cada canto. El gancho va en "
+                         "el ala del ángulo del lateral.")
         bis = sorted([m for m in pz["marcas"] if m["tipo"] == "bisagra"], key=lambda m: m["x"])
         for i, m in enumerate(bis):
             ax.plot([m["x"]] * 2, [0, h], color="#7d3c98", lw=0.7, ls="-.")
@@ -663,7 +692,8 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
                          + (". Logo grabado: el dibujo está en la capa GRABADO del DXF." if any(hm["modo"] == "grabado" for hm in man) else "."))
 
         n_niveles = len(xs_c) + len(bis)
-        ax.set_xlim(-paso * 2.6, w + paso * (1.0 + 0.9 * len(acc)))
+        n_lados = max(len(acc), len({round(m["y"], 2) for m in esq_c}))
+        ax.set_xlim(-paso * 2.6, w + paso * (1.0 + 0.9 * n_lados))
         ax.set_ylim(-paso * 2.4, h + paso * (1.2 + 0.9 * max(n_niveles, 0)))
 
         # rótulo

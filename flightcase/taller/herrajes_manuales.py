@@ -246,6 +246,8 @@ def caras_desde(geo: Dict[str, Any], paneles: Sequence[Any], X: float, Y: float,
 
 def caras(res) -> List[Cara]:
     v = res.valores
+    if v["geo"].get("forma"):     # formas.py: los herrajes a mano todavía no se ubican
+        return []
     return caras_desde(v["geo"], res.paneles, v["ext_ancho"], v["ext_prof"], v["ext_alto"])
 
 

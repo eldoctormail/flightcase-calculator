@@ -213,7 +213,12 @@ def calcular(res, P: Dict[str, Any], cat) -> PesoCase:
             esp = float(m[2] or esp)
             ref = str(m[5]) if len(m) > 5 and m[5] else ("" if material != mat_general else ref_placa)
         dens, origen = densidad_placa(cat, ref, material, defecto)
-        area = max(p.ancho * p.alto - calado_area.get(p.id, 0.0), 0.0) / 1e6
+        bruta = p.ancho * p.alto
+        if getattr(p, "contorno", None):      # trapecio del rack inclinado
+            c = p.contorno
+            bruta = abs(sum(c[i][0] * c[(i + 1) % len(c)][1] - c[(i + 1) % len(c)][0] * c[i][1]
+                            for i in range(len(c)))) / 2
+        area = max(bruta - calado_area.get(p.id, 0.0), 0.0) / 1e6
         clave = (material, esp, dens, origen)
         g = grupos.setdefault(clave, [0.0, 0])
         g[0] += area

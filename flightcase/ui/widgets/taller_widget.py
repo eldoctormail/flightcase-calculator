@@ -43,6 +43,8 @@ from ...taller.scad import escribir_proyecto, leer_proyecto, literal, valor_lite
 # Opciones fijas de los parámetros de texto que las tienen
 OPCIONES: Dict[str, List[str]] = {
     "orientacion": ["vertical", "horizontal", "frontal"],
+    "forma": ["caja", "inclinado", "funda", "plegable"],
+    "puerta_lado": ["izq", "der"],
     "sistema": ["angulo", "hibrido"],
     "acceso_tipo": ["paneles", "cubierta"],
     "paredes_enteras": ["frente", "laterales"],
@@ -51,7 +53,7 @@ OPCIONES: Dict[str, List[str]] = {
     "cierres_laterales": ["auto", "si", "no"],
 }
 # Números que sólo toman valores enteros
-ENTEROS = {"tapas", "acceso_cierres_n", "cantidad_cases", "manijas_n", "cierres_frente_n",
+ENTEROS = {"tapas", "pleg_cierres_esquina", "acceso_cierres_n", "cantidad_cases", "manijas_n", "cierres_frente_n",
            "cierres_lateral_n", "ruedas", "rueda_frenos", "rueda_fijas", "cazoleta_remaches", "bandeja_soportes", "encastre_remaches",
            "pies", "bisagras", "topes", "refuerzos", "refuerzo_remaches"}
 

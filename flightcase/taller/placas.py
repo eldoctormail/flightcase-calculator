@@ -227,8 +227,8 @@ def placa_dxf(pl: Dict[str, Any], piezas_por_num: Dict[int, Dict[str, Any]],
         pz = piezas_por_num.get(p["num"], {})
         w, h, rot = p["w"], p["h"], p["rot"]
         t = _transformar(p["x"], p["y"], h, rot)
-        esq = [t(0, 0), t(w, 0), t(w, h), t(0, h)]
-        ent += [_dxf_linea("0", esq[i], esq[(i + 1) % 4]) for i in range(4)]
+        esq = [t(*q) for q in pz["contorno"]] if pz.get("contorno") else [t(0, 0), t(w, 0), t(w, h), t(0, h)]
+        ent += [_dxf_linea("0", esq[i], esq[(i + 1) % len(esq)]) for i in range(len(esq))]
         for c in pz.get("calados", []):
             capa = "REBAJE" if c["tipo"] == "rebaje" else "0"
             if c.get("puntos"):
