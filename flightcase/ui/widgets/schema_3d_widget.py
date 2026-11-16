@@ -733,6 +733,7 @@ class Schema3DCanvas(QOpenGLWidget):
         if self.mesh.faces:
             self._draw_gl_solid_faces()
             self._draw_gl_face_outlines()
+            self._draw_gl_aristas()
             self._draw_gl_dashed_segments()
         else:
             self._draw_gl_fallback_segments()
@@ -856,6 +857,8 @@ class Schema3DCanvas(QOpenGLWidget):
         for face in self.mesh.faces:
             if face.color_group == "wall" and not self.show_inside_walls:
                 continue
+            if not face.contorno:
+                continue
 
             _, edge_color, line_width = self._get_face_styling(face, 1.0)
             GL.glLineWidth(float(line_width))
@@ -865,6 +868,24 @@ class Schema3DCanvas(QOpenGLWidget):
             for v in face.vertices:
                 GL.glVertex3f(v.x, v.y, v.z)
             GL.glEnd()
+
+    def _draw_gl_aristas(self) -> None:
+        """Aristas de los modelos STEP de los herrajes (los triángulos no llevan contorno)."""
+        if not self.mesh or not self.mesh.segments:
+            return
+        GL.glLineWidth(1.2)
+        GL.glBegin(GL.GL_LINES)
+        color_actual = None
+        for seg in self.mesh.segments:
+            if seg.style != "arista":
+                continue
+            if seg.color_group != color_actual:
+                color_actual = seg.color_group
+                c = QColor(COLORS.get(f"{seg.color_group}_edge", COLORS["base_edge"]))
+                GL.glColor4f(c.redF(), c.greenF(), c.blueF(), 1.0)
+            GL.glVertex3f(seg.p1.x, seg.p1.y, seg.p1.z)
+            GL.glVertex3f(seg.p2.x, seg.p2.y, seg.p2.z)
+        GL.glEnd()
 
     def _draw_gl_dashed_segments(self) -> None:
         """Renders dashed markings (e.g. lid cut lines on uncut panels) with depth testing."""

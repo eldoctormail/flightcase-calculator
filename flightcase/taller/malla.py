@@ -49,6 +49,7 @@ class PolygonFace3D:
     is_endgrain: bool = False
     layer_order: int = ComponentLayer.BASE_FLOOR
     wall_index: Optional[int] = None
+    contorno: bool = True   # False: triángulos de un modelo 3D, sin dibujar sus bordes
 
     @property
     def centroid(self) -> Point3D:
