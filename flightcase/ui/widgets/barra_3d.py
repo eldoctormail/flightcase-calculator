@@ -47,16 +47,25 @@ def _lupa(signo: str):
 
 
 def _mano(p: QPainter) -> None:
+    """Puño agarrando (como el cursor de «arrastrar»): los cuatro nudillos arriba, la palma
+    y el pulgar doblado por delante; alrededor, flechas chicas de mover."""
     camino = QPainterPath()
-    for x, alto in ((6.5, 9.0), (9.5, 11.0), (12.5, 10.5), (15.5, 8.5)):   # dedos
-        camino.addRoundedRect(QRectF(x - 1.4, 13 - alto, 2.8, alto + 2), 1.4, 1.4)
-    camino.addRoundedRect(QRectF(5.1, 10, 11.8, 9.5), 3.5, 3.5)            # palma
-    pulgar = QPainterPath()
-    pulgar.moveTo(5.5, 14.5)
-    pulgar.cubicTo(3.5, 12.5, 2.0, 13.5, 3.0, 15.0)
-    pulgar.lineTo(6.5, 19.0)
-    camino = camino.united(pulgar)
+    for x in (6.9, 10.0, 13.1, 16.2):                                        # dedos doblados
+        camino.addRoundedRect(QRectF(x - 1.45, 6.2, 2.9, 6.0), 1.45, 1.45)
+    camino.addRoundedRect(QRectF(5.45, 10.0, 12.2, 8.4), 3.4, 3.4)          # palma
     p.drawPath(camino.simplified())
+    pulgar = QPainterPath()                                                  # pulgar doblado
+    pulgar.moveTo(5.6, 13.0)
+    pulgar.cubicTo(8.0, 12.2, 10.6, 12.6, 12.0, 14.6)
+    p.drawPath(pulgar)
+    pen = p.pen()
+    fina = QPen(pen)
+    fina.setWidthF(pen.widthF() * 0.8)
+    p.setPen(fina)
+    for punta, ang in ((QPointF(11.5, 2.4), -90), (QPointF(11.5, 21.2), 90),
+                       (QPointF(1.6, 14.2), 180), (QPointF(21.4, 14.2), 0)):
+        _flecha(p, punta, ang, 2.0)
+    p.setPen(pen)
 
 
 def _flecha(p: QPainter, punta: QPointF, angulo: float, largo: float = 4.0) -> None:
@@ -66,17 +75,23 @@ def _flecha(p: QPainter, punta: QPointF, angulo: float, largo: float = 4.0) -> N
 
 
 def _orbitar(p: QPainter) -> None:
-    p.drawEllipse(QPointF(11, 11), 3, 3)
-    rect = QRectF(3, 6, 16, 10)
-    p.drawArc(rect, 200 * 16, 290 * 16)
-    _flecha(p, QPointF(3.6, 13.5), 100)
+    """Girar alrededor: un cubito con una flecha que le da la vuelta."""
+    frente = QPolygonF([QPointF(8, 9.5), QPointF(13, 9.5), QPointF(13, 14.5), QPointF(8, 14.5)])
+    p.drawPolygon(frente)
+    p.drawPolyline(QPolygonF([QPointF(8, 9.5), QPointF(10, 7.5), QPointF(15, 7.5), QPointF(15, 12.5),
+                              QPointF(13, 14.5)]))
+    p.drawLine(QPointF(13, 9.5), QPointF(15, 7.5))
+    p.drawArc(QRectF(2, 4, 18, 15), 200 * 16, 300 * 16)
+    _flecha(p, QPointF(3.2, 14.6), 115, 3.6)
 
 
 def _zoom_arrastre(p: QPainter) -> None:
-    p.drawLine(QPointF(11, 3), QPointF(11, 19))
-    _flecha(p, QPointF(11, 3), -90)
-    _flecha(p, QPointF(11, 19), 90)
-    p.drawEllipse(QPointF(11, 11), 3, 3)
+    """Zoom arrastrando: lupa con una flecha para arriba y otra para abajo."""
+    p.drawEllipse(QPointF(8.5, 9.5), 5.2, 5.2)
+    p.drawLine(QPointF(12.3, 13.3), QPointF(15.5, 16.5))
+    p.drawLine(QPointF(19, 3.5), QPointF(19, 18.5))
+    _flecha(p, QPointF(19, 3.5), -90, 3.2)
+    _flecha(p, QPointF(19, 18.5), 90, 3.2)
 
 
 def _girar(sentido: int):

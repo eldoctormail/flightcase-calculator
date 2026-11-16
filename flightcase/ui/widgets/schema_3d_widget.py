@@ -12,6 +12,7 @@ from PySide6.QtGui import (
     QFont,
     QFontMetrics,
     QPolygonF,
+    QTransform,
     QMouseEvent,
     QWheelEvent,
     QSurfaceFormat,
@@ -360,8 +361,8 @@ class Schema3DCanvas(QOpenGLWidget):
 
     # --- Cubo de vistas (arriba a la derecha: clic en una cara = esa vista) ---
 
-    CUBO_LADO = 44.0
-    CUBO_ROTULOS = {(0, -1, 0): "FRENTE", (0, 1, 0): "ATRÁS", (1, 0, 0): "DER.", (-1, 0, 0): "IZQ.",
+    CUBO_LADO = 64.0
+    CUBO_ROTULOS = {(0, -1, 0): "FRENTE", (0, 1, 0): "ATRÁS", (1, 0, 0): "DERECHA", (-1, 0, 0): "IZQUIERDA",
                     (0, 0, 1): "ARRIBA", (0, 0, -1): "ABAJO"}
     CUBO_VISTAS = {(0, -1, 0): "frente", (0, 1, 0): "atras", (1, 0, 0): "derecha", (-1, 0, 0): "izquierda",
                    (0, 0, 1): "arriba", (0, 0, -1): "abajo"}
@@ -377,7 +378,7 @@ class Schema3DCanvas(QOpenGLWidget):
         return x1, -y2, prof
 
     def centro_cubo(self) -> QPointF:
-        return QPointF(self.width() - 62.0, 62.0)
+        return QPointF(self.width() - 78.0, 78.0)
 
     def _armar_cubo(self) -> List[Tuple[QPolygonF, str, Tuple[int, int, int], float]]:
         c, L = self.centro_cubo(), self.CUBO_LADO
@@ -409,6 +410,22 @@ class Schema3DCanvas(QOpenGLWidget):
                 return vista
         return None
 
+    # dirección «derecha» y «arriba» del texto sobre cada cara, mirándola desde afuera
+    CUBO_TEXTO = {(0, -1, 0): ((1, 0, 0), (0, 0, 1)), (0, 1, 0): ((-1, 0, 0), (0, 0, 1)),
+                  (1, 0, 0): ((0, 1, 0), (0, 0, 1)), (-1, 0, 0): ((0, -1, 0), (0, 0, 1)),
+                  (0, 0, 1): ((1, 0, 0), (0, 1, 0)), (0, 0, -1): ((1, 0, 0), (0, -1, 0))}
+
+    def transformacion_cara(self, n: Tuple[int, int, int]) -> QTransform:
+        """Lleva el cuadrado (-50..50, -50..50) de la cara `n` del cubo a la pantalla, en
+        perspectiva: así el rótulo queda pegado a la cara y gira con el cubo."""
+        c, k = self.centro_cubo(), self.CUBO_LADO / 2 / 50.0
+        der, arriba = self.CUBO_TEXTO[n]
+        rx, ry, _ = self.proyectar_direccion(*der)
+        ux, uy, _ = self.proyectar_direccion(*arriba)
+        nx, ny, _ = self.proyectar_direccion(*n)
+        return QTransform(rx * k, ry * k, -ux * k, -uy * k,
+                          c.x() + nx * self.CUBO_LADO / 2, c.y() + ny * self.CUBO_LADO / 2)
+
     def _dibujar_cubo(self, painter: QPainter) -> None:
         claro = self.fondo_claro
         for poly, vista, n, prof in self._armar_cubo():
@@ -417,12 +434,19 @@ class Schema3DCanvas(QOpenGLWidget):
             painter.setBrush(QBrush(relleno))
             painter.setPen(QPen(QColor("#93a4c3") if not claro else QColor("#7b8494"), 1.2))
             painter.drawPolygon(poly)
-            if prof > 0.35:
-                r = poly.boundingRect()
-                f = QFont("Segoe UI", 6, QFont.Weight.Bold)
+            if prof > 0.12:
+                painter.save()
+                painter.setTransform(self.transformacion_cara(n), True)
+                texto = self.CUBO_ROTULOS[n]
+                f = QFont("Segoe UI")
+                f.setPixelSize(int(min(25, 140 / len(texto))))
+                f.setBold(True)
                 painter.setFont(f)
-                painter.setPen(QColor("#e6ecf7") if not claro else QColor("#2b3240"))
-                painter.drawText(r, Qt.AlignmentFlag.AlignCenter, self.CUBO_ROTULOS[n])
+                col = QColor("#e6ecf7") if not claro else QColor("#2b3240")
+                col.setAlphaF(min(1.0, 0.35 + prof))
+                painter.setPen(col)
+                painter.drawText(QRectF(-50, -50, 100, 100), Qt.AlignmentFlag.AlignCenter, texto)
+                painter.restore()
 
     def keyPressEvent(self, event) -> None:
         k, mods = event.key(), event.modifiers()

@@ -157,9 +157,9 @@ El botón **Vista** de la barra lateral abre el panel de la vista:
 
 ![Fondo claro, sin herrajes](captura-fondo-claro.png)
 
-El **cubo de vistas** (arriba a la derecha) cambia a la vista de la cara en la que hacés clic: frente, atrás, lados, arriba o abajo.
+El **cubo de vistas** (arriba a la derecha) gira con el case y cada cara lleva su nombre pegado en perspectiva (FRENTE, DERECHA, ARRIBA…). Un clic en una cara cambia a esa vista.
 
-La barra de arriba de la vista tiene: acercar y alejar, qué hace el botón izquierdo del mouse (girar, **mano** para mover la imagen o zoom), girar 90°, vistas (isométrica, frente, atrás, lados, arriba, abajo), encuadrar, perspectiva, cotas y ejes. Además:
+La barra de arriba de la vista tiene: acercar y alejar, qué hace el botón izquierdo del mouse (girar alrededor del case, **puño** para agarrar y mover la imagen, o zoom arrastrando hacia arriba y abajo), girar 90°, vistas (isométrica, frente, atrás, lados, arriba, abajo), encuadrar, perspectiva, cotas y ejes. Además:
 
 - Rueda del mouse: zoom hacia donde está el puntero. Botón derecho o rueda apretada: mover. Doble clic: encuadrar.
 - Teclado (con la vista seleccionada): flechas giran de a 5°, Mayús + flechas mueven, `+` y `-` hacen zoom, `Inicio` o `F` encuadran.
