@@ -23,4 +23,4 @@ testpaths = ["tests"]
 include = ["flightcase*"]
 
 [tool.setuptools.package-data]
-flightcase = ["resources/*"]
+flightcase = ["resources/*", "resources/iconos/*"]
