@@ -91,13 +91,15 @@ def test_case_desde_medidas_exteriores(qapp):
     with pytest.raises(ValueError):
         interior_para_exterior({}, 15, 400, 800)
     w = TallerWidget()
+    w.set_medicion("exterior")
     alto_tapa = w.params["int_alto_tapa"]
     w.poner_exterior(800, 500, 600)
     v = w.resultado.valores
     assert (v["ext_ancho"], v["ext_prof"], v["ext_alto"]) == pytest.approx((800, 500, 600), abs=0.1)
     assert w.params["int_alto_tapa"] == alto_tapa                       # la tapa queda igual
     assert w.editores["int_ancho"].valor() == w.params["int_ancho"]
-    assert [round(s.value()) for s in w.ext_spins] == [800, 500, 600]
+    assert [round(w.medidas[c].value()) for c in ("ancho", "largo", "alto")] == [800, 500, 600]
+    w.set_medicion("interior")
 
 
 def test_botones_de_la_vista_3d(qapp):
@@ -133,20 +135,39 @@ def test_botones_de_la_vista_3d(qapp):
 def test_medidas_interiores_y_exteriores_enganchadas(qapp):
     from flightcase.ui.widgets import TallerWidget
     w = TallerWidget()
-    tapa = w.params["int_alto_tapa"]
-    w.editores["int_alto_tapa"].widget.setValue(tapa + 40)       # la tapa cambia, el alto total no
-    w.recalcular()
-    assert w.params["int_alto_cuerpo"] + w.params["int_alto_tapa"] == pytest.approx(w.sp_alto_interior.value())
-    w.sp_alto_interior.setValue(500)
-    w.recalcular()
+    m = w.medidas
+    w.set_medicion("interior")
+    assert w.cmb_medicion.currentText() == "Interiores"
+    p = w.params
+    assert m["ancho"].value() == p["int_ancho"] and m["tapa"].value() == p["int_alto_tapa"]
+    assert m["alto"].value() == pytest.approx(p["int_alto_cuerpo"] + p["int_alto_tapa"])
+    tapa, total = p["int_alto_tapa"], m["alto"].value()
+    assert w.btn_candado.isChecked()                       # con candado: la tapa cambia, el alto no
+    m["tapa"].setValue(tapa + 40)
+    assert m["alto"].value() == pytest.approx(total) and w.params["int_alto_tapa"] == tapa + 40
+    w.btn_candado.setChecked(False)                        # sin candado: el alto crece
+    m["cuerpo"].setValue(w.params["int_alto_cuerpo"] + 10)
+    assert m["alto"].value() == pytest.approx(total + 10)
+    w.btn_candado.setChecked(True)
+    m["alto"].setValue(500)                                # el cuerpo toma la diferencia
     assert w.params["int_alto_cuerpo"] == pytest.approx(500 - tapa - 40)
-    assert w.ext_spins[2].value() == pytest.approx(w.resultado.valores["ext_alto"])
-    w.editores["int_ancho"].widget.setValue(700)                 # interior -> exterior
-    w.recalcular()
-    assert w.ext_spins[0].value() == pytest.approx(w.resultado.valores["ext_ancho"]) and w.ext_spins[0].value() > 700
-    w.ext_spins[1].setValue(600)                                 # exterior -> interior
+    m["ancho"].setValue(700)
+    assert w.params["int_ancho"] == 700 and "Por fuera" in w.lbl_medidas_nota.text()
+    v = w.resultado.valores
+    w.set_medicion("exterior")                             # las mismas casillas, por fuera
+    assert [m[c].value() for c in ("ancho", "largo", "alto")] == pytest.approx(
+        [v["ext_ancho"], v["ext_prof"], v["ext_alto"]])
+    assert m["tapa"].value() == pytest.approx(v["ext_alto"] - v["geo"]["z_cierre"])
+    assert "Por dentro" in w.lbl_medidas_nota.text()
+    m["largo"].setValue(600)                               # exterior -> interior
     assert w.resultado.valores["ext_prof"] == pytest.approx(600, abs=0.1)
     assert w.editores["int_prof"].valor() == w.params["int_prof"] < 600
+    cuerpo, tapa_ext = w.params["int_alto_cuerpo"], m["tapa"].value()
+    m["tapa"].setValue(tapa_ext + 20)                      # la tapa por fuera crece lo mismo que por dentro
+    assert w.params["int_alto_tapa"] == pytest.approx(tapa + 60)
+    assert w.params["int_alto_cuerpo"] == pytest.approx(cuerpo - 20)
+    assert m["alto"].value() == pytest.approx(w.resultado.valores["ext_alto"])
+    w.set_medicion("interior")
 
 
 def test_deshacer_y_rehacer(qapp, tmp_path):

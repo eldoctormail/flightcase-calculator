@@ -518,3 +518,49 @@ QFrame#barra3d QToolButton:checked {
   background-color: #1d3460;
   border-color: #3b82f6;
 }
+
+/* ---------------------------------------------------------------- sección de medidas */
+
+QLabel#subtituloMedidas {
+  font-weight: 600;
+  color: #e6ecf7;
+  padding: 8px 0px 2px 0px;
+}
+
+QLabel#etiquetaCampo {
+  color: #8b97b0;
+  padding-top: 4px;
+}
+
+QLabel#notaMedidas {
+  color: #aab5cc;
+  padding-top: 8px;
+}
+
+QToolButton#candado {
+  background-color: #182238;
+  border: 1px solid #26334f;
+  border-radius: 5px;
+  padding: 4px;
+}
+
+QToolButton#candado:checked {
+  background-color: #1d3460;
+  border-color: #3b82f6;
+}
+
+QDoubleSpinBox#medida, QComboBox#medicion {
+  padding: 2px 8px;
+  min-height: 26px;
+  border-radius: 6px;
+  background-color: #0f1626;
+}
+
+QDoubleSpinBox#medida:focus, QComboBox#medicion:focus {
+  border-color: #3b82f6;
+}
+
+QDoubleSpinBox#medida::up-button, QDoubleSpinBox#medida::down-button {
+  width: 0px;
+  border: none;
+}
