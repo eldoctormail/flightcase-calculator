@@ -9,6 +9,7 @@ Programa de escritorio (Python + PySide6 + OpenGL) para diseñar y fabricar flig
 ## Funciones
 
 - **Medidas interiores o exteriores** (sección Medidas): elegís si cargás las medidas por dentro o por fuera (sin ruedas), y las mismas casillas muestran Ancho y Largo, el Alto total con un **candado**, y el alto del cuerpo y de la tapa. Debajo se ve la otra medida. Al cargar exteriores se calculan las interiores con las paredes, el aluminio y la espuma del armado elegido. Con el candado cerrado, al cambiar el cuerpo o la tapa el otro se ajusta y el alto total queda igual; abierto, el alto total crece o se achica. El `.scad` sigue guardando las interiores.
+- **Fórmulas** (Medidas → Fórmulas): medidas que se calculan a partir de otras, como en una planilla. Cada fila es un nombre y una fórmula: si el nombre es un parámetro del case (`int_alto_cuerpo`, `int_alto_tapa`, `ruedas`…) ese campo toma el valor y queda bloqueado (al pasar el mouse dice la fórmula); si no, es una variable propia para usar en las otras (`alto_equipo = 88`, `int_alto_cuerpo = alto_equipo + 2 * 15`). Se puede usar + − × ÷ y `^`, coma decimal, paréntesis, `min`, `max`, `round`, `ceil`, `floor`, `abs`, `sqrt`, comparaciones y `a if condición else b`. El orden de las filas no importa; si una fórmula tiene un error o se usa a sí misma en círculo, aparece un aviso y no se aplica. Debajo de la tabla se ve lo que dio cada una. Se guardan en el `.scad` como `formulas`.
 - **Editor del case**: todos los parámetros del generador, agrupados como en `flightcase.scad`, con su explicación al pasar el mouse. Paneles, perfiles, herrajes y avisos se recalculan al instante.
 - **Estilos de case** (rack, mixer, utilitario, tapa superior, cajonera, etc.) y estilos propios guardados.
 - **Interiores**: espuma en capas con calados rectangulares, redondos o con el contorno de un dibujo, huecos para los dedos, cajones, rack 19" y chequeos de choques.
@@ -143,6 +144,12 @@ Las miniaturas se dibujan con la misma vista 3D del instructivo y quedan guardad
 - `Ctrl+Shift+P` (o el botón **Planos PDF…**) guarda sólo `planos.pdf`, igual que el que armaba el generador de OpenSCAD: resumen con el render en el color de la placa, perspectiva explotada, perfil de cierre, detalle de la junta, cubierta removible, cada pieza acotada, placas, perfiles y materiales
 - `Ctrl+Z` deshacer y `Ctrl+Y` (o `Ctrl+Shift+Z`) rehacer cualquier cambio del case: medidas, armado, estilo, herrajes a mano, interior. El menú **Editar** dice qué se va a deshacer; el historial guarda los últimos 200 pasos y empieza de cero al abrir otro proyecto
 - Al abrir la app se vuelve a cargar el último `.scad` que usaste, y la barra de estado muestra medidas, paneles, material y avisos del case
+
+### Fórmulas
+
+![Fórmulas: el alto del cuerpo y de la tapa salen del alto del equipo](captura-formulas.png)
+
+En el ejemplo, el cuerpo es el alto del equipo más 15 mm de espuma arriba y abajo, la tapa es un tercio del cuerpo (60 mm como mínimo) y las ruedas se ponen solas si el case pasa de 500 mm de ancho. Los campos calculados (Alto, Alto de cuerpo, Alto de tapa) quedan en gris.
 
 ### Pantalla de inicio
 

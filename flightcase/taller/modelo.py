@@ -192,11 +192,26 @@ def _pos_n(L: float, n: int, margen: float) -> List[float]:
     return [margen + i * (L - 2 * margen) / (n - 1) for i in range(n)]
 
 
+# parámetros que son cantidades (van sin decimales)
+ENTEROS = {"tapas", "pleg_cierres_esquina", "acceso_cierres_n", "cantidad_cases", "manijas_n", "cierres_frente_n",
+           "cierres_lateral_n", "ruedas", "rueda_frenos", "rueda_fijas", "cazoleta_remaches", "bandeja_soportes", "encastre_remaches",
+           "pies", "bisagras", "topes", "refuerzos", "refuerzo_remaches"}
+
+
 def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[CatalogoTaller] = None) -> ResultadoTaller:
     P = parametros_por_defecto()
     if params:
         P.update(params)
-    cat = catalogo or catalogo_actual()
+    # ---- fórmulas (formulas.py): medidas calculadas a partir de otras; no está en flightcase.scad ----
+    from . import formulas as _formulas
+    _fx = _formulas.aplicar(P, parametros_por_defecto(), ENTEROS)
+    res = _calcular(P, catalogo or catalogo_actual())
+    res.valores["formulas"] = _fx
+    res.avisos[:0] = _fx.avisos
+    return res
+
+
+def _calcular(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
     g = P.get
     from . import formas as _formas
     if _formas.es_forma(P):     # rack inclinado, funda de rack, baúl plegable (formas.py)

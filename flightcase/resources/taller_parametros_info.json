@@ -25,6 +25,16 @@
   ]
  },
  {
+  "seccion": "Fórmulas",
+  "parametros": [
+   {
+    "nombre": "formulas",
+    "etiqueta": "Medidas calculadas",
+    "ayuda": "Cada fila es [medida o variable, fórmula]. Si el nombre es un parámetro del case (int_ancho, int_alto_tapa, ruedas, bisagras...) ese campo toma el valor calculado y queda bloqueado. Si no, es una variable propia que se usa en las otras fórmulas. Se puede usar + - * / ^, paréntesis, min, max, round, ceil, floor, abs, sqrt y «a if condición else b». Ej.: alto_equipo = 88; int_alto_cuerpo = alto_equipo + 2*15; int_alto_tapa = max(60, int_alto_cuerpo / 3)."
+   }
+  ]
+ },
+ {
   "seccion": "Tipo de case",
   "parametros": [
    {
