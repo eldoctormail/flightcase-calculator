@@ -9,6 +9,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
+    QComboBox,
     QDoubleSpinBox,
     QFormLayout,
     QHBoxLayout,
@@ -226,6 +227,18 @@ class _PaginaMedidas(QWizardPage):
             self.lbl_nota.setText("")
 
 
+# Ruedas que ofrece el asistente: clave, texto y explicación
+RUEDAS_ASISTENTE = [
+    ("no", "Sin ruedas", "El case va sin ruedas."),
+    ("giratorias", "4 giratorias (2 con freno)", "Lo más común: las 4 giran y 2 tienen freno."),
+    ("fijas", "2 giratorias con freno + 2 fijas", "Como un carro: adelante giran y frenan, atrás van fijas y el case va derecho."),
+    ("cazoletas", "4 giratorias en cazoleta (más bajo)",
+     "Cada rueda va embutida en una cazoleta de acero en el piso: el case queda más bajo."),
+    ("suelta", "Base suelta con ruedas (wheel board)",
+     "Una tabla con ruedas y un marco de ángulo donde se apoya el case; el piso no se perfora."),
+]
+
+
 class _PaginaTerminaciones(QWizardPage):
     def __init__(self) -> None:
         super().__init__()
@@ -235,8 +248,11 @@ class _PaginaTerminaciones(QWizardPage):
         d = parametros_por_defecto()
         self.sp_placa = _mm(3, 30, d["placa_esp"])
         form.addRow("Espesor de la placa", self.sp_placa)
-        self.chk_ruedas = QCheckBox("4 ruedas (2 con freno)")
-        form.addRow("Ruedas", self.chk_ruedas)
+        self.cmb_ruedas = QComboBox()
+        for clave, texto, ayuda in RUEDAS_ASISTENTE:
+            self.cmb_ruedas.addItem(texto, clave)
+            self.cmb_ruedas.setItemData(self.cmb_ruedas.count() - 1, ayuda, Qt.ToolTipRole)
+        form.addRow("Ruedas", self.cmb_ruedas)
         self.chk_manijas = QCheckBox("Manijas embutidas")
         self.chk_manijas.setChecked(bool(d["manijas"]))
         form.addRow("Manijas", self.chk_manijas)
@@ -247,7 +263,10 @@ class _PaginaTerminaciones(QWizardPage):
     def initializePage(self) -> None:   # noqa: N802
         e = self.wizard().pagina_estilo.estilo()
         p = estilos.aplicar(parametros_por_defecto(), e, parametros_por_defecto()) if e else parametros_por_defecto()
-        self.chk_ruedas.setChecked(int(p.get("ruedas", 0)) > 0)
+        self.cmb_ruedas.setCurrentIndex(self.cmb_ruedas.findData("giratorias" if int(p.get("ruedas", 0)) > 0 else "no"))
+
+    def ruedas(self) -> str:
+        return self.cmb_ruedas.currentData() or "no"
         self.chk_manijas.setChecked(bool(p.get("manijas", True)))
         self.sp_placa.setValue(float(p.get("placa_esp", 9)))
 
@@ -359,8 +378,12 @@ class AsistenteCase(QWizard):
             q = estilos.aplicar(q, e, defectos) if e else q
             q["placa_esp"] = pt.sp_placa.value()          # lo elegido en el asistente manda sobre el estilo
             q["espuma_esp"] = pt.sp_forro.value()
-            q["ruedas"] = 4 if pt.chk_ruedas.isChecked() else 0
-            if not pt.chk_ruedas.isChecked():
+            r = pt.ruedas()
+            q["ruedas"] = 0 if r == "no" else 4
+            q["rueda_fijas"] = 2 if r == "fijas" else 0
+            q["cazoletas"] = r == "cazoletas"
+            q["base_suelta"] = r == "suelta"
+            if r in ("no", "cazoletas", "suelta"):
                 q["base_ruedas"] = []
             q["manijas"] = pt.chk_manijas.isChecked()
             return q

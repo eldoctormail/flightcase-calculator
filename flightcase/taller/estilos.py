@@ -29,7 +29,7 @@ CLAVES_ESTILO = (
     "paredes_enteras", "paredes_enteras_cuerpo", "extremos_cubren",
     "manijas", "manijas_en", "manijas_n", "manija_sep", "manija_pos",
     "cierres_laterales", "cierres_frente_n", "cierres_lateral_n",
-    "ruedas", "rueda_frenos", "base_ruedas", "encastres",
+    "ruedas", "rueda_frenos", "rueda_fijas", "base_ruedas", "base_suelta", "cazoletas", "encastres",
     "pies", "ref_pie", "bisagras", "ref_bisagra", "topes", "ref_tope", "refuerzos", "sistema",
 )
 

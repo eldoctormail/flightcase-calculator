@@ -375,6 +375,22 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
                                        (x0, y0, e_, c.alto), (x1 - e_, y0, e_, c.alto)):
                     k.caja(_sum(o, _mul(u, a0), _mul(vv, b0)), u, vv, n, aw, bh, prof, col_p,
                            ComponentLayer.BASE_ALU, "Plato")
+            if c.tipo == "cazoleta" and k.visible(P_RUEDAS):
+                # cazoleta de rueda: reborde por fuera del piso y cubeta metida en el case
+                cz = geo.get("cazoleta") or {}
+                ala, prof = cz.get("ala", 12), cz.get("prof", 35)
+                col_p = col_m(c, P_RUEDAS, "plato")
+                for a0, b0, aw, bh in ((x0 - ala, y0 - ala, c.ancho + 2 * ala, ala), (x0 - ala, y1, c.ancho + 2 * ala, ala),
+                                       (x0 - ala, y0, ala, c.alto), (x1, y0, ala, c.alto)):
+                    k.caja(_sum(o, _mul(u, a0), _mul(vv, b0), _mul(fuera, 1.5)), u, vv, n, aw, bh, 1.5, col_p,
+                           ComponentLayer.BASE_ALU, "Cazoleta")
+                k.caja(_sum(o, _mul(u, x0 + 0.5), _mul(vv, y0 + 0.5), _mul(n, prof)), u, vv, n,
+                       c.ancho - 1, c.alto - 1, 1.5, col_p, ComponentLayer.BASE_ALU, "Cazoleta")
+                e_ = 1.5
+                for a0, b0, aw, bh in ((x0, y0, c.ancho, e_), (x0, y1 - e_, c.ancho, e_),
+                                       (x0, y0, e_, c.alto), (x1 - e_, y0, e_, c.alto)):
+                    k.caja(_sum(o, _mul(u, a0), _mul(vv, b0)), u, vv, n, aw, bh, prof + 1.5, col_p,
+                           ComponentLayer.BASE_ALU, "Cazoleta")
             if c.tipo in ("manija", "manija a mano") and k.visible(P_MANIJAS):
                 _manija_embutida(k, o, u, vv, n, x0, y0, x1, y1, col_m(c, P_MANIJAS, "herraje"))
         for m in marcas.get(p.id, []):
@@ -402,7 +418,8 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
                 else:
                     _gancho_cierre(k, o, u, vv, n, m.x, ys, s, col_c)
             elif m.tipo == "rueda" and (geo["horizontal"] or geo["frontal"]) and not geo["base"] and k.visible(P_RUEDAS):
-                _rueda(k, geo, o, u, vv, fuera, m.x, m.y, m.texto == "freno", ex)
+                _rueda(k, geo, o, u, vv, fuera, m.x, m.y, m.texto == "freno", ex,
+                       "fija" if m.texto == "fija" else "", (geo.get("cazoleta") or {}).get("prof", 0.0))
             elif m.tipo == "pie" and (geo["horizontal"] or geo["frontal"]) and k.visible(P_RUEDAS):
                 k.caja(_sum(o, _mul(u, m.x - geo["pie_d"] / 2), _mul(vv, m.y - geo["pie_d"] / 2)), u, vv, fuera,
                        geo["pie_d"], geo["pie_d"], geo["pie_h"] + ex * 2.2, k.color(P_RUEDAS, "herraje"),
@@ -422,7 +439,25 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
         k.caja(o, u, vv, n, base["ancho"], base["alto"], base["esp"], k.color(P_RUEDAS, "base_ruedas"),
                ComponentLayer.BASE_FLOOR, "Base de ruedas")
         for i, (rx, ry) in enumerate(geo["ruedas_en_base"]):
-            _rueda(k, geo, o, u, vv, fuera, rx, ry, i < geo["rueda_frenos"], ex)
+            tipo = _tipo_i(geo, i)
+            _rueda(k, geo, o, u, vv, fuera, rx, ry, tipo == "freno", ex, tipo)
+        # base suelta: marco de ángulo sobre la base, con un ala parada contra el case
+        ala_m, e_m = base.get("marco_ala", 32), base.get("marco_esp", 2)
+        tope = _sum(o, _mul(n, base["esp"]))    # cara de arriba de la base (n apunta hacia el case)
+        col_m_ = k.color(P_RUEDAS, "aluminio")
+        for tr in base.get("marco") or []:
+            x0, x1, y0, y1 = tr["x0"], tr["x1"], tr["y0"], tr["y1"]
+            k.caja(_sum(tope, _mul(u, x0), _mul(vv, y0)), u, vv, n, x1 - x0, y1 - y0, e_m, col_m_,
+                   ComponentLayer.BASE_ALU, "Marco de la base")
+            b = tr["borde"]
+            if b in ("y0", "y1"):
+                yb = y0 if b == "y0" else y1 - e_m
+                k.caja(_sum(tope, _mul(u, x0), _mul(vv, yb)), u, vv, n, x1 - x0, e_m, ala_m, col_m_,
+                       ComponentLayer.BASE_ALU, "Marco de la base")
+            else:
+                xb = x0 if b == "x0" else x1 - e_m
+                k.caja(_sum(tope, _mul(u, xb), _mul(vv, y0)), u, vv, n, e_m, y1 - y0, ala_m, col_m_,
+                       ComponentLayer.BASE_ALU, "Marco de la base")
 
     # Aros de cierre: macho en el cuerpo, hembra en la tapa (aro_cierre); con cubierta
     # removible el del cuerpo va partido a la altura de la junta
@@ -532,8 +567,11 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
     lift_pie = desplaz["tapa2"] if geo["dos_tapas"] else 0.0
     if k.visible(P_RUEDAS):
         if not base:
+            hundir = (geo.get("cazoleta") or {}).get("prof", 0.0)
             for i, (cx, cy) in enumerate(geo["ruedas"]):
-                _rueda(k, geo, (0, 0, lift_pie), (1, 0, 0), (0, 1, 0), (0, 0, -1), cx, cy, i < geo["rueda_frenos"], ex)
+                tipo = _tipo_i(geo, i)
+                _rueda(k, geo, (0, 0, lift_pie), (1, 0, 0), (0, 1, 0), (0, 0, -1), cx, cy, tipo == "freno", ex,
+                       tipo, hundir)
         if not (geo["horizontal"] or geo["frontal"]):
             for cx, cy in geo["pies"]:
                 d = geo["pie_d"]
@@ -693,30 +731,47 @@ def _rect_redondeado(x0: float, y0: float, x1: float, y1: float, r: float, por_e
     return pts
 
 
+def _tipo_i(geo: dict, i: int) -> str:
+    tipos = geo.get("ruedas_tipos") or []
+    return tipos[i] if i < len(tipos) else ("freno" if i < geo["rueda_frenos"] else "giratoria")
+
+
 def _rueda(k: _Constructor, geo: dict, o: Vec, u: Vec, v: Vec, fuera: Vec, cx: float, cy: float,
-           freno: bool, ex: float) -> None:
-    """rueda_3d(): placa, giratorio, horquilla, rueda y freno, hacia `fuera` desde o + cx·u + cy·v."""
+           freno: bool, ex: float, tipo: str = "", hundir: float = 0.0) -> None:
+    """rueda_3d(): placa, giratorio, horquilla, rueda y freno, hacia `fuera` desde o + cx·u + cy·v.
+
+    `tipo` "fija" dibuja la rueda sin giratorio, con el eje bajo el centro de la placa; las medidas
+    de cada tipo salen de geo["rueda_dims"]. `hundir` mete la placa dentro del case (cazoleta)."""
     pl, d = geo["rueda_placa"], geo["rueda_diametro"]
-    r = d / 2
     alto = geo["rueda_alto"] or (d + 25)
+    dims = (geo.get("rueda_dims") or {}).get(tipo or ("freno" if freno else "giratoria"))
+    if dims and geo["rueda_alto"]:
+        d, alto = dims[0], dims[1]
+    fija = tipo == "fija"
+    r = d / 2
     hf = alto - d
-    base = _sum(o, _mul(u, cx), _mul(v, cy), _mul(fuera, ex * 2.2))
+    base = _sum(o, _mul(u, cx), _mul(v, cy), _mul(fuera, ex * 2.2 - hundir))
     L = lambda a, b, c: _sum(base, _mul(u, a), _mul(v, b), _mul(fuera, c))   # coords de rueda_3d
     resalta = k.op.paso < 99 and k.op.paso == P_RUEDAS
     c_placa = "resalte" if resalta else "rueda_placa"
     c_horq = "resalte" if resalta else "rueda_horq"
     k.caja(L(-pl[0] / 2, -pl[1] / 2, 0), u, v, fuera, pl[0], pl[1], 4, c_placa, ComponentLayer.BASE_ALU, "Rueda")
-    hg = max(hf - 4, 1) * 0.35
-    k.cilindro(L(0, 0, 4 + hg / 2), fuera, u, v, pl[1] * 0.3, hg, c_horq, ComponentLayer.BASE_ALU, "Rueda")
+    nombre = "Rueda fija" if fija else "Rueda"
+    za = 4
+    if not fija:
+        hg = max(hf - 4, 1) * 0.35
+        k.cilindro(L(0, 0, 4 + hg / 2), fuera, u, v, pl[1] * 0.3, hg, c_horq, ComponentLayer.BASE_ALU, "Rueda")
+    eje = 0.0 if fija else r * 0.35          # la giratoria lleva el eje corrido (avance)
+    ze = alto - r
     for s_ in (-1, 1):   # horquilla: de la placa al eje (hull de rueda_3d)
         y0, y1 = s_ * r * 0.55 - 1.5, s_ * r * 0.55 + 1.5
-        za, ze = 4, alto - r
-        k.hexaedro([L(-r * 0.2, y0, za), L(r * 0.4, y0, za), L(r * 0.4, y1, za), L(-r * 0.2, y1, za),
-                    L(r * 0.35 - 6, y0, ze + 6), L(r * 0.35 + 6, y0, ze + 6), L(r * 0.35 + 6, y1, ze + 6),
-                    L(r * 0.35 - 6, y1, ze + 6)], c_horq, ComponentLayer.BASE_ALU, "Rueda")
-    k.cilindro(L(r * 0.35, 0, alto - r), v, u, fuera, r, r * 0.8, "rueda", ComponentLayer.BASE_ALU, "Rueda")
+        xa0, xa1 = (-r * 0.45, r * 0.45) if fija else (-r * 0.2, r * 0.4)
+        k.hexaedro([L(xa0, y0, za), L(xa1, y0, za), L(xa1, y1, za), L(xa0, y1, za),
+                    L(eje - 6, y0, ze + 6), L(eje + 6, y0, ze + 6), L(eje + 6, y1, ze + 6),
+                    L(eje - 6, y1, ze + 6)], c_horq, ComponentLayer.BASE_ALU, nombre)
+    k.cilindro(L(eje, 0, alto - r), v, u, fuera, r, r * 0.8, "rueda", ComponentLayer.BASE_ALU, nombre)
     if freno:
-        k.caja(L(r * 0.35 + r * 0.7, -6, alto - r * 1.4), u, v, fuera, 10, 12, 6, "freno",
+        k.caja(L(eje + r * 0.7, -6, alto - r * 1.4), u, v, fuera, 10, 12, 6, "freno",
                ComponentLayer.BASE_ALU, "Freno")
 
 
@@ -818,11 +873,12 @@ def _herraje_manual(k: _Constructor, geo: dict, o: Vec, u: Vec, v: Vec, n: Vec, 
     if h.forma == "rueda":
         d = h.datos
         g2 = dict(geo, rueda_placa=list(d.get("placa") or [h.pw, h.ph]),
-                  rueda_diametro=float(d.get("diametro", 100)), rueda_alto=float(d.get("alto", 0)))
+                  rueda_diametro=float(d.get("diametro", 100)), rueda_alto=float(d.get("alto", 0)),
+                  rueda_dims=None)
         if h.giro_panel % 180:
-            _rueda(k, g2, o, v, u, fuera, h.py, h.px, bool(d.get("freno")), ex)
+            _rueda(k, g2, o, v, u, fuera, h.py, h.px, bool(d.get("freno")), ex, "fija" if d.get("tipo") == "fija" else "")
         else:
-            _rueda(k, g2, o, u, v, fuera, h.px, h.py, bool(d.get("freno")), ex)
+            _rueda(k, g2, o, u, v, fuera, h.px, h.py, bool(d.get("freno")), ex, "fija" if d.get("tipo") == "fija" else "")
     elif h.forma == "pie":
         alto = float(h.datos.get("alto", 15))
         k.cilindro(P(h.px, h.py, alto / 2), fuera, u, v, h.pw / 2, alto, col, capa, h.nombre, lados=16)

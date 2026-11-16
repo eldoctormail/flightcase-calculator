@@ -308,6 +308,41 @@
     "etiqueta": "Separación de la rueda al esquinero"
    },
    {
+    "nombre": "rueda_fijas",
+    "ayuda": "cuántas de las 4 son fijas (sin giro): van del lado opuesto a las de freno. Lo común es 0 (4 giratorias) o 2 (2 giratorias con freno adelante y 2 fijas atrás, como un carro).",
+    "etiqueta": "Ruedas fijas"
+   },
+   {
+    "nombre": "cazoletas",
+    "ayuda": "cada rueda va metida en una cazoleta de acero embutida en el piso: el case queda más bajo (la profundidad de la cazoleta) y la rueda no sobresale tanto. Se cala el piso y la cazoleta se remacha por el reborde; los bulones de la rueda van en la cazoleta. No se usa con base de ruedas.",
+    "etiqueta": "Ruedas en cazoleta"
+   },
+   {
+    "nombre": "cazoleta_corte",
+    "ayuda": "calado en el piso para la cazoleta (largo, ancho), en el mismo sentido que la placa de la rueda",
+    "etiqueta": "Calado de la cazoleta"
+   },
+   {
+    "nombre": "cazoleta_ala",
+    "ayuda": "ancho del reborde de la cazoleta que apoya por fuera del piso",
+    "etiqueta": "Reborde de la cazoleta"
+   },
+   {
+    "nombre": "cazoleta_prof",
+    "ayuda": "profundidad de la cazoleta: cuánto se mete la placa de la rueda dentro del case (y cuánto baja el alto total)",
+    "etiqueta": "Profundidad de la cazoleta"
+   },
+   {
+    "nombre": "cazoleta_radio",
+    "ayuda": "radio de las esquinas del calado de la cazoleta",
+    "etiqueta": "Radio del calado de la cazoleta"
+   },
+   {
+    "nombre": "cazoleta_remaches",
+    "ayuda": "remaches del reborde de cada cazoleta",
+    "etiqueta": "Remaches por cazoleta"
+   },
+   {
     "nombre": "base_ruedas",
     "ayuda": "Base de ruedas: placa exterior más gruesa (p. ej. fenólico 18) atornillada bajo el piso; las ruedas se montan en ella. [medida a lo ancho del plano del piso, a lo alto del plano, espesor] ej. [530, 750, 18]; vacío = las ruedas van directo al piso",
     "etiqueta": "Base de ruedas"
@@ -321,6 +356,16 @@
     "nombre": "base_pasantes",
     "ayuda": "los bulones de las ruedas atraviesan también el piso del case",
     "etiqueta": "Bulones pasantes al piso"
+   },
+   {
+    "nombre": "base_suelta",
+    "ayuda": "Wheel board: la base de ruedas es una tabla suelta (carro) en la que se apoya el case, con un marco de ángulo de aluminio alrededor que lo sostiene. No se perfora el piso del case. Su medida sale sola: la planta del case más la holgura y el ángulo. Sólo para cases parados (orientación vertical).",
+    "etiqueta": "Base suelta (wheel board)"
+   },
+   {
+    "nombre": "base_holgura",
+    "ayuda": "juego entre el case y el marco de la base suelta, de cada lado",
+    "etiqueta": "Holgura en la base suelta"
    }
   ]
  },
@@ -661,6 +706,16 @@
     "nombre": "ref_rueda_freno",
     "ayuda": "ej. \"08-372191\" rueda 100 mm con freno",
     "etiqueta": "Rueda con freno (catálogo)"
+   },
+   {
+    "nombre": "ref_rueda_fija",
+    "ayuda": "rueda sin giro para las ruedas fijas, ej. \"LBD-R100F\"; vacío = la misma medida que la giratoria",
+    "etiqueta": "Rueda fija (catálogo)"
+   },
+   {
+    "nombre": "ref_cazoleta",
+    "ayuda": "cazoleta de acero para embutir la rueda, ej. \"LBD-CZ100\"",
+    "etiqueta": "Cazoleta (catálogo)"
    },
    {
     "nombre": "ref_plato",
