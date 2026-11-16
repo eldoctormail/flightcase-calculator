@@ -275,6 +275,10 @@ class FlightCaseMainWindow(QMainWindow):
                      "DXF por pieza, listas de corte y materiales, planos.pdf e instructivo de montaje")
         self._accion(m, "Exportar p&lanos (PDF)...", "Ctrl+Shift+P", lambda: self.taller_widget.exportar_planos(),
                      "planos.pdf: resumen, vistas, cada pieza acotada, placas, perfiles y materiales")
+        self._accion(m, "Exportar &hoja del case (PDF)...", "Ctrl+Alt+H", lambda: self.taller_widget.exportar_hoja(),
+                     "Una hoja con la vista 3D como se ve ahora y las seis vistas de los lados, acotadas")
+        self._accion(m, "Guardar &imagen de la vista 3D (PNG)...", "Ctrl+Alt+I",
+                     lambda: self.taller_widget.guardar_imagen_3d(), "La vista 3D tal como se ve, con fondo transparente")
         self._accion(m, "Exportar a &STEP (3D para CAD)...", "Ctrl+Alt+S", self._taller_step,
                      "El case armado para abrir en Fusion, SolidWorks o FreeCAD")
         self._accion(m, "Paquete del &taller desde un .scad sin abrirlo...", "Ctrl+T", self._export_taller_pack)
@@ -288,6 +292,9 @@ class FlightCaseMainWindow(QMainWindow):
         self.accion_rehacer = self._accion(self.edit_menu, "&Rehacer", None, self.taller_widget.rehacer)
         self.accion_rehacer.setShortcuts(QKeySequence.keyBindings(QKeySequence.StandardKey.Redo)
                                          + [QKeySequence("Ctrl+Y")])
+        self.edit_menu.addSeparator()
+        self._accion(self.edit_menu, "Copiar &imagen de la vista 3D", "Ctrl+Shift+C", self.taller_widget.copiar_imagen_3d,
+                     "Copia la vista 3D (sin fondo) para pegarla en otro programa")
         self.edit_menu.addSeparator()
         self._accion(self.edit_menu, "&Biblioteca de equipos...", "Ctrl+B", self.taller_widget.biblioteca,
                      "Tus equipos con sus medidas, para usarlos en la espuma o el rack de cualquier case")

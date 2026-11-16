@@ -18,6 +18,7 @@ from PySide6.QtGui import (
     QMouseEvent,
     QWheelEvent,
     QSurfaceFormat,
+    QImage,
 )
 from PySide6.QtWidgets import (
     QWidget,
@@ -78,6 +79,7 @@ class Schema3DCanvas(QOpenGLWidget):
         self.realista: bool = True            # colores de case real (placa negra, aluminio)
         self.colores_placa: dict = {}         # color de la placa del proyecto: base, lid, wall
         self.mostrar_cubo: bool = True        # cubo de vistas arriba a la derecha
+        self._fondo_captura: Optional[QColor] = None   # al sacar una foto: fondo liso, sin grilla ni ayudas
         self._cubo_caras: List[Tuple[QPolygonF, str]] = []
         # herramienta Medir: clic en dos puntos del case (se engancha al vértice más cercano)
         self.modo_medir: bool = False
@@ -455,6 +457,80 @@ class Schema3DCanvas(QOpenGLWidget):
             painter.setPen(QPen(QColor("#0b1120"), 1.2))
             painter.drawEllipse(q, 6.0 if enganche else 4.5, 6.0 if enganche else 4.5)
 
+    # --- Foto de la vista ---
+
+    def _grabar(self, fondo: str) -> QImage:
+        self._fondo_captura = QColor(fondo)
+        try:
+            img = self.grabFramebuffer()
+        finally:
+            self._fondo_captura = None
+            self.update()
+        return img.convertToFormat(QImage.Format.Format_RGBA8888) if not img.isNull() else img
+
+    @staticmethod
+    def _matriz(img: QImage) -> np.ndarray:
+        w, h = img.width(), img.height()
+        return np.frombuffer(img.constBits(), dtype=np.uint8).reshape(h, img.bytesPerLine() // 4, 4)[:, :w, :3] \
+            .astype(np.float32)
+
+    def capturar(self, transparente: bool = True, recortar: bool = True, margen: int = 16) -> QImage:
+        """Foto de la vista 3D tal como se ve (ángulo, zoom, tapas abiertas, cotas), sin el fondo,
+        la grilla, los ejes ni el cubo. Con `transparente` el fondo queda transparente (PNG con
+        alfa); si no, blanco. OpenGL no entrega la transparencia, así que se dibuja dos veces, sobre
+        negro y sobre blanco, y de la diferencia sale cuánto tapa cada píxel (incluso en los bordes
+        suavizados). Si la placa de video no deja leer la imagen, se dibuja por software."""
+        if self.mesh is None or not self.mesh.faces:
+            return QImage()
+        blanco = self._grabar("#ffffff")
+        if blanco.isNull():
+            return self._capturar_software(transparente, recortar, margen)
+        b = self._matriz(blanco)
+        if transparente:
+            n = self._matriz(self._grabar("#000000"))
+            alfa = np.clip(1.0 - (b - n).mean(axis=2) / 255.0, 0.0, 1.0)
+            rgb = np.where(alfa[:, :, None] > 1e-3, n / np.maximum(alfa, 1e-3)[:, :, None], 0.0)
+            rgba = np.dstack([np.clip(rgb, 0, 255), alfa * 255.0])
+        else:
+            rgba = np.dstack([b, np.full(b.shape[:2], 255.0, dtype=np.float32)])
+            alfa = (np.abs(b - 255.0).max(axis=2) > 1.0).astype(np.float32)
+        if recortar:
+            filas, cols = np.nonzero(alfa > 0.01)
+            if len(filas):
+                h, w = alfa.shape
+                y0, y1 = max(0, filas.min() - margen), min(h, filas.max() + 1 + margen)
+                x0, x1 = max(0, cols.min() - margen), min(w, cols.max() + 1 + margen)
+                rgba = rgba[y0:y1, x0:x1]
+        rgba = np.ascontiguousarray(np.round(rgba).astype(np.uint8))
+        h, w = rgba.shape[:2]
+        return QImage(rgba.data, w, h, 4 * w, QImage.Format.Format_RGBA8888).copy()
+
+    def _capturar_software(self, transparente: bool, recortar: bool, margen: int) -> QImage:
+        """La misma vista dibujada sin OpenGL (render.py), por si la placa no deja leer la imagen."""
+        from ...taller.render import imagen
+        camara = f"0,0,0,{90.0 - self.elevation_deg:.3f},0,{self.azimuth_deg:.3f},0"
+        dpr = self.devicePixelRatioF()
+        w, h = max(200, round(self.width() * dpr)), max(150, round(self.height() * dpr))
+        img = imagen(self.mesh, camara, f"{w},{h}", self.colores_placa or None, transparente=True)
+        if img is None:
+            return QImage()
+        img = img.convertToFormat(QImage.Format.Format_RGBA8888)
+        if recortar:
+            a = np.frombuffer(img.constBits(), dtype=np.uint8).reshape(img.height(), img.bytesPerLine() // 4, 4)
+            filas, cols = np.nonzero(a[:, :img.width(), 3] > 2)
+            if len(filas):
+                x0, y0 = max(0, cols.min() - margen), max(0, filas.min() - margen)
+                x1, y1 = min(img.width(), cols.max() + 1 + margen), min(img.height(), filas.max() + 1 + margen)
+                img = img.copy(x0, y0, x1 - x0, y1 - y0)
+        if not transparente:
+            fondo = QImage(img.size(), QImage.Format.Format_RGB32)
+            fondo.fill(QColor("#ffffff"))
+            p = QPainter(fondo)
+            p.drawImage(0, 0, img)
+            p.end()
+            return fondo.convertToFormat(QImage.Format.Format_RGBA8888)
+        return img
+
     def set_fondo_claro(self, si: bool) -> None:
         self.fondo_claro = bool(si)
         self._cambio()
@@ -660,13 +736,17 @@ class Schema3DCanvas(QOpenGLWidget):
         w, h = max(1, self.width()), max(1, self.height())
         aspect = w / h
 
-        # 1. Clear color and depth buffers, con un degradado de fondo
+        # 1. Clear color and depth buffers, con un degradado de fondo (liso al sacar una foto)
+        foto = self._fondo_captura
         arriba, abajo = (QColor(c) for c in FONDO_3D["claro" if self.fondo_claro else "oscuro"])
+        if foto is not None:
+            arriba = abajo = foto
         GL.glClearColor(abajo.redF(), abajo.greenF(), abajo.blueF(), 1.0)
         dpr = self.devicePixelRatioF()      # en Retina el buffer es 2x: si no, el 3D ocupa un cuarto
         GL.glViewport(0, 0, max(1, round(w * dpr)), max(1, round(h * dpr)))
         GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
-        self._dibujar_degradado(arriba, abajo)
+        if foto is None:
+            self._dibujar_degradado(arriba, abajo)
 
         if not self.mesh:
             painter = QPainter(self)
@@ -726,7 +806,7 @@ class Schema3DCanvas(QOpenGLWidget):
         GL.glEnable(GL.GL_DEPTH_TEST)
 
         # 5a. Ground Reference Grid
-        if self.mostrar_piso:
+        if self.mostrar_piso and foto is None:
             self._draw_gl_ground_grid(p_max)
 
         # 5b. Solid Panel Polygons with Directional Lighting & Offset
@@ -757,6 +837,10 @@ class Schema3DCanvas(QOpenGLWidget):
         if self.show_dimensions:
             for dim in self.mesh.dimensions:
                 self._draw_2d_dimension_callout(painter, dim, project_3d_to_screen)
+
+        if foto is not None:      # la foto lleva sólo el case y sus cotas
+            painter.end()
+            return
 
         # 7b. 3D Coordinate Axis Triad (Bottom-Left)
         if self.show_axes:

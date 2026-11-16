@@ -222,6 +222,16 @@ Los tipos de case vienen en siete grupos, con nombres en español:
 
 En **Herrajes del catálogo FR Sistemas** cada herraje (placa, ángulo, perfiles de cierre, esquineros, cierres, manijas, ruedas, bisagras, topes, pies, espuma, remaches…) se elige de una lista con número y nombre, filtrada por tipo; se puede escribir parte del nombre para buscar. Los artículos con * tienen medidas estimadas. En **Otros accesorios → extras** se agregan, en una tabla, artículos del catálogo para la lista de compras (asas telescópicas, argollas, tornillería, carátulas de rack…) con su cantidad.
 
+### Foto de la vista 3D y hoja del case
+
+El botón de la **cámara** en la barra de la vista 3D saca una foto de la vista tal como se ve (ángulo, zoom, tapas abiertas o cajones afuera, cotas), sin el fondo, la grilla, los ejes ni el cubo de vistas:
+
+- **Copiar imagen** (`Ctrl+Shift+C`, también en **Editar**): queda en el portapapeles como PNG transparente y, para los programas que no entienden la transparencia, sobre blanco. Se pega con `Ctrl+V` en Word, PowerPoint, WhatsApp, etc.
+- **Guardar imagen PNG (sin fondo)** (`Ctrl+Alt+I`, también en **Archivo**): el mismo PNG con fondo transparente, recortado al case.
+- **Hoja del case (PDF)** (`Ctrl+Alt+H`, también en **Archivo**): una hoja A4 con la foto de la vista 3D, los datos del case (medidas exteriores, interiores y totales, placa, color y peso) y las seis vistas de los lados (frente, atrás, izquierda, derecha, arriba y abajo), todas a la misma escala y acotadas con la medida total, herrajes y ruedas incluidos. Para fabricar siguen estando los planos (`Ctrl+Shift+P`).
+
+OpenGL no entrega la transparencia, así que la foto se dibuja dos veces, sobre negro y sobre blanco, y de la diferencia sale cuánto tapa cada píxel (los bordes suavizados quedan bien sobre cualquier fondo). Si la placa de video no deja leer la imagen, se dibuja por software con el mismo ángulo.
+
 ### Exportar a STEP
 
 Con el botón **Exportar STEP…** del Taller (o **Archivo → Exportar a STEP**, `Ctrl+Alt+S`) se guarda el case armado, con las tapas cerradas, como un ensamble STEP (AP214, en milímetros). Cada pieza es un sólido de caras planas con su nombre y su color: los paneles con sus calados pasantes, los aros y ángulos de aluminio, los esquineros, cierres, manijas y ruedas (simplificados, igual que en la vista 3D) y el interior (equipos, espuma con sus bolsillos, cajones y rack). El archivo lo escribe la app directamente, sin librerías de CAD; los tests lo validan con OpenCASCADE (el motor de FreeCAD) cuando está instalado.
