@@ -120,7 +120,7 @@ def test_editor_aplica_estilo_y_guarda_uno_propio(widget):
 
     id_propio = widget.guardar_estilo("Mi rack")
     assert widget.cmb_estilo.currentData() == id_propio and widget.btn_borrar_estilo.isEnabled()
-    widget.nuevo()
+    widget.nuevo(preguntar=False)          # descarta el estilo aplicado sin guardar
     assert widget.params["orientacion"] == "vertical" and widget.cmb_estilo.currentIndex() == 0
     widget.aplicar_estilo(id_propio)
     assert widget.params["orientacion"] == "frontal" and widget.params["tapas"] == 2
