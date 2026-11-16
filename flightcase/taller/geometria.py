@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import math
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from .malla import ComponentLayer, PolygonFace3D, Point3D, Segment3D, WireframeMesh3D
@@ -124,6 +124,8 @@ class Solido3D:
     desde: int
     hasta: int
     agujeros: List[List[Point3D]] = field(default_factory=list)
+    pieza: str = ""          # id de la pieza (piezas.py), si se puede elegir con un clic
+    color_hex: str = ""      # color que pidió el usuario para esa pieza ("#rrggbb")
 
 
 @dataclass
@@ -229,6 +231,19 @@ class _Constructor:
         """Las caras agregadas desde `desde` forman un cuerpo cerrado."""
         if len(self.caras) > desde:
             self.solidos.append(Solido3D(etiqueta, color, desde, len(self.caras)))
+
+    def marcar(self, desde_caras: int, desde_solidos: int, pieza: str, color: str = "",
+               grupos: Optional[Sequence[str]] = None) -> None:
+        """Las caras y sólidos agregados desde ahí son de esa pieza (para elegirla con un clic).
+        `color` ("#rrggbb") pinta las de esos grupos de color (no los remaches)."""
+        for i in range(desde_caras, len(self.caras)):
+            f = self.caras[i]
+            pinta = bool(color) and (grupos is None or f.color_group in grupos)
+            self.caras[i] = replace(f, pieza=pieza, color=color if pinta else f.color)
+        for so in self.solidos[desde_solidos:]:
+            so.pieza = pieza
+            if color and (grupos is None or so.color in grupos):
+                so.color_hex = color
 
     def visible(self, paso: int) -> bool:
         return self.op.paso >= paso
@@ -438,6 +453,7 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
     def col_m(obj, paso: int, color: str) -> str:
         return "resalte" if (res_man and id(obj) in man_ids) else k.color(paso, color)
 
+    colores_pz = geo.get("colores_paneles") or {}
     cub_ids = {"cuerpo_trasera", "acceso_izq", "acceso_der"} if geo["cubierta"] else set()
     ver_fija, ver_cub = op.vista_parte != "cubierta", op.vista_parte != "fija"
     cl = op.cubierta_abierta
@@ -457,7 +473,9 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
         o = _sum(col["o"], (0, 0, desplaz.get(grupo, 0.0)), _mul(n, -ex), (0, cl if cub else 0, 0))
         color = "resalte" if (cub and op.resaltar_cubierta) else k.color(paso_p, _GRUPO_COLOR.get(grupo, "base"))
         tp = col.get("esp", t)
+        d_c, d_s = len(k.caras), len(k.solidos)
         k.caja(o, u, vv, n, p.ancho, p.alto, tp, color, _GRUPO_CAPA.get(grupo, 30), p.nombre)
+        k.marcar(d_c, d_s, p.id, colores_pz.get(p.id, "") if color != "resalte" else "")
         sol_panel = k.solidos[-1]
         fuera = _mul(n, -1)
         if col["id"] in op.etiquetas:
@@ -622,7 +640,8 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
     e_ar, ala = geo["arista_esp"], geo["ala"]
     ed = geo["esq_descuento"]
 
-    def arista(o: Vec, a: Vec, b: Vec, c: Vec, L: float, paso: int, dy: float = 0.0) -> None:
+    def arista(o: Vec, a: Vec, b: Vec, c: Vec, L: float, paso: int, dy: float = 0.0, ala: float = ala,
+               e_ar: float = e_ar) -> None:
         if not k.visible(paso) or L < 30:
             return
         o = _sum(o, _mul(_sum(a, b), ex * 1.7), (0, dy, 0))
@@ -636,49 +655,60 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
             _remache(k, _sum(o, _mul(a, e_ar), _mul(b, -ala / 2), _mul(c, zc_)), a, b, c)
             _remache(k, _sum(o, _mul(b, e_ar), _mul(a, -ala / 2), _mul(c, zc_)), b, a, c)
 
-    def esquinero(o: Vec, a: Vec, b: Vec, c: Vec) -> None:
+    def esquinero(o: Vec, a: Vec, b: Vec, c: Vec, p_: float = geo["esq_pata"]) -> None:
         if not k.visible(P_ESQ):
             return
-        p_, e = geo["esq_pata"], 1.5
+        e = 1.5
         # va por encima de los ángulos: corrido hacia afuera el espesor del perfil en las tres caras
         o = _sum(o, _mul(_sum(a, b, c), ex * 2.4 + e_ar))
         col = k.color(P_ESQ, "herraje")
         k.caja(_sum(o, _mul(b, -p_), _mul(c, -p_)), a, b, c, e, p_, p_, col, ComponentLayer.BASE_ALU, "Esquinero")
         k.caja(_sum(o, _mul(a, -p_), _mul(c, -p_)), a, b, c, p_, e, p_, col, ComponentLayer.BASE_ALU, "Esquinero")
         k.caja(_sum(o, _mul(a, -p_), _mul(b, -p_)), a, b, c, p_, p_, e, col, ComponentLayer.BASE_ALU, "Esquinero")
-        k.esfera(o, 12, col, ComponentLayer.BASE_ALU, "Esquinero")
+        k.esfera(o, 12 * p_ / max(geo["esq_pata"], 1.0) if p_ < geo["esq_pata"] else 12, col,
+                 ComponentLayer.BASE_ALU, "Esquinero")
         for f1, f2 in ((0.35, 0.72), (0.72, 0.35)):     # dos remaches por ala
             _remache(k, _sum(o, _mul(a, e), _mul(b, -p_ * f1), _mul(c, -p_ * f2)), a, b, c)
             _remache(k, _sum(o, _mul(b, e), _mul(a, -p_ * f1), _mul(c, -p_ * f2)), b, a, c)
             _remache(k, _sum(o, _mul(c, e), _mul(a, -p_ * f1), _mul(b, -p_ * f2)), c, a, b)
 
-    if ver_fija or ver_cub:
-        for z, sz in ((0.0, -1), (Z, 1)):
-            dz = desplaz["tapa"] if z > 0 else (desplaz["tapa2"] if geo["dos_tapas"] else 0.0)
-            paso_e = paso_ar_t if (z > 0 or geo["dos_tapas"]) else paso_ar_c
-            if op.vista_parte and z > 0:
+    # cada ángulo y cada esquinero, con lo que le cambió el usuario (piezas.py)
+    giro_de = {"tapa": giros.get("tapa"), "tapa2": giros.get("tapa2"), "cuerpo": None}
+    for ar in geo.get("aristas_case") or []:
+        if ar["quitar"]:
+            continue
+        grupo, tipo = ar["grupo"], ar["tipo"]
+        dy = 0.0
+        if tipo in ("x", "y"):
+            if op.vista_parte and grupo == "tapa":
                 continue
-            k.giro = giros.get("tapa") if z > 0 else (giros.get("tapa2") if geo["dos_tapas"] else None)
-            for y0, sy in ((0.0, -1), (Y, 1)):
-                arista((ed, y0, z + dz), (0, sy, 0), (0, 0, sz), (1, 0, 0), geo["L_x"], paso_e)
-            for x0, sx in ((0.0, -1), (X, 1)):
-                arista((x0, ed, z + dz), (sx, 0, 0), (0, 0, sz), (0, 1, 0), geo["L_y"], paso_e)
-            for x0, sx in ((0.0, -1), (X, 1)):
-                for y0, sy in ((0.0, -1), (Y, 1)):
-                    esquinero((x0, y0, z + dz), (sx, 0, 0), (0, sy, 0), (0, 0, sz))
-        k.giro = None
-        for x0, sx in ((0.0, -1), (X, 1)):
-            for y0, sy in ((0.0, -1), (Y, 1)):
-                z_c = zc2 + m_alto if geo["dos_tapas"] else ed
-                if ver_fija or (y0 > 0 and ver_cub):
-                    arista((x0, y0, z_c), (sx, 0, 0), (0, sy, 0), (0, 0, 1), geo["L_zc"], paso_ar_c, cl if y0 > 0 else 0.0)
-                if not op.vista_parte:
-                    k.giro = giros.get("tapa")
-                    arista((x0, y0, zc1 + h_alto + lift), (sx, 0, 0), (0, sy, 0), (0, 0, 1), geo["L_zt"], paso_ar_t)
-                    k.giro = giros.get("tapa2")
-                    if geo["dos_tapas"]:
-                        arista((x0, y0, ed - lift), (sx, 0, 0), (0, sy, 0), (0, 0, 1), geo["L_zt2"], paso_ar_t)
-                    k.giro = None
+            paso = paso_ar_c if grupo == "cuerpo" else paso_ar_t
+        elif tipo == "zc":
+            fondo = ar["o"][1] > 0
+            if not (ver_fija or (fondo and ver_cub)):
+                continue
+            paso, dy = paso_ar_c, (cl if fondo else 0.0)
+        else:
+            if op.vista_parte:
+                continue
+            paso = paso_ar_t
+        o = _sum(ar["o"], (0, 0, desplaz.get(grupo, 0.0) if tipo != "zc" else 0.0))
+        k.giro = giro_de.get(grupo)
+        d_c, d_s = len(k.caras), len(k.solidos)
+        arista(o, ar["a"], ar["b"], ar["c"], ar["L"], paso, dy, ar["ala"], ar["esp"])
+        k.marcar(d_c, d_s, ar["id"], ar["color"] if k.color(paso, "aluminio") != "resalte" else "", ("aluminio",))
+    for es in geo.get("esquineros_case") or []:
+        if es["quitar"]:
+            continue
+        grupo = es["grupo"]
+        if op.vista_parte and grupo == "tapa":
+            continue
+        k.giro = giro_de.get(grupo)
+        o = _sum(es["o"], (0, 0, desplaz.get(grupo, 0.0)))
+        d_c, d_s = len(k.caras), len(k.solidos)
+        esquinero(o, es["a"], es["b"], es["c"], es["pata"])
+        k.marcar(d_c, d_s, es["id"], es["color"] if k.color(P_ESQ, "herraje") != "resalte" else "", ("herraje",))
+    k.giro = None
 
     # Juntas de las tapas de acceso laterales (juntas_acceso)
     if geo["acceso"] and k.visible(P_CUERPO):

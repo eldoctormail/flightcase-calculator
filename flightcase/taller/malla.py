@@ -49,6 +49,8 @@ class PolygonFace3D:
     is_endgrain: bool = False
     layer_order: int = ComponentLayer.BASE_FLOOR
     wall_index: Optional[int] = None
+    pieza: str = ""      # id de la pieza que se puede elegir con un clic (piezas.py); vacío = ninguna
+    color: str = ""      # "#rrggbb" que pidió el usuario para esa pieza (vacío = el de su grupo)
     contorno: bool = True   # False: triángulos de un modelo 3D, sin dibujar sus bordes
 
     @property

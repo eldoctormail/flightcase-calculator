@@ -70,10 +70,12 @@ def malla_formas(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla
         tp = col.get("esp", geo["espesor"])
         c_ = color(paso, "lid" if col["grupo"] == "tapa" else "base")
         capa = ComponentLayer.LID_WALLS if col["grupo"] == "tapa" else ComponentLayer.OUTER_BASE_WALLS
+        d_c, d_s = len(k.caras), len(k.solidos)
         if col.get("contorno"):
             k.prisma(o, u, vv, n, col["contorno"], tp, c_, capa, p.nombre)
         else:
             k.caja(o, u, vv, n, p.ancho, col.get("alto_3d", p.alto), tp, c_, capa, p.nombre)
+        k.marcar(d_c, d_s, p.id, (geo.get("colores_paneles") or {}).get(p.id, "") if c_ != "resalte" else "")
         sol = k.solidos[-1]
         fuera = _mul(n, -1)
         if col["id"] in op.etiquetas:
