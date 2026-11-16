@@ -9,6 +9,9 @@ Claves especiales de un estilo (empiezan con "_", no son parámetros del .scad):
 - ``_base_ruedas: "auto"``: base de ruedas bajo el cuerpo, 10 mm más chica que el piso.
 - ``_mitades: true``: reparte el alto interior total en cuerpo y tapa iguales.
 - ``_acceso: fracción``: tapa de acceso lateral de esa fracción del alto del case.
+- ``_tapa_baja: mm``: la tapa queda de ese alto interior y el resto pasa al cuerpo (el total no cambia).
+- ``_cajones: mm``: llena el alto interior con cajones (bandejas con correderas) de ese paso,
+  si el proyecto todavía no tiene cajones.
 """
 
 from __future__ import annotations
@@ -121,6 +124,15 @@ def aplicar(params: Dict[str, Any], estilo: Estilo, defectos: Dict[str, Any]) ->
         total = float(nuevo["int_alto_cuerpo"]) + float(nuevo["int_alto_tapa"])
         mitad = round(total / 2)
         nuevo["int_alto_cuerpo"], nuevo["int_alto_tapa"] = mitad, total - mitad
+    baja = estilo.params.get("_tapa_baja")
+    if baja:
+        total = float(nuevo["int_alto_cuerpo"]) + float(nuevo["int_alto_tapa"])
+        tapa = min(float(baja), total / 3)
+        nuevo["int_alto_cuerpo"], nuevo["int_alto_tapa"] = round(total - tapa), round(tapa)
+    paso = estilo.params.get("_cajones")
+    if paso and not nuevo.get("cajones"):
+        n = max(1, int(_alto_case(nuevo) // float(paso)))
+        nuevo["cajones"] = [[float(paso) - 4, i * float(paso)] for i in range(n)]
     frac = estilo.params.get("_acceso")
     if frac:
         nuevo["acceso_lateral"] = round(float(frac) * _alto_case(nuevo))

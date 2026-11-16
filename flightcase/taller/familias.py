@@ -22,26 +22,37 @@ CAMARA = "0,0,0,62,0,30,0"
 NEGRO = {"base": "#26282d", "wall": "#26282d", "lid": "#26282d"}   # como la placa negra de la mayoría
 
 FAMILIAS = (
-    ("baules", "Baúles", "Cases de gira con tapa suelta o abisagrada, sobre ruedas, con base de ruedas o plegables.",
-     ("baul_tapa_suelta", "baul_bisagras", "baul_base_ruedas", "baul_plegable")),
-    ("mano", "Cases de mano", "Cases chicos para llevar a mano: con pies, bisagra de piano o perfil híbrido liviano.",
-     ("case_mano_pies", "tapa_piano", "hibrido_liviano")),
-    ("dos_tapas", "Dos mitades y dos tapas", "Se abren como un libro o tienen una tapa en cada extremo, "
-     "parados o acostados.", ("clamshell", "dos_tapas_vertical", "acostado_dos_tapas")),
-    ("racks", "Racks 19\"", "Racks parados medidos en unidades: tapa adelante, adelante y atrás, puertas o "
-     "funda abierta.", ("rack_una_tapa", "rack_dos_tapas", "rack_puertas", "funda_rack")),
-    ("racks_especiales", "Racks especiales", "Racks con tapas de acceso a los costados, cubierta que sale entera "
-     "o cuerpo inclinado para consola.", ("rack_acceso_paneles", "rack_cubierta", "rack_inclinado")),
+    ("estandar", "Estándar", "Baúles de gira con tapa suelta, baja, 50/50 o abisagrada, plegables y cases de mano.",
+     ("baul_tapa_suelta", "baul_tapa_baja", "baul_50_50", "baul_bisagras", "baul_base_ruedas", "baul_plegable",
+      "case_mano_pies", "tapa_piano", "hibrido_liviano")),
+    ("broadcast", "Broadcast", "Cases de producción parados, con rieles de rack y acceso por arriba a los cables.",
+     ("broadcast_produccion", "broadcast_trasera_cerrada", "broadcast_trasera_cerrada_2")),
+    ("clamshell", "Clamshell", "Dos mitades que se abren como un libro, hacia arriba o hacia los costados, "
+     "o una tapa en cada extremo.", ("clamshell", "clamshell_izq_der", "dos_tapas_vertical", "acostado_dos_tapas")),
+    ("frontal", "Apertura frontal", "Cases parados que se abren de frente: tapa adelante, puertas o bandejas.",
+     ("apertura_frontal", "bandejas_euro")),
+    ("racks", "Racks", "Racks 19\" medidos en unidades: tapa adelante, adelante y atrás, puertas, tapas de acceso, "
+     "cubierta, inclinado para consola o funda abierta.",
+     ("rack_una_tapa", "rack_dos_tapas", "rack_puertas", "rack_acceso_paneles", "rack_cubierta", "rack_inclinado",
+      "funda_rack")),
+    ("slam", "Tapas slam", "Tapas que cierran solas al bajarlas, con cierres slam embutidos.", ()),
+    ("especiales", "Especiales", "Armados para un uso puntual.", ()),
 )
 
 # Nombre corto de cada estilo en los chips de su familia (sin repetir lo que ya dice la familia)
 CORTOS = {
-    "baul_tapa_suelta": "Tapa suelta", "baul_bisagras": "Tapa abisagrada", "baul_base_ruedas": "Base de ruedas",
-    "baul_plegable": "Plegable", "case_mano_pies": "Con pies", "tapa_piano": "Bisagra de piano",
-    "hibrido_liviano": "Perfil híbrido", "clamshell": "Clamshell", "dos_tapas_vertical": "Tapa arriba y abajo",
-    "acostado_dos_tapas": "Acostado, tapas a los lados", "rack_una_tapa": "Tapa adelante",
-    "rack_dos_tapas": "Adelante y atrás", "rack_puertas": "Con puertas", "funda_rack": "Funda (sleeve)",
-    "rack_acceso_paneles": "Tapas de acceso", "rack_cubierta": "Cubierta entera", "rack_inclinado": "Inclinado",
+    "baul_tapa_suelta": "Baúl", "baul_tapa_baja": "Tapa baja", "baul_50_50": "50/50",
+    "baul_bisagras": "Tapa abisagrada", "baul_base_ruedas": "Base de ruedas",
+    "baul_plegable": "Plegable", "case_mano_pies": "De mano con pies", "tapa_piano": "Bisagra de piano",
+    "hibrido_liviano": "Perfil híbrido",
+    "broadcast_produccion": "De producción", "broadcast_trasera_cerrada": "Trasera cerrada",
+    "broadcast_trasera_cerrada_2": "Trasera cerrada 2",
+    "clamshell": "Clamshell", "clamshell_izq_der": "Izquierda/derecha", "dos_tapas_vertical": "Tapa arriba y abajo",
+    "acostado_dos_tapas": "Acostado, tapas a los lados",
+    "apertura_frontal": "Tapa adelante", "bandejas_euro": "Bandejas euro",
+    "rack_una_tapa": "Tapa adelante", "rack_dos_tapas": "Adelante y atrás", "rack_puertas": "Con puertas",
+    "funda_rack": "Funda (sleeve)", "rack_acceso_paneles": "Tapas de acceso", "rack_cubierta": "Cubierta entera",
+    "rack_inclinado": "Para mezcladora",
 }
 
 

@@ -37,7 +37,7 @@ def test_cada_estilo_calcula_sin_errores(estilo, medidas):
     res = calcular(q)
     assert res.paneles
     assert q["orientacion"] == estilo.params["orientacion"]
-    if not estilo.params.get("_mitades"):   # las medidas no cambian
+    if not (estilo.params.get("_mitades") or estilo.params.get("_tapa_baja")):   # las medidas no cambian
         for k, v in medidas.items():
             assert q[k] == v
 
@@ -160,3 +160,14 @@ def test_accesorios_extra_en_tabla(widget):
     ed.tabla.setItem(1, 0, QTableWidgetItem("08-3476031"))   # sin cantidad: va 1
     widget.recalcular()
     assert widget.params["extras"] == [["08-5740A", 4], ["08-3476031", 1]]
+
+
+def test_tapa_baja_y_bandejas_euro():
+    por_id = {e.id: e for e in estilos.estilos_incluidos()}
+    p = dict(D, int_alto_cuerpo=500, int_alto_tapa=100)
+    q = estilos.aplicar(p, por_id["baul_tapa_baja"], D)
+    assert (q["int_alto_cuerpo"], q["int_alto_tapa"]) == (550, 50)        # el total no cambia
+    p = dict(D, int_prof=700, cajones=[])
+    q = estilos.aplicar(p, por_id["bandejas_euro"], D)
+    assert q["cajones"] == [[116.0, 0.0], [116.0, 120.0], [116.0, 240.0], [116.0, 360.0], [116.0, 480.0]]
+    assert estilos.aplicar(dict(p, cajones=[[200, 0]]), por_id["bandejas_euro"], D)["cajones"] == [[200, 0]]

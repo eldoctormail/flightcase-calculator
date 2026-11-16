@@ -116,5 +116,53 @@
   "nombre": "Case liviano con perfil híbrido",
   "descripcion": "Armado con perfil híbrido en lugar de ángulo: más liviano y prolijo, para cases chicos y medianos que se llevan a mano.",
   "params": {"orientacion": "vertical", "tapas": 1, "sistema": "hibrido", "ruedas": 0, "pies": 4}
+ },
+ {
+  "id": "baul_tapa_baja",
+  "nombre": "Baúl con tapa baja",
+  "descripcion": "Baúl de gira con la tapa suelta y baja (50 mm por dentro): casi todo el alto queda en el cuerpo y el equipo se saca por arriba. Ruedas abajo y platos de apilado en el techo.",
+  "params": {"orientacion": "vertical", "tapas": 1, "ruedas": 4, "encastres": true, "_tapa_baja": 50}
+ },
+ {
+  "id": "baul_50_50",
+  "nombre": "Baúl 50/50",
+  "descripcion": "Baúl de gira partido por la mitad: la tapa suelta tiene el mismo alto que el cuerpo, así el equipo queda a la vista al sacarla. Ruedas abajo y platos de apilado en el techo.",
+  "params": {"orientacion": "vertical", "tapas": 1, "ruedas": 4, "encastres": true, "refuerzos": 1, "_mitades": true}
+ },
+ {
+  "id": "broadcast_produccion",
+  "nombre": "Broadcast de producción",
+  "descripcion": "Case de producción parado: tapa adelante y atrás, rieles de rack adelante y atrás, y una tapa removible arriba de cada costado para llegar a los cables. Base de ruedas.",
+  "params": {"orientacion": "frontal", "tapas": 2, "paredes_enteras": "laterales", "paredes_enteras_cuerpo": "frente", "extremos_cubren": true, "_acceso": 0.31, "acceso_cierres_n": 2, "acceso_tipo": "paneles", "rack_traseros": true, "manijas_n": 2, "manija_pos": 0.55, "cierres_frente_n": 1, "cierres_lateral_n": 2, "refuerzos": 1, "ruedas": 4, "_base_ruedas": "auto"}
+ },
+ {
+  "id": "broadcast_trasera_cerrada",
+  "nombre": "Broadcast con trasera cerrada",
+  "descripcion": "Case de producción parado con tapa sólo adelante: la trasera queda fija y el techo con los dos costados de arriba forman una cubierta en U que sale entera para llegar a los equipos y los cables. Base de ruedas.",
+  "params": {"orientacion": "frontal", "tapas": 1, "paredes_enteras": "laterales", "extremos_cubren": true, "_acceso": 0.31, "acceso_cierres_n": 2, "acceso_tipo": "cubierta", "manijas_n": 2, "manija_pos": 0.45, "refuerzos": 1, "ruedas": 4, "_base_ruedas": "auto"}
+ },
+ {
+  "id": "broadcast_trasera_cerrada_2",
+  "nombre": "Broadcast con trasera cerrada 2",
+  "descripcion": "Como el de trasera cerrada, pero en lugar de la cubierta tiene una tapa de acceso suelta arriba de cada costado y el techo queda fijo. Base de ruedas.",
+  "params": {"orientacion": "frontal", "tapas": 1, "paredes_enteras": "laterales", "extremos_cubren": true, "_acceso": 0.31, "acceso_cierres_n": 2, "acceso_tipo": "paneles", "manijas_n": 2, "manija_pos": 0.45, "refuerzos": 1, "ruedas": 4, "_base_ruedas": "auto"}
+ },
+ {
+  "id": "clamshell_izq_der",
+  "nombre": "Clamshell izquierda/derecha",
+  "descripcion": "Case de dos mitades iguales que se abre hacia los costados: la junta es vertical y las bisagras van en un lateral. Apoyado sobre pies.",
+  "params": {"orientacion": "horizontal", "tapas": 1, "bisagras": 3, "topes": 1, "ruedas": 0, "pies": 4, "_mitades": true}
+ },
+ {
+  "id": "apertura_frontal",
+  "nombre": "Apertura frontal",
+  "descripcion": "Case parado con la tapa adelante, sin rieles de rack: para equipos o cajas que se sacan de frente. Ruedas abajo.",
+  "params": {"orientacion": "frontal", "tapas": 1, "extremos_cubren": true, "ruedas": 4, "refuerzos": 1}
+ },
+ {
+  "id": "bandejas_euro",
+  "nombre": "Case con bandejas euro",
+  "descripcion": "Case parado con la tapa adelante y bandejas que salen de frente sobre correderas, una cada 120 mm de alto (para cajas euro de 600 x 400 o repuestos). Ruedas abajo.",
+  "params": {"orientacion": "frontal", "tapas": 1, "extremos_cubren": true, "ruedas": 4, "refuerzos": 1, "_cajones": 120}
  }
 ]
