@@ -7,7 +7,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QBrush, QColor
+from PySide6.QtGui import QBrush, QColor, QImage, QPainter
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -841,6 +841,7 @@ class TallerWidget(QWidget):
         self.barra_tapas = QHBoxLayout()            # Abrir/Ocultar de cada tapa, a mano sobre la vista
         self.barra_tapas.setSpacing(2)
         self.barra_3d.layout().addLayout(self.barra_tapas)
+        self._boton_foto()
         l3d.addWidget(self.barra_3d)
         l3d.addWidget(self.vista_3d, 1)
         self.barra_datos = QFrame()
@@ -1902,6 +1903,111 @@ class TallerWidget(QWidget):
         if self.isVisible():
             QMessageBox.information(self, "Exportar planos", f"Se guardaron los planos en:\n{ruta}")
         return ruta
+
+    # --- Foto de la vista 3D y hoja del case ---
+
+    def _boton_foto(self) -> None:
+        from PySide6.QtWidgets import QMenu, QToolButton
+        from .barra_3d import LADO, _icono
+        b = QToolButton(self.barra_3d)
+        b.setIcon(_icono("camera"))
+        b.setIconSize(QSize(LADO, LADO))
+        b.setAutoRaise(True)
+        b.setToolTip("Foto de la vista 3D: copiarla, guardarla como PNG sin fondo o sacar la hoja del case en PDF")
+        b.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        menu = QMenu(b)
+        menu.addAction("Copiar imagen", self.copiar_imagen_3d)
+        menu.addAction("Guardar imagen PNG (sin fondo)...", lambda: self.guardar_imagen_3d())
+        menu.addSeparator()
+        menu.addAction("Hoja del case (PDF): vista 3D y cada lado...", lambda: self.exportar_hoja())
+        b.setMenu(menu)
+        self.barra_3d.botones["foto"] = b
+        fila = self.barra_3d.layout()
+        fila.insertWidget(fila.count() - 2, b)     # antes del estirador y de los botones de las tapas
+
+    def _nombre_case(self) -> str:
+        return os.path.splitext(os.path.basename(self.ruta))[0] if self.ruta else "case"
+
+    def imagen_3d(self, transparente: bool = True):
+        """La vista 3D tal como se ve, sin fondo ni ayudas (QImage)."""
+        return self.vista_3d.capturar(transparente)
+
+    def copiar_imagen_3d(self) -> bool:
+        """Copia la vista 3D al portapapeles: como PNG transparente (Word, PowerPoint, Keynote, GIMP)
+        y como imagen sobre blanco para los programas que no entienden la transparencia."""
+        from PySide6.QtCore import QBuffer, QByteArray, QIODevice, QMimeData
+        img = self.imagen_3d(True)
+        if img.isNull():
+            return False
+        datos = QByteArray()
+        buf = QBuffer(datos)
+        buf.open(QIODevice.OpenModeFlag.WriteOnly)
+        img.save(buf, "PNG")
+        buf.close()
+        fondo = QImage(img.size(), QImage.Format.Format_RGB32)
+        fondo.fill(QColor("#ffffff"))
+        p = QPainter(fondo)
+        p.drawImage(0, 0, img)
+        p.end()
+        mime = QMimeData()
+        mime.setData("image/png", datos)
+        mime.setImageData(fondo)
+        QApplication.clipboard().setMimeData(mime)
+        self._avisar_estado("Vista 3D copiada: pegala en otro programa con Ctrl+V")
+        return True
+
+    def guardar_imagen_3d(self, ruta: Optional[str] = None) -> Optional[str]:
+        """Guarda la vista 3D como PNG con fondo transparente."""
+        img = self.imagen_3d(True)
+        if img.isNull():
+            QMessageBox.warning(self, "Guardar imagen", "No hay nada en la vista 3D para guardar.")
+            return None
+        if not ruta:
+            ruta, _ = QFileDialog.getSaveFileName(self, "Guardar la vista 3D", f"{self._nombre_case()}.png",
+                                                  "Imagen PNG (*.png)")
+            if not ruta:
+                return None
+            if not ruta.lower().endswith(".png"):
+                ruta += ".png"
+        if not img.save(ruta, "PNG"):
+            QMessageBox.critical(self, "Guardar imagen", f"No se pudo guardar la imagen en:\n{ruta}")
+            return None
+        self._avisar_estado(f"Imagen guardada en {ruta}")
+        return ruta
+
+    def exportar_hoja(self, ruta: Optional[str] = None) -> Optional[str]:
+        """Una hoja A4 en PDF con la vista 3D (como se ve ahora) y las seis vistas de los lados acotadas."""
+        from ...taller.hoja import generar_hoja
+        if self.resultado is None:
+            return None
+        nombre = self._nombre_case()
+        if not ruta:
+            ruta, _ = QFileDialog.getSaveFileName(self, "Hoja del case", f"Hoja - {nombre}.pdf", "PDF (*.pdf)")
+            if not ruta:
+                return None
+            if not ruta.lower().endswith(".pdf"):
+                ruta += ".pdf"
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            generar_hoja(self.resultado, ruta, nombre, self.imagen_3d(True),
+                         self.vista_3d.colores_placa or None)
+        except Exception as e:
+            QApplication.restoreOverrideCursor()
+            QMessageBox.critical(self, "Hoja del case", f"No se pudo generar la hoja:\n{e}")
+            return None
+        QApplication.restoreOverrideCursor()
+        if self.isVisible():
+            QMessageBox.information(self, "Hoja del case", f"Se guardó la hoja en:\n{ruta}")
+        return ruta
+
+    def _avisar_estado(self, texto: str) -> None:
+        """Aviso corto junto al botón de la cámara (la ventana no tiene barra de estado)."""
+        from PySide6.QtCore import QPoint
+        from PySide6.QtWidgets import QToolTip
+        self.ultimo_aviso = texto
+        b = self.barra_3d.botones.get("foto")
+        if b is not None and b.isVisible():
+            QToolTip.showText(b.mapToGlobal(QPoint(0, b.height())), texto, b, b.rect(), 3000)
 
     def exportar_step(self, ruta: Optional[str] = None):
         """Modelo 3D del case armado (.step) para abrir en Fusion, SolidWorks o FreeCAD."""
