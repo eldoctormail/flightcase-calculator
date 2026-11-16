@@ -188,7 +188,7 @@ class FlightCaseMainWindow(QMainWindow):
         if respuesta == "descartar":
             recuperacion.borrar(r.id)
             return False
-        if respuesta != "recuperar" or not self.taller_widget.puede_seguir("Recuperar case", "recuperar el otro"):
+        if respuesta != "recuperar" or not self.taller_widget.confirmar_cambios("Recuperar case", "recuperar el otro"):
             return False
         try:
             self.taller_widget.cargar_con_cambios(r.scad, r.ruta, r.carpeta_case)
@@ -294,6 +294,23 @@ class FlightCaseMainWindow(QMainWindow):
         self.help_menu = barra.addMenu("A&yuda")
         a = self._accion(self.help_menu, f"&Acerca de {TITULO}...", None, self.acerca_de, "Autor y versión")
         a.setMenuRole(QAction.MenuRole.AboutRole)     # en Mac va al menú de la app
+        from .actualizador import Actualizador
+        self.actualizador = Actualizador(
+            self, _settings, self._confirmar_para_actualizar)
+        a = self._accion(self.help_menu, "&Buscar actualizaciones...", None, lambda: self.actualizador.buscar(),
+                         "Ver si hay una versión nueva en GitHub e instalarla")
+        a.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)   # en Mac, en el menú de la app
+        self.accion_buscar_al_abrir = a = QAction("Buscar actualizaciones al &abrir", self, checkable=True)
+        a.setChecked(self.actualizador.buscar_al_abrir)
+        a.toggled.connect(lambda v: setattr(self.actualizador, "buscar_al_abrir", v))
+        self.help_menu.addAction(a)
+
+    def _confirmar_para_actualizar(self) -> bool:
+        """Antes de cerrar para instalar una versión nueva (si ya se respondió, al cerrar no se vuelve a preguntar)."""
+        self._ya_confirmado = self.taller_widget.confirmar_cambios("Actualizar", "cerrar para actualizar")
+        if self._ya_confirmado:     # vale solo para el cierre que sigue enseguida (si la instalación falla, no)
+            QTimer.singleShot(0, lambda: setattr(self, "_ya_confirmado", False))
+        return self._ya_confirmado
 
     def _actualizar_historial(self) -> None:
         t = self.taller_widget
@@ -471,7 +488,7 @@ class FlightCaseMainWindow(QMainWindow):
                 pass
 
     def closeEvent(self, event: QCloseEvent) -> None:
-        if not self.taller_widget.puede_seguir("Salir", "salir"):
+        if not getattr(self, "_ya_confirmado", False) and not self.taller_widget.confirmar_cambios("Salir", "salir"):
             event.ignore()
             return
         QApplication.instance().removeEventFilter(self)
@@ -525,4 +542,8 @@ def run_app() -> int:
     app.installEventFilter(file_filter)
     window.show()
     QTimer.singleShot(300, window.ofrecer_recuperacion)    # si la última vez se cerró de golpe
+
+    from ..actualizaciones import es_app_instalada
+    if es_app_instalada() and window.actualizador.buscar_al_abrir:   # desde el código no: la versión es otra
+        QTimer.singleShot(3000, lambda: window.actualizador.buscar(silencioso=True))
     return app.exec()

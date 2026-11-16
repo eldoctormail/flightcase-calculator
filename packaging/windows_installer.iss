@@ -44,3 +44,11 @@ Root: HKA; Subkey: "Software\Classes\FlightcaseCalculator.Scad\shell\open\comman
 
 [Run]
 Filename: "{app}\{#AppName}.exe"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+; Actualización desde la app (/SILENT /RELANZAR=1): al terminar la vuelve a abrir
+Filename: "{app}\{#AppName}.exe"; Flags: nowait runasoriginaluser; Check: Relanzar
+
+[Code]
+function Relanzar: Boolean;
+begin
+  Result := ExpandConstant('{param:RELANZAR|0}') = '1';
+end;

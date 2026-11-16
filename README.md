@@ -48,6 +48,17 @@ Los instaladores se generan solos en GitHub (*Actions → Instaladores*). Para p
 - **Windows**: `LBDFlightcaseMaker-X.Y.Z-Windows-Instalador.exe`. Si aparece «Windows protegió su PC», tocá *Más información → Ejecutar de todas formas* (el instalador todavía no está firmado).
 - **Mac**: `…-macOS-AppleSilicon.dmg` (M1 o más nuevo) o `…-macOS-Intel.dmg`. Arrastrá la app a Aplicaciones. La primera vez, clic derecho sobre la app → *Abrir* (todavía no está firmada por Apple).
 
+#### Actualizaciones
+
+La app instalada se fija sola en *Releases* al abrirse (unos segundos después, sin trabar nada) y, si hay una versión nueva, la ofrece con sus novedades: **Actualizar ahora**, **Más tarde** u **Omitir esta versión**. También está en **Ayuda → Buscar actualizaciones…** (en Mac, en el menú de la app), y ahí se puede apagar **Buscar actualizaciones al abrir**. Sin internet no avisa nada.
+
+«Actualizar ahora» baja el instalador que corresponde a la computadora, pregunta si guardar el case si tiene cambios, cierra la app, instala la versión nueva y la vuelve a abrir:
+
+- **Windows**: corre el instalador en silencio (se ve solo la barra de progreso). Windows pide permiso de administrador porque la app está en *Archivos de programa*; si se le dice que no, vuelve a abrir la versión de antes. Como el archivo lo baja la propia app, no aparece el aviso de SmartScreen.
+- **Mac**: reemplaza la app en la carpeta donde está y la abre. Hace falta usarla desde *Aplicaciones*: si se abrió desde el `.dmg` o desde Descargas, abre el `.dmg` nuevo para arrastrarla a mano. Lo que baja la app no queda en cuarentena, así que Gatekeeper no vuelve a pedir el clic derecho → *Abrir*.
+
+Al correr desde el código no se busca sola (la versión es la de `pyproject.toml`); desde el menú ofrece abrir la página de la versión.
+
 Los estilos de case propios se guardan en tu carpeta de usuario (`%APPDATA%\FlightcaseCalculator` en Windows, `~/Library/Application Support/FlightcaseCalculator` en Mac), así que no se pierden al actualizar.
 
 ### 1. Instalación para desarrollo

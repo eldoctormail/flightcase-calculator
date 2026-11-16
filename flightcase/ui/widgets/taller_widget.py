@@ -1111,8 +1111,8 @@ class TallerWidget(QWidget):
         self._leer_editores()
         return self._foto() != getattr(self, "_foto_guardada", None)
 
-    def puede_seguir(self, titulo: str, antes_de: str) -> bool:
-        """Si hay cambios sin guardar, pregunta si guardarlos. False si el usuario canceló."""
+    def confirmar_cambios(self, titulo: str, antes_de: str) -> bool:
+        """Si hay cambios sin guardar pregunta Guardar/Descartar/Cancelar. False = canceló."""
         if not self.hay_cambios():
             return True
         r = QMessageBox.question(
@@ -1128,7 +1128,7 @@ class TallerWidget(QWidget):
 
     def nuevo(self, preguntar: bool = True) -> bool:
         """Empieza un case con las medidas por defecto; si hay cambios sin guardar, pregunta antes."""
-        if preguntar and not self.puede_seguir("Case nuevo", "empezar uno nuevo"):
+        if preguntar and not self.confirmar_cambios("Case nuevo", "empezar uno nuevo"):
             return False
         self.set_params({})
         self.case_nuevo.emit()
@@ -1144,7 +1144,7 @@ class TallerWidget(QWidget):
                                                   "Proyecto OpenSCAD (*.scad)")
         if not ruta:
             return False
-        if preguntar and not self._es_el_abierto(ruta) and not self.puede_seguir("Abrir case", "abrir otro"):
+        if preguntar and not self._es_el_abierto(ruta) and not self.confirmar_cambios("Abrir case", "abrir otro"):
             return False
         try:
             self.set_params(leer_proyecto(ruta), ruta)
