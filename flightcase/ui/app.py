@@ -6,17 +6,24 @@ import os
 import sys
 from typing import List, Optional
 
-from PySide6.QtCore import QEvent, QObject, QSettings, Qt
-from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence, QSurfaceFormat
-from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMenu, QMessageBox, QStatusBar, QWidget
+from datetime import datetime
+
+from PySide6.QtCore import QEvent, QLockFile, QObject, QSettings, Qt, QTimer
+from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QIcon, QKeySequence, QSurfaceFormat
+from PySide6.QtWidgets import (QApplication, QFileDialog, QLabel, QMainWindow, QMenu, QMessageBox,
+                               QStatusBar, QWidget)
 
 from ..paths import bundled_resource
+from ..taller import recuperacion
 from ..taller.scad import leer_proyecto
 from .theme import DARK_THEME_QSS
 from .widgets import TallerWidget
 
 TITULO = "LBD Flightcase Maker"
 MAX_RECIENTES = 8
+AUTOGUARDADO_MINUTOS = (1, 3, 5, 10)
+AUTOGUARDADO_POR_DEFECTO = 3
+RECUPERACION_SEGUNDOS = 30          # cada cuánto se copia el case con cambios sin guardar
 
 
 def _settings() -> QSettings:
@@ -38,11 +45,187 @@ class FlightCaseMainWindow(QMainWindow):
         self.taller_widget.resultado_cambiado.connect(self._estado_taller)
         self.taller_widget.ruta_cambiada.connect(self._ruta_cambiada)
         self.taller_widget.proyectos_pedidos.connect(self.proyectos)
+        self.taller_widget.case_nuevo.connect(self._case_nuevo_creado)
+        self.taller_widget.guardado.connect(self._guardado)
+        self.lbl_autoguardado = QLabel()
+        self.lbl_autoguardado.setStyleSheet("color:#8a93a3; padding-right:6px")
+        self.status_bar.addPermanentWidget(self.lbl_autoguardado)
+        self._init_recuperacion()
         self._init_menus()
         QApplication.instance().installEventFilter(self)
         if restore_settings:
             self._restore_settings(load_last_project)
         self._actualizar()
+
+    # ------------------------------------------------- autoguardado/recuperación
+    def _init_recuperacion(self) -> None:
+        """Esta ventana tiene su copia de recuperación, marcada como «en uso» con un QLockFile
+        (si la app se cuelga, el lock queda huérfano y al arrancar se ofrece recuperarla)."""
+        self.sesion = recuperacion.Sesion()
+        self._lock: Optional[QLockFile] = None
+        try:
+            recuperacion.carpeta().mkdir(parents=True, exist_ok=True)
+            lock = QLockFile(self.sesion.lock)
+            lock.setStaleLockTime(0)
+            if lock.tryLock(0):
+                self._lock = lock
+        except OSError:
+            pass
+        self._foto_recuperacion: Optional[str] = None
+        self._timer_recuperacion = QTimer(self)
+        self._timer_recuperacion.setInterval(RECUPERACION_SEGUNDOS * 1000)
+        self._timer_recuperacion.timeout.connect(self.copiar_para_recuperar)
+        self._timer_recuperacion.start()
+        self._timer_autoguardado = QTimer(self)
+        self._timer_autoguardado.timeout.connect(self.autoguardar)
+        self._programar_autoguardado()
+
+    def minutos_autoguardado(self) -> int:
+        v = _settings().value("autoguardadoMinutos", AUTOGUARDADO_POR_DEFECTO)
+        try:
+            return max(0, int(v))
+        except (TypeError, ValueError):
+            return AUTOGUARDADO_POR_DEFECTO
+
+    def poner_autoguardado(self, minutos: int) -> None:
+        _settings().setValue("autoguardadoMinutos", int(minutos))
+        self._programar_autoguardado()
+        for a in getattr(self, "_acciones_autoguardado", {}).values():
+            a.setChecked(a.data() == int(minutos))
+
+    def _programar_autoguardado(self) -> None:
+        m = self.minutos_autoguardado()
+        if m:
+            self._timer_autoguardado.start(m * 60_000)
+        else:
+            self._timer_autoguardado.stop()
+        self._mostrar_autoguardado()
+
+    def _mostrar_autoguardado(self, cuando: Optional[datetime] = None) -> None:
+        m = self.minutos_autoguardado()
+        if cuando is not None:
+            self.lbl_autoguardado.setText(f"Guardado automáticamente a las {cuando:%H:%M}")
+        elif not m:
+            self.lbl_autoguardado.setText("Autoguardado desactivado")
+        elif not self.taller_widget.ruta:
+            self.lbl_autoguardado.setText("Sin guardar: el autoguardado empieza cuando le pongas nombre (Ctrl+S)")
+        else:
+            self.lbl_autoguardado.setText(f"Autoguardado cada {m} min")
+
+    def _ocupado(self) -> bool:
+        """Con un diálogo abierto (asistente, Mis cases, guardar...) no se autoguarda."""
+        return QApplication.activeModalWidget() is not None or QApplication.activePopupWidget() is not None
+
+    def autoguardar(self) -> bool:
+        """Guarda el case en su archivo si tiene cambios. Los nuevos sin nombre no: esos van
+        solo a la copia de recuperación."""
+        t = self.taller_widget
+        if not t.ruta or self._ocupado() or not t.hay_cambios():
+            return False
+        if t.guardar(t.ruta, automatico=True):
+            return True
+        self.lbl_autoguardado.setText("⚠ No se pudo autoguardar (¿el archivo está abierto en otro programa?)")
+        return False
+
+    def copiar_para_recuperar(self) -> bool:
+        """Copia el case con los cambios sin guardar a la carpeta de recuperación."""
+        t = self.taller_widget
+        if not t.hay_cambios():
+            if self._foto_recuperacion is not None:
+                self.sesion.borrar()
+                self._foto_recuperacion = None
+            return False
+        foto = t._foto()
+        if foto == self._foto_recuperacion:
+            return False
+        if self.sesion.escribir(t.texto_proyecto(), t.ruta, t.params.get("_carpeta", "")):
+            self._foto_recuperacion = foto
+            return True
+        return False
+
+    def _guardado(self, automatico: bool) -> None:
+        self.sesion.borrar()            # ya está en el archivo
+        self._foto_recuperacion = None
+        self._mostrar_autoguardado(datetime.now() if automatico else None)
+
+    @staticmethod
+    def _sigue_abierta(lock: str) -> bool:
+        """True si otra ventana de la app tiene tomado ese lock (si el proceso murió, queda libre)."""
+        if not os.path.exists(lock):
+            return False
+        lf = QLockFile(lock)
+        lf.setStaleLockTime(0)
+        if lf.tryLock(0):
+            lf.unlock()                 # también borra el archivo del lock
+            return False
+        return True
+
+    def pendientes_de_recuperar(self) -> List[recuperacion.Recuperable]:
+        return recuperacion.pendientes(self._sigue_abierta, propia=self.sesion.id)
+
+    def _preguntar_recuperar(self, r: recuperacion.Recuperable, quedan: int) -> str:
+        """'recuperar', 'descartar' o 'despues'."""
+        caja = QMessageBox(QMessageBox.Icon.Warning, "Recuperar case",
+                           "La última vez la app se cerró sin guardar los cambios de "
+                           f"«{r.nombre}».\nHay una copia de {r.fecha:%d/%m/%Y a las %H:%M}.", parent=self)
+        caja.setInformativeText("Recuperar la pone en la ventana como cambios sin guardar: revisala y guardala."
+                                + (f"\n(Hay {quedan} copia{'s' if quedan != 1 else ''} más para después.)" if quedan else ""))
+        b_rec = caja.addButton("Recuperar", QMessageBox.ButtonRole.AcceptRole)
+        b_desc = caja.addButton("Descartar", QMessageBox.ButtonRole.DestructiveRole)
+        caja.addButton("Después", QMessageBox.ButtonRole.RejectRole)
+        caja.setDefaultButton(b_rec)
+        caja.exec()
+        return {b_rec: "recuperar", b_desc: "descartar"}.get(caja.clickedButton(), "despues")
+
+    def ofrecer_recuperacion(self) -> bool:
+        """Al arrancar: si quedó una copia de un cierre inesperado, ofrece recuperarla. True si la cargó."""
+        pendientes = self.pendientes_de_recuperar()
+        if not pendientes:
+            return False
+        r = pendientes[0]
+        quedan = len(pendientes) - 1
+        respuesta = self._preguntar_recuperar(r, quedan)
+        if respuesta == "descartar":
+            recuperacion.borrar(r.id)
+            return False
+        if respuesta != "recuperar" or not self.taller_widget.confirmar_cambios("Recuperar case", "recuperar el otro"):
+            return False
+        try:
+            self.taller_widget.cargar_con_cambios(r.scad, r.ruta, r.carpeta_case)
+        except Exception as e:
+            QMessageBox.warning(self, "Recuperar case", f"No se pudo leer la copia:\n{e}\n\nQuedó en {r.scad}")
+            return False
+        self.copiar_para_recuperar()     # ahora es la copia de esta sesión
+        recuperacion.borrar(r.id)
+        self._actualizar()
+        self.status_bar.showMessage(f"Se recuperaron los cambios de «{r.nombre}». Guardalos con Ctrl+S.", 10000)
+        return True
+
+    def versiones(self, ruta: Optional[str] = None) -> bool:
+        """Las versiones anteriores de un case (el abierto si no se dice). True si se restauró una."""
+        from .widgets.versiones_widget import VersionesDialog
+        t = self.taller_widget
+        ruta = ruta or t.ruta
+        if not ruta:
+            QMessageBox.information(self, "Versiones anteriores",
+                                    "Este case todavía no se guardó: las versiones aparecen cuando tiene archivo.")
+            return False
+
+        def restaurar(version: str) -> bool:
+            if not t._es_el_abierto(ruta) and not t.abrir(ruta):
+                return False
+            t.cargar_con_cambios(version, ruta)
+            return True
+
+        dlg = VersionesDialog(self, ruta, restaurar, t._etiquetas, t.defectos)
+        dlg.exec()
+        if dlg.restaurada:
+            nombre = os.path.basename(dlg.restaurada)[:16]
+            self._actualizar()
+            self.status_bar.showMessage(f"Versión del {nombre} en la ventana, sin guardar: Ctrl+S para quedártela "
+                                        "(la actual queda entre las versiones).", 12000)
+            return True
+        return False
 
     # ------------------------------------------------------------------ menús
     def _accion(self, menu: QMenu, texto: str, atajo: Optional[str], funcion, ayuda: str = "") -> QAction:
@@ -69,6 +252,21 @@ class FlightCaseMainWindow(QMainWindow):
         m.addSeparator()
         self._accion(m, "&Guardar case", "Ctrl+S", self._taller_guardar, "Guardar el proyecto del taller")
         self._accion(m, "Guardar case &como...", "Ctrl+Shift+S", self._taller_guardar_como, "Guardar en otro archivo")
+        self.accion_versiones = self._accion(m, "&Versiones anteriores...", "Ctrl+Alt+V", lambda: self.versiones(),
+                                             "Las copias fechadas que quedan cada vez que se guarda el case")
+        self.menu_autoguardado = m.addMenu("A&utoguardado")
+        grupo = QActionGroup(self)
+        self._acciones_autoguardado = {}
+        actual = self.minutos_autoguardado()
+        for minutos in AUTOGUARDADO_MINUTOS + (0,):
+            a = QAction(f"Cada {minutos} minuto{'s' if minutos != 1 else ''}" if minutos else "Desactivado", self)
+            a.setCheckable(True)
+            a.setData(minutos)
+            a.setChecked(minutos == actual)
+            a.triggered.connect(lambda _=False, n=minutos: self.poner_autoguardado(n))
+            grupo.addAction(a)
+            self.menu_autoguardado.addAction(a)
+            self._acciones_autoguardado[minutos] = a
         m.addSeparator()
         self._accion(m, "Exportar &paquete del taller (planos, DXF, instructivo)...", "Ctrl+P", self._taller_exportar,
                      "DXF por pieza, listas de corte y materiales, planos.pdf e instructivo de montaje")
@@ -94,6 +292,27 @@ class FlightCaseMainWindow(QMainWindow):
                      "Las medidas reales de tus herrajes, perfiles y placas, con importar y exportar planilla CSV")
         self.taller_widget.historial_cambiado.connect(self._actualizar_historial)
         self._actualizar_historial()
+
+        self.help_menu = barra.addMenu("A&yuda")
+        a = self._accion(self.help_menu, f"&Acerca de {TITULO}...", None, self.acerca_de, "Autor y versión")
+        a.setMenuRole(QAction.MenuRole.AboutRole)     # en Mac va al menú de la app
+        from .actualizador import Actualizador
+        self.actualizador = Actualizador(
+            self, _settings, self._confirmar_para_actualizar)
+        a = self._accion(self.help_menu, "&Buscar actualizaciones...", None, lambda: self.actualizador.buscar(),
+                         "Ver si hay una versión nueva en GitHub e instalarla")
+        a.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)   # en Mac, en el menú de la app
+        self.accion_buscar_al_abrir = a = QAction("Buscar actualizaciones al &abrir", self, checkable=True)
+        a.setChecked(self.actualizador.buscar_al_abrir)
+        a.toggled.connect(lambda v: setattr(self.actualizador, "buscar_al_abrir", v))
+        self.help_menu.addAction(a)
+
+    def _confirmar_para_actualizar(self) -> bool:
+        """Antes de cerrar para instalar una versión nueva (si ya se respondió, al cerrar no se vuelve a preguntar)."""
+        self._ya_confirmado = self.taller_widget.confirmar_cambios("Actualizar", "cerrar para actualizar")
+        if self._ya_confirmado:     # vale solo para el cierre que sigue enseguida (si la instalación falla, no)
+            QTimer.singleShot(0, lambda: setattr(self, "_ya_confirmado", False))
+        return self._ya_confirmado
 
     def _actualizar_historial(self) -> None:
         t = self.taller_widget
@@ -158,7 +377,8 @@ class FlightCaseMainWindow(QMainWindow):
         from .widgets.proyectos_widget import ProyectosDialog
         t = self.taller_widget
         return ProyectosDialog(self, recientes=self._get_recent_files, abrir=self.abrir,
-                               ruta_actual=lambda: t.ruta, al_renombrar=t.renombrado, al_borrar=t.borrado)
+                               ruta_actual=lambda: t.ruta, al_renombrar=t.renombrado, al_borrar=t.borrado,
+                               versiones=self.versiones)
 
     def proyectos(self) -> None:
         """«Mis cases»: la lista de proyectos guardados."""
@@ -168,7 +388,23 @@ class FlightCaseMainWindow(QMainWindow):
 
     def _taller_nuevo(self) -> None:
         self.taller_widget.nuevo()
+
+    def _case_nuevo_creado(self) -> None:
+        """Al empezar un case nuevo se avisa en la barra de estado (si no, parece que no pasó nada)."""
         self._actualizar()
+        self.status_bar.showMessage(
+            "Case nuevo con las medidas por defecto: cambialas a la izquierda, o usá el asistente (Ctrl+Shift+N).",
+            8000)
+        QTimer.singleShot(8000, self._actualizar)
+
+    def acerca_de(self) -> None:
+        from ..version import AUTOR, version
+        QMessageBox.about(
+            self, f"Acerca de {TITULO}",
+            f"<h3>{TITULO}</h3>"
+            f"<p>Versión {version()}</p>"
+            f"<p>Autor: {AUTOR}</p>"
+            "<p>Cases a medida con las reglas del taller: planos, DXF, instructivo de montaje y STEP.</p>")
 
     def _asistente(self) -> None:
         if self.taller_widget.asistente():
@@ -217,6 +453,9 @@ class FlightCaseMainWindow(QMainWindow):
 
     def _actualizar(self) -> None:
         self.setWindowTitle(f"{TITULO} — {self._nombre()}")
+        self.accion_versiones.setEnabled(bool(self.taller_widget.ruta))
+        if not self.lbl_autoguardado.text().startswith(("Guardado automáticamente", "⚠")) or not self.taller_widget.ruta:
+            self._mostrar_autoguardado()
         self._estado_taller(self.taller_widget.resultado)
 
     def _estado_taller(self, res) -> None:
@@ -251,8 +490,17 @@ class FlightCaseMainWindow(QMainWindow):
                 pass
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        if not getattr(self, "_ya_confirmado", False) and not self.taller_widget.confirmar_cambios("Salir", "salir"):
+            event.ignore()
+            return
         QApplication.instance().removeEventFilter(self)
         self._save_settings()
+        self._timer_recuperacion.stop()
+        self._timer_autoguardado.stop()
+        self.sesion.borrar()                # se cerró bien: no hay nada que recuperar
+        if self._lock is not None:
+            self._lock.unlock()
+            self._lock = None
         super().closeEvent(event)
 
 
@@ -295,4 +543,9 @@ def run_app() -> int:
     file_filter = _FileOpenFilter(app)
     app.installEventFilter(file_filter)
     window.show()
+    QTimer.singleShot(300, window.ofrecer_recuperacion)    # si la última vez se cerró de golpe
+
+    from ..actualizaciones import es_app_instalada
+    if es_app_instalada() and window.actualizador.buscar_al_abrir:   # desde el código no: la versión es otra
+        QTimer.singleShot(3000, lambda: window.actualizador.buscar(silencioso=True))
     return app.exec()

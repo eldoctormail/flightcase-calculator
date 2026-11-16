@@ -103,7 +103,8 @@ class ProyectosDialog(QDialog):
                  abrir: Optional[Callable[[str], None]] = None,
                  ruta_actual: Callable[[], Optional[str]] = lambda: None,
                  al_renombrar: Optional[Callable[[str, str], None]] = None,
-                 al_borrar: Optional[Callable[[str], None]] = None) -> None:
+                 al_borrar: Optional[Callable[[str], None]] = None,
+                 versiones: Optional[Callable[[str], bool]] = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Mis cases")
         self.resize(1120, 720)
@@ -112,6 +113,7 @@ class ProyectosDialog(QDialog):
         self._ruta_actual = ruta_actual
         self._al_renombrar = al_renombrar
         self._al_borrar = al_borrar
+        self._versiones = versiones
         self.infos: List[P.InfoProyecto] = []
         self.abierto: Optional[str] = None
         self._items: Dict[str, QListWidgetItem] = {}
@@ -188,7 +190,12 @@ class ProyectosDialog(QDialog):
         self.btn_borrar.clicked.connect(lambda: self.borrar())
         self.btn_mostrar = QPushButton("Mostrar en la carpeta")
         self.btn_mostrar.clicked.connect(self.mostrar_en_carpeta)
-        for w in (self.btn_abrir, self.btn_duplicar, self.btn_renombrar, self.btn_borrar, self.btn_mostrar):
+        self.btn_versiones = QPushButton("Versiones…")
+        self.btn_versiones.setToolTip("Las copias fechadas que quedan cada vez que se guarda, para volver a una anterior.")
+        self.btn_versiones.clicked.connect(self.ver_versiones)
+        self.btn_versiones.setVisible(self._versiones is not None)
+        for w in (self.btn_abrir, self.btn_duplicar, self.btn_renombrar, self.btn_versiones, self.btn_borrar,
+                  self.btn_mostrar):
             botones.addWidget(w)
         botones.addStretch(1)
         self.lbl_total = QLabel()
@@ -210,6 +217,8 @@ class ProyectosDialog(QDialog):
         m.addAction("Abrir", self.abrir_elegido)
         m.addAction("Duplicar", lambda: self.duplicar())
         m.addAction("Renombrar…", lambda: self.renombrar())
+        if self._versiones is not None:
+            m.addAction("Versiones anteriores…", self.ver_versiones)
         m.addAction("Mostrar en la carpeta", self.mostrar_en_carpeta)
         m.addSeparator()
         m.addAction("Borrar", lambda: self.borrar())
@@ -286,7 +295,8 @@ class ProyectosDialog(QDialog):
 
     def _botones(self) -> None:
         hay = self.ruta_elegida() is not None
-        for b in (self.btn_abrir, self.btn_duplicar, self.btn_renombrar, self.btn_borrar, self.btn_mostrar):
+        for b in (self.btn_abrir, self.btn_duplicar, self.btn_renombrar, self.btn_borrar, self.btn_mostrar,
+                  self.btn_versiones):
             b.setEnabled(hay)
 
     def ruta_elegida(self) -> Optional[str]:
@@ -400,12 +410,21 @@ class ProyectosDialog(QDialog):
                 QMessageBox.warning(self, "Borrar case", f"No se pudo borrar {nombre}:\n{e}")
                 return False
         P.olvidar(ruta)
+        from ...taller import versiones as V
+        V.a_la_papelera(ruta, QFile.moveToTrash)        # sus versiones anteriores, con él
         _settings().setValue("recientesScad",
                              [r for r in self._recientes() if os.path.normcase(r) != os.path.normcase(ruta)])
         if abierto and self._al_borrar:
             self._al_borrar(ruta)
         self.recargar()
         return True
+
+    def ver_versiones(self) -> None:
+        """Las versiones anteriores del case elegido; si se restaura una, queda abierta en el Taller."""
+        ruta = self.ruta_elegida()
+        if ruta and self._versiones is not None and self._versiones(ruta):
+            self.abierto = ruta
+            self.accept()
 
     def mostrar_en_carpeta(self) -> None:
         ruta = self.ruta_elegida()

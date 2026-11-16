@@ -186,3 +186,42 @@ def test_deshacer_y_rehacer(qapp, tmp_path):
     t.set_params({})                               # otro proyecto: historial nuevo
     assert not w.accion_deshacer.isEnabled() and not w.accion_rehacer.isEnabled()
     w.close()
+
+
+def test_nuevo_pregunta_si_hay_cambios_y_avisa(qapp, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    from flightcase.ui.app import FlightCaseMainWindow
+    w = FlightCaseMainWindow(restore_settings=False)
+    t = w.taller_widget
+    assert not t.hay_cambios()
+    t.set_params({"int_ancho": 900}, str(tmp_path / "x.scad"))
+    assert not t.hay_cambios()
+    t.editores["int_ancho"].poner(700)
+    assert t.hay_cambios()
+    nuevo = next(a for a in w.file_menu.actions() if a.text() == "&Nuevo case")
+    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.Cancel)
+    nuevo.trigger()
+    assert t.params["int_ancho"] == 700                       # canceló: sigue el case de antes
+    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.Save)
+    nuevo.trigger()
+    assert "int_ancho = 700" in (tmp_path / "x.scad").read_text(encoding="utf-8")   # lo guardó antes
+    assert t.ruta is None and t.lbl_archivo.text() == "Proyecto nuevo"
+    assert t.params["int_ancho"] == t.defectos["int_ancho"]
+    assert w.status_bar.currentMessage().startswith("Case nuevo")
+    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: pytest.fail("no había cambios"))
+    nuevo.trigger()                                              # sin cambios no pregunta
+    w.close()
+
+
+def test_acerca_de(qapp, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    from flightcase.ui.app import FlightCaseMainWindow
+    from flightcase.version import version
+    visto = []
+    monkeypatch.setattr(QMessageBox, "about", lambda parent, titulo, texto: visto.append(texto))
+    w = FlightCaseMainWindow(restore_settings=False)
+    accion = next(a for a in w.help_menu.actions() if "Acerca de" in a.text())
+    accion.trigger()
+    assert "Javier Amigo" in visto[0] and f"Versión {version()}" in visto[0]
+    assert version() not in ("", "desconocida")
+    w.close()
