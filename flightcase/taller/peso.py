@@ -39,7 +39,7 @@ PERFIL_GM = {"hibrido": 650.0, "tapa_m": 380.0, "tapa_h": 330.0, "angulo": 240.0
 HERRAJE_G_CATEGORIA = {
     "esquinero": 120.0, "escuadra": 30.0, "cierre": 300.0, "bisagra": 90.0, "tope": 60.0,
     "manija": 350.0, "cazoleta": 450.0, "plato": 250.0, "pie": 25.0, "remache": 1.2,
-    "rueda_otra": 1000.0,
+    "rueda_otra": 1000.0, "conector": 30.0,
 }
 HERRAJE_G_NOMBRE: List[Tuple[str, float]] = [
     ("remache", 1.2), ("bulón", 25.0), ("bulon", 25.0), ("tornillo", 3.0), ("tuerca", 2.0), ("arandela", 1.0),

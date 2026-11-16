@@ -130,10 +130,20 @@ CATEGORIAS: List[Tuple[str, str, List[Tuple[str, str, Any, str]]]] = [
         ("densidad", "Densidad", "num", "kg/m³ de la espuma, para el peso del case (plastazote LD29 ≈ 29)."),
     ]),
     ("rack", "Rack", []),
+    ("conector", "Conectores y energía", [
+        ("forma", "Forma del calado", ("redondo", "rectangular"), "Redondo (conectores D: XLR, powerCON, etherCON…) o rectangular (IEC, pasacables)."),
+        ("corte", "Calado", "par", "Calado en la placa, ancho x alto en mm (en uno redondo, el diámetro en los dos)."),
+        ("radio", "Radio", "num", "Radio de las esquinas del calado rectangular (mm)."),
+        ("brida", "Brida", "par", "Medida de la brida o tapa que queda por fuera, ancho x alto en mm."),
+        ("tornillos", "Tornillos", "par", "Distancia entre los agujeros de los tornillos, ancho x alto en mm (vacío = sin tornillos, a presión)."),
+        ("tornillos_n", "Cantidad de tornillos", "num", "2 (en diagonal, como los conectores D) o 4 (en las cuatro esquinas)."),
+        ("tornillo_d", "Ø agujero tornillo", "num", "Diámetro del agujero para el tornillo (mm)."),
+        ("fondo", "Fondo", "num", "Cuánto entra el conector hacia adentro del case, desde la cara de afuera (mm)."),
+    ]),
     ("extra", "Accesorios", []),
 ]
 _CON_PESO = ("esquinero", "escuadra", "cierre", "bisagra", "tope", "manija", "rueda", "rueda_otra", "cazoleta",
-             "plato", "pie", "remache", "rack", "extra")
+             "plato", "pie", "remache", "rack", "conector", "extra")
 for _c, _n, _m in CATEGORIAS:
     if _c in _CON_PESO:
         _m.append(("peso", "Peso (g)", "num", "Peso de una unidad en gramos, para el peso total del case (pesala o sacala de la ficha del proveedor)."))
