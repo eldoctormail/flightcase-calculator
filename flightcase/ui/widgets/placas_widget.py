@@ -137,6 +137,7 @@ class PlacasWidget(QWidget):
         self.placas: List[Dict[str, Any]] = []
         self.piezas: List[Dict[str, Any]] = []
         self.trazos: Dict[int, List[tuple]] = {}
+        self.agujeros: Dict[int, List[tuple]] = {}
         self.avisos: List[str] = []
         raiz = QVBoxLayout(self)
         raiz.setContentsMargins(4, 4, 4, 0)
@@ -195,6 +196,8 @@ class PlacasWidget(QWidget):
             self.piezas = piezas
             self.trazos = {pz["num"]: PR.trazos_manuales(d["manuales"].get(pz["ids"][0], []))
                            for pz in piezas if not pz.get("extra")}
+            self.agujeros = {pz["num"]: d["perforaciones"].get(pz["ids"][0], [])
+                             for pz in piezas if not pz.get("extra")}
             n_cases = gen.cantidad_cases(d)
         except Exception as e:   # nunca debe impedir ver el resto del Taller
             self.placas, self.avisos, n_cases = [], [f"No se pudieron acomodar las piezas: {e}"], 1
@@ -225,7 +228,8 @@ class PlacasWidget(QWidget):
             carpeta = QFileDialog.getExistingDirectory(self, "Carpeta para los DXF de las placas")
             if not carpeta:
                 return []
-        rutas = P.escribir_dxf_placas(self.placas, self.piezas, os.path.join(carpeta, "placas"), self.trazos)
+        rutas = P.escribir_dxf_placas(self.placas, self.piezas, os.path.join(carpeta, "placas"), self.trazos,
+                                     self.agujeros)
         ruta_csv = os.path.join(carpeta, "placas.csv")
         with open(ruta_csv, "w", newline="", encoding="utf-8-sig") as f:
             csv.writer(f, delimiter=";").writerows(P.filas_csv(self.placas))

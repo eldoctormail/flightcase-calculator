@@ -110,7 +110,7 @@ En GitHub corren solos en cada PR y en cada cambio a main (`.github/workflows/te
 
 `flightcase/taller/` tiene en Python las reglas de construcción del generador de OpenSCAD del taller (placa de 10 mm, ángulo 32x32, perfil híbrido, refuerzos, tapas, cubiertas, bandejas, base de ruedas, catálogo FR Sistemas / Adam Hall), más los interiores (espuma, cajones, rack 19"). En la ventana del Taller se editan todos los parámetros del generador (agrupados como en `flightcase.scad`, con su explicación al pasar el mouse) y se ven al instante los paneles, perfiles, herrajes y avisos; desde ahí se abre y se guarda el `.scad` y se exporta el paquete. También, con **Archivo → Paquete del taller desde un .scad sin abrirlo** (`Ctrl+T`) se toma un proyecto `.scad` (por ejemplo `mi_case.scad`) y se genera, sin tener OpenSCAD instalado:
 
-- `dxf/*.dxf`: un DXF por pieza distinta, con calados (capa 0) y rebajes (capa `REBAJE`)
+- `dxf/*.dxf`: un DXF por pieza distinta, con calados (capa 0), rebajes (capa `REBAJE`) y los agujeros de remaches (`PERFORACIONES`) y tornillos (`TORNILLOS`)
 - `dxf/placas/*.dxf`: un DXF por placa entera con las piezas ya acomodadas (ver **Placas** abajo)
 - `lista_cortes.csv`, `placas.csv` y `materiales.csv` (separador `;`, se abren directo en Excel)
 - `planos.pdf`: piezas acotadas, aprovechamiento de placas, cortes de perfiles y materiales
@@ -121,7 +121,9 @@ En GitHub corren solos en cada PR y en cada cambio a main (`.github/workflows/te
 
 La pestaña **Placas** del Taller acomoda todas las piezas del pedido (todos los cases de **Cantidad de cases**, separadas por material) en placas enteras con el kerf y el margen de **Corte y compra**. Prueba varias formas de acomodarlas y se queda con la que usa menos placas y deja el retazo más grande. Arriba dice cuántas placas comprar, el aprovechamiento y el retazo libre más grande (marcado en verde en el dibujo). **Girar piezas** deja rotarlas 90° para aprovechar mejor; apagalo si la placa tiene veta o dibujo.
 
-**Guardar DXF de las placas…** escribe un DXF por placa con cada pieza en su lugar, lista para la router CNC: borde de la placa en la capa `PLACA`, contornos y calados pasantes en `0`, rebajes en `REBAJE`, marcas de herrajes en `MARCA`, logos en `GRABADO` y el número de pieza en `TEXTO` (para apagar en el CAM). También va `placas.csv` con las piezas de cada placa. Lo mismo sale en el paquete de producción.
+**Guardar DXF de las placas…** escribe un DXF por placa con cada pieza en su lugar, lista para la router CNC: borde de la placa en la capa `PLACA`, contornos y calados pasantes en `0`, rebajes en `REBAJE`, marcas de herrajes en `MARCA`, logos en `GRABADO`, agujeros de remaches en `PERFORACIONES`, tornillos en `TORNILLOS` y el número de pieza en `TEXTO` (para apagar en el CAM). También va `placas.csv` con las piezas de cada placa. Lo mismo sale en el paquete de producción.
+
+**Perforaciones.** Los agujeros de remaches salen como círculos con el diámetro de la mecha (remache + 0,1 mm) en la capa `PERFORACIONES`, para taladrarlos en la CNC o apagarlos si se perforan a mano: las filas de los ángulos de las aristas (en el medio del ala) y de los aros de cierre, con la misma cantidad que la lista de materiales (`remache_paso`); las patas de los esquineros; y alrededor de cierres, bisagras (también la de piano), manijas, cazoletas, platos y placas de logo, incluidos los herrajes puestos a mano. Los remaches del perfil que tapa un herraje no se perforan. Los tornillos del marco de la base suelta van en `TORNILLOS`; los bulones de las ruedas siguen en la capa 0. Si un artículo del catálogo trae `perforaciones` (`[[dx, dy], ...]` en mm desde el centro del herraje; en cierres y bisagras `dy` se mide desde la línea de cierre, negativo del lado del cuerpo), se usan esas posiciones en lugar de las estimadas.
 
 ### Mis cases
 

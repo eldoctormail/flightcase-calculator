@@ -43,9 +43,12 @@ def lineas_datos(res: ResultadoTaller) -> List[str]:
 
 def datos(res: ResultadoTaller) -> Dict[str, Any]:
     """Diccionario `d` con la forma que usan las funciones de generar.py. Los herrajes puestos
-    a mano van además en d["manuales"] (por panel, en coordenadas del panel)."""
+    a mano van además en d["manuales"] (por panel, en coordenadas del panel) y los agujeros de
+    remaches y tornillos en d["perforaciones"] (por panel, (capa, x, y, diámetro))."""
     d = gen.parsear_datos(lineas_datos(res))
     d["manuales"] = manuales_por_panel(res)
+    from . import perforaciones
+    d["perforaciones"] = {pid: perforaciones.tuplas(ags) for pid, ags in perforaciones.calcular(res).items()}
     d["peso"] = res.valores.get("peso")
     return d
 
@@ -99,6 +102,17 @@ def _dxf_arco(capa: str, c, r: float, a0: float, a1: float) -> str:
             f" 50\n{_n(a0)}\n 51\n{_n(a1)}\n")
 
 
+def _dxf_circulo(capa: str, c, r: float) -> str:
+    return f"  0\nCIRCLE\n  8\n{capa}\n 10\n{_n(c[0])}\n 20\n{_n(c[1])}\n 40\n{_n(r)}\n"
+
+
+COLORES_CAPA = {"MARCA": 5, "PERFORACIONES": 6, "TORNILLOS": 30}
+
+
+def _color_capa(capa: str) -> int:
+    return COLORES_CAPA.get(capa, 3)
+
+
 def _dxf_polilinea(capa: str, pts) -> str:
     """Polilínea cerrada (POLYLINE de R12, que lee cualquier CAM): un calado de espuma con forma."""
     vert = "".join(f"  0\nVERTEX\n  8\n{capa}\n 10\n{_n(x)}\n 20\n{_n(y)}\n 30\n0\n" for x, y in pts)
@@ -125,10 +139,13 @@ def _rect_redondeado(capa: str, cx: float, cy: float, w: float, h: float, r: flo
     ]
 
 
-def panel_dxf(ancho: float, alto: float, calados: List[Dict[str, Any]] = (), trazos: List[tuple] = ()) -> str:
+def panel_dxf(ancho: float, alto: float, calados: List[Dict[str, Any]] = (), trazos: List[tuple] = (),
+              agujeros: List[tuple] = ()) -> str:
     """DXF de un panel: contorno y calados pasantes en la capa 0 (como OpenSCAD) y
     rebajes (no pasantes) en la capa REBAJE. `trazos` (capa, polilínea) agrega las marcas
-    de los herrajes puestos a mano (capa MARCA) y los logos grabados (capa GRABADO)."""
+    de los herrajes puestos a mano (capa MARCA) y los logos grabados (capa GRABADO).
+    `agujeros` (capa, x, y, diámetro) son las perforaciones de remaches y tornillos
+    (capas PERFORACIONES y TORNILLOS, ver perforaciones.py), como círculos."""
     ent: List[str] = []
     esquinas = [(0, 0), (ancho, 0), (ancho, alto), (0, alto)]
     ent += [_dxf_linea("0", esquinas[i], esquinas[(i + 1) % 4]) for i in range(4)]
@@ -143,7 +160,11 @@ def panel_dxf(ancho: float, alto: float, calados: List[Dict[str, Any]] = (), tra
     for capa, pts in trazos:
         ent += [_dxf_linea(capa, pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
         if capa not in [c[0] for c in capas]:
-            capas.append((capa, 5 if capa == "MARCA" else 3))
+            capas.append((capa, _color_capa(capa)))
+    for capa, x, y, dm in agujeros:
+        ent.append(_dxf_circulo(capa, (x, y), dm / 2))
+        if capa not in [c[0] for c in capas]:
+            capas.append((capa, _color_capa(capa)))
     tabla = "".join(f"  0\nLAYER\n  2\n{c}\n 70\n0\n 62\n{col}\n  6\nCONTINUOUS\n" for c, col in capas)
     return (f"  0\nSECTION\n  2\nTABLES\n  0\nTABLE\n  2\nLAYER\n 70\n{len(capas)}\n" + tabla +
             "  0\nENDTAB\n  0\nENDSEC\n"
@@ -332,8 +353,9 @@ def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool =
     N = gen.cantidad_cases(d)
     for pz in piezas:
         pz["dxf"] = f"{pz['num']:02d}_{pz['ids'][0]}_x{pz['cant']}.dxf"
+        pz["agujeros"] = d["perforaciones"].get(pz["ids"][0], [])
         escribir(pz["dxf"], panel_dxf(pz["w"], pz["h"], pz["calados"],
-                                      trazos_manuales(d["manuales"].get(pz["ids"][0], []))))
+                                      trazos_manuales(d["manuales"].get(pz["ids"][0], [])), pz["agujeros"]))
     forro = res.valores.get("forro")
     huecos_forro = {}
     if forro is not None:
@@ -360,7 +382,8 @@ def exportar(res: ResultadoTaller, carpeta: str, rotar: bool = True, pdf: bool =
     placas, av = P.armar_placas(d, piezas, rotar=rotar, cantidad=N)
     paq.avisos += av
     trazos = {pz["num"]: trazos_manuales(d["manuales"].get(pz["ids"][0], [])) for pz in piezas if not pz.get("extra")}
-    paq.archivos += P.escribir_dxf_placas(placas, piezas, os.path.join(carpeta, "dxf", "placas"), trazos)
+    agujeros = {pz["num"]: pz.get("agujeros", []) for pz in piezas if not pz.get("extra")}
+    paq.archivos += P.escribir_dxf_placas(placas, piezas, os.path.join(carpeta, "dxf", "placas"), trazos, agujeros)
     ruta = os.path.join(carpeta, "placas.csv")
     with open(ruta, "w", newline="", encoding="utf-8-sig") as f:
         csv.writer(f, delimiter=";").writerows(P.filas_csv(placas, "dxf/placas/"))
