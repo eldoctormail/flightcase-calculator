@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QButtonGroup,
     QFrame,
+    QGridLayout,
     QStackedWidget,
     QToolButton,
     QVBoxLayout,
@@ -156,6 +157,11 @@ class _Numero(QDoubleSpinBox):
 
     def textFromValue(self, valor: float) -> str:  # noqa: N802 (nombre de Qt)
         return f"{valor:.{self.decimals()}f}".rstrip("0").rstrip(".") if self.decimals() else f"{valor:.0f}"
+
+
+def _settings():
+    from PySide6.QtCore import QSettings
+    return QSettings("FlightcaseCalculator", "FlightcaseCalculator")
 
 
 def _con_codigo(ayuda: str, nombre: str) -> str:
@@ -760,13 +766,14 @@ class TallerWidget(QWidget):
             scroll.setWidget(pagina)
             self._paginas[clave] = self.toolbox.addWidget(scroll)
         for n_sec, sec in enumerate(secciones_parametros()):
-            titulo = "Medidas (exteriores e interiores)" if n_sec == 0 else sec["seccion"]
+            titulo = "Medidas" if n_sec == 0 else sec["seccion"]
             grupo = self._grupo_de(n_sec, titulo)
             self.secciones_de_grupo[grupo].append(titulo)
-            cab = QLabel(titulo)
-            cab.setObjectName("tituloSeccion")
-            cab.setWordWrap(True)
-            paginas[grupo].addWidget(cab)
+            if n_sec:                 # la de medidas ya lleva el título de la página
+                cab = QLabel(titulo)
+                cab.setObjectName("tituloSeccion")
+                cab.setWordWrap(True)
+                paginas[grupo].addWidget(cab)
             caja = QWidget()
             form = QFormLayout(caja)
             form.setContentsMargins(0, 0, 0, 6)
@@ -1052,60 +1059,199 @@ class TallerWidget(QWidget):
         fila.addWidget(QLabel("mm"))
         return caja
 
+    MEDIDAS = (("ancho", "Ancho"), ("largo", "Largo"), ("alto", "Alto"), ("cuerpo", "Alto de cuerpo"),
+               ("tapa", "Alto de tapa"))
+
     def _seccion_medidas(self, form: QFormLayout, sec: Dict[str, Any]) -> None:
-        """Medidas exteriores e interiores, enganchadas: al cambiar unas se recalculan las otras."""
+        """Medidas del case, interiores o exteriores a elección: Ancho y Largo, el Alto total con
+        candado, y el alto del cuerpo y de la tapa. Las interiores son las que se guardan en el .scad;
+        al cargar exteriores se recalculan con las paredes, el aluminio y la espuma de este armado."""
         ayudas = {p["nombre"]: p["ayuda"] for p in sec["parametros"]}
-        ayuda_ext = ("Medida exterior del case, sin ruedas. Al cambiarla se recalculan las interiores con las "
-                     "paredes, el aluminio y la espuma de este armado. El alto de tapa no cambia.")
-        titulo = QLabel("<b>Exteriores</b> (sin ruedas)")
-        titulo.setToolTip(ayuda_ext)
-        form.addRow(titulo)
-        self.ext_spins = []
-        for nombre in ("Ancho exterior", "Largo exterior", "Alto exterior"):
+        caja = QWidget()
+        g = QGridLayout(caja)
+        g.setContentsMargins(0, 0, 0, 0)
+        g.setHorizontalSpacing(10)
+        g.setVerticalSpacing(3)
+
+        def subtitulo(texto: str, fila: int) -> None:
+            l = QLabel(texto)
+            l.setObjectName("subtituloMedidas")
+            g.addWidget(l, fila, 0, 1, 2)
+
+        def etiqueta(texto: str) -> QLabel:
+            l = QLabel(texto)
+            l.setObjectName("etiquetaCampo")
+            return l
+
+        subtitulo("Medición", 0)
+        g.addWidget(etiqueta("Medidas tomadas por"), 1, 0, 1, 2)
+        self.cmb_medicion = QComboBox()
+        self.cmb_medicion.setObjectName("medicion")
+        self.cmb_medicion.addItem("Interiores", "interior")
+        self.cmb_medicion.addItem("Exteriores (sin ruedas)", "exterior")
+        self.cmb_medicion.setToolTip(_ayuda(
+            "Interiores: el hueco útil, lo que entra adentro del case.\n"
+            "Exteriores: lo que ocupa el case por fuera, sin ruedas. Al cargarlas se calculan las "
+            "interiores con las paredes, el aluminio y la espuma de este armado."))
+        self.cmb_medicion.currentIndexChanged.connect(lambda *_: self._medicion_cambiada())
+        g.addWidget(self.cmb_medicion, 2, 0, 1, 2)
+
+        subtitulo("Dimensiones", 3)
+        self.medidas: Dict[str, QDoubleSpinBox] = {}
+        self.etiquetas_medidas: Dict[str, QLabel] = {}
+        lugar = {"ancho": (4, 0, 1), "largo": (4, 1, 1), "alto": (6, 0, 2), "cuerpo": (8, 0, 1), "tapa": (8, 1, 1)}
+        for clave, texto in self.MEDIDAS:
             sp = _Numero()
-            sp.setRange(50, 5000)
+            sp.setRange(0, 10000)
             sp.setDecimals(1)
             sp.setKeyboardTracking(False)
-            sp.setToolTip(ayuda_ext)
-            sp.valueChanged.connect(self._exterior_editado)
-            etiqueta = QLabel(nombre)
-            etiqueta.setToolTip(ayuda_ext)
-            form.addRow(etiqueta, self._con_mm(sp))
-            self.ext_spins.append(sp)
+            sp.setObjectName("medida")
+            sp.valueChanged.connect(lambda val, c=clave: self._medida_editada(c, val))
+            fila, col, ancho = lugar[clave]
+            et = etiqueta(texto)
+            g.addWidget(et, fila, col, 1, ancho)
+            self.etiquetas_medidas[clave] = et
+            if clave == "alto":
+                linea = QHBoxLayout()
+                linea.setSpacing(6)
+                linea.addWidget(sp, 1)
+                linea.addWidget(QLabel("mm"))
+                self.btn_candado = QToolButton()
+                self.btn_candado.setObjectName("candado")
+                self.btn_candado.setCheckable(True)
+                self.btn_candado.setChecked(True)
+                self.btn_candado.setIconSize(QSize(18, 18))
+                self.btn_candado.toggled.connect(lambda *_: self._poner_icono_candado())
+                linea.addWidget(self.btn_candado)
+                g.addLayout(linea, fila + 1, col, 1, ancho)
+                self._poner_icono_candado()
+            else:
+                g.addWidget(self._con_mm(sp), fila + 1, col, 1, ancho)
+            self.medidas[clave] = sp
+        g.setColumnStretch(0, 1)
+        g.setColumnStretch(1, 1)
+        self.lbl_medidas_nota = QLabel()
+        self.lbl_medidas_nota.setObjectName("notaMedidas")
+        self.lbl_medidas_nota.setWordWrap(True)
+        g.addWidget(self.lbl_medidas_nota, 10, 0, 1, 2)
+        form.addRow(caja)
 
-        form.addRow(QLabel("<b>Interiores</b>"))
-        filas = (("int_ancho", "Ancho interior"), ("int_prof", "Largo interior"), ("alto_total", "Alto interior"),
-                 ("int_alto_tapa", "Alto de tapa"), ("int_alto_cuerpo", ""))
-        for nombre, texto in filas:
-            if nombre == "alto_total":
-                sp = _Numero()
-                sp.setRange(1, 10000)
-                sp.setDecimals(2)
-                sp.setKeyboardTracking(False)
-                sp.setToolTip(_ayuda("Alto interior total: del piso al techo interior (cuerpo + tapa"
-                                     " + segunda tapa si la hay). Al cambiarlo, la tapa queda igual y el"
-                                     " cuerpo toma la diferencia."))
-                sp.valueChanged.connect(self._alto_interior_editado)
-                self.sp_alto_interior = sp
-                form.addRow(QLabel(texto), self._con_mm(sp))
-                continue
+        # los parámetros del .scad (siempre interiores) quedan como editores ocultos
+        for nombre in ("int_ancho", "int_prof", "int_alto_cuerpo", "int_alto_tapa"):
             ed = _Editor(nombre, self.defectos[nombre], self._programar)
             ed.widget.setToolTip(_ayuda(_con_codigo(ayudas.get(nombre, ""), nombre)))
+            ed.widget.setVisible(False)
             self.editores[nombre] = ed
-            if nombre == "int_alto_cuerpo":       # se maneja con el alto interior total
-                form.addRow(ed.widget)
-                ed.widget.setVisible(False)
-                continue
-            if nombre == "int_alto_tapa":
-                ed.widget.valueChanged.connect(self._alto_tapa_editado)
-            etiqueta = QLabel(texto)
-            etiqueta.setToolTip(_ayuda(_con_codigo(ayudas.get(nombre, ""), nombre)))
-            form.addRow(etiqueta, self._con_mm(ed.widget))
-        self.lbl_exterior_nota = QLabel()
-        self.lbl_exterior_nota.setStyleSheet("color:#bbbbbb")
-        self.lbl_exterior_nota.setWordWrap(True)
-        form.addRow(self.lbl_exterior_nota)
-        self._alto_total = None
+            form.addRow(ed.widget)
+        self.medidas["ancho"].setToolTip(_ayuda(_con_codigo(ayudas.get("int_ancho", ""), "int_ancho")))
+        self.medidas["largo"].setToolTip(_ayuda(_con_codigo(ayudas.get("int_prof", ""), "int_prof")))
+        self.medidas["alto"].setToolTip(_ayuda("Alto total: el cuerpo más la tapa (y la segunda tapa si la hay). "
+                                               "Al cambiarlo, la tapa queda igual y el cuerpo toma la diferencia."))
+        self.medidas["cuerpo"].setToolTip(_ayuda(_con_codigo(
+            "Alto del cuerpo, del piso al cierre de la tapa (entre los dos cierres si el case tiene dos tapas).",
+            "int_alto_cuerpo")))
+        self.medidas["tapa"].setToolTip(_ayuda(_con_codigo(ayudas.get("int_alto_tapa", ""), "int_alto_tapa")))
+        try:
+            medicion = _settings().value("taller/medicion", "interior")
+        except Exception:  # noqa: BLE001
+            medicion = "interior"
+        self.cmb_medicion.blockSignals(True)
+        self.cmb_medicion.setCurrentIndex(1 if medicion == "exterior" else 0)
+        self.cmb_medicion.blockSignals(False)
+        self._etiquetas_medicion()
+
+    # ---- medidas: interiores o exteriores
+    @property
+    def medicion(self) -> str:
+        """"interior" o "exterior": cómo se muestran y se cargan las medidas."""
+        return self.cmb_medicion.currentData()
+
+    def set_medicion(self, medicion: str) -> None:
+        self.cmb_medicion.setCurrentIndex(1 if medicion == "exterior" else 0)
+
+    def _medicion_cambiada(self) -> None:
+        try:
+            _settings().setValue("taller/medicion", self.medicion)
+        except Exception:  # noqa: BLE001
+            pass
+        self._etiquetas_medicion()
+        self._mostrar_exterior()
+
+    def _etiquetas_medicion(self) -> None:
+        tapas = int(self.params.get("tapas", 1)) == 2
+        self.etiquetas_medidas["cuerpo"].setText("Alto de cuerpo" + (" (entre cierres)" if tapas else ""))
+        self.etiquetas_medidas["tapa"].setText("Alto de tapa" + (" 1" if tapas else ""))
+
+    def _poner_icono_candado(self) -> None:
+        from .barra_3d import _icono
+        fijo = self.btn_candado.isChecked()
+        self.btn_candado.setIcon(_icono("lock" if fijo else "lock-open"))
+        self.btn_candado.setToolTip(
+            "Alto fijo: al cambiar el cuerpo o la tapa, el otro se ajusta y el alto total queda igual."
+            if fijo else "Alto libre: al cambiar el cuerpo o la tapa, el alto total crece o se achica.")
+
+    def _valores_medidas(self) -> Dict[str, float]:
+        """Lo que muestran los cinco campos según la medición elegida."""
+        p = self.params
+        cuerpo, tapa = float(p["int_alto_cuerpo"]), float(p["int_alto_tapa"])
+        interior = {"ancho": float(p["int_ancho"]), "largo": float(p["int_prof"]),
+                    "alto": cuerpo + self._alto_tapas(), "cuerpo": cuerpo, "tapa": tapa}
+        if self.medicion != "exterior" or self.resultado is None:
+            return interior
+        v, geo = self.resultado.valores, self.resultado.valores["geo"]
+        Z, zc1, zc2 = v["ext_alto"], geo["z_cierre"], geo["z_cierre2"]
+        return {"ancho": v["ext_ancho"], "largo": v["ext_prof"], "alto": Z,
+                "cuerpo": zc1 - (zc2 if geo.get("dos_tapas") else 0.0), "tapa": Z - zc1}
+
+    def _poner_tapas(self, total_tapas: float) -> bool:
+        """Pone la tapa para que las tapas sumen `total_tapas` (con la segunda igual si la copia)."""
+        dos = int(self.params.get("tapas", 1)) == 2
+        t2 = float(self.params.get("int_alto_tapa2", -1))
+        tapa = total_tapas / 2 if dos and t2 < 0 else total_tapas - (t2 if dos else 0.0)
+        if tapa <= 0:
+            self.lbl_avisos.setText("La tapa no puede quedar sin alto: achicá el cuerpo o soltá el candado del alto.")
+            return False
+        self.editores["int_alto_tapa"].poner(round(tapa, 2))
+        self.params["int_alto_tapa"] = round(tapa, 2)
+        return True
+
+    def _medida_editada(self, clave: str, valor: float) -> None:
+        if self.resultado is None:
+            return
+        self._leer_editores()
+        antes = self._valores_medidas()
+        delta = valor - antes[clave]
+        if abs(delta) < 0.005:
+            return
+        ok = True
+        if self.medicion == "exterior" and clave in ("ancho", "largo", "alto"):
+            quiero = [antes["ancho"], antes["largo"], antes["alto"]]
+            quiero[("ancho", "largo", "alto").index(clave)] = valor
+            self.poner_exterior(*quiero)
+            return
+        if clave in ("ancho", "largo"):
+            nombre = "int_ancho" if clave == "ancho" else "int_prof"
+            self.editores[nombre].poner(round(float(self.params[nombre]) + delta, 2))
+        elif clave == "alto":
+            ok = self._poner_cuerpo(float(self.params["int_alto_cuerpo"]) + delta)
+        elif clave == "cuerpo":
+            total = float(self.params["int_alto_cuerpo"]) + self._alto_tapas()
+            cuerpo = float(self.params["int_alto_cuerpo"]) + delta
+            if self.btn_candado.isChecked():
+                ok = self._poner_tapas(total - cuerpo)
+            ok = ok and self._poner_cuerpo(cuerpo)
+        elif clave == "tapa":
+            total = float(self.params["int_alto_cuerpo"]) + self._alto_tapas()
+            ok = self._poner_tapas(self._alto_tapas() + delta * (2 if self._tapa2_copia() else 1))
+            if ok and self.btn_candado.isChecked():
+                ok = self._poner_cuerpo(total - self._alto_tapas())
+        if not ok:
+            self._mostrar_exterior()
+            return
+        self.recalcular()
+
+    def _tapa2_copia(self) -> bool:
+        return int(self.params.get("tapas", 1)) == 2 and float(self.params.get("int_alto_tapa2", -1)) < 0
 
     def _opciones_cara(self) -> List[tuple]:
         """Caras y grupos del forro interior, con los nombres de este case."""
@@ -1128,47 +1274,33 @@ class TallerWidget(QWidget):
 
     def _poner_cuerpo(self, cuerpo: float) -> bool:
         if cuerpo <= 0:
-            self.lbl_avisos.setText("El alto interior tiene que ser mayor que el alto de tapa.")
-            self._mostrar_exterior()
+            self.lbl_avisos.setText("El cuerpo no puede quedar sin alto: agrandá el alto total o achicá la tapa.")
             return False
         self.editores["int_alto_cuerpo"].poner(round(cuerpo, 2))
-        self._programar()
+        self.params["int_alto_cuerpo"] = round(cuerpo, 2)
         return True
 
-    def _alto_interior_editado(self, total: float) -> None:
-        if self._poner_cuerpo(total - self._alto_tapas()):
-            self._alto_total = total
-
-    def _alto_tapa_editado(self, *_args) -> None:
-        """Al cambiar la tapa, el alto interior total queda igual (y el exterior también)."""
-        if self._alto_total is not None:
-            self._poner_cuerpo(self._alto_total - self._alto_tapas())
-
     def _mostrar_exterior(self) -> None:
+        """Pone en los campos las medidas (interiores o exteriores) del case calculado."""
         if self.resultado is None:
             return
-        v = self.resultado.valores
-        for sp, clave in zip(self.ext_spins, ("ext_ancho", "ext_prof", "ext_alto")):
+        self._etiquetas_medicion()
+        for clave, valor in self._valores_medidas().items():
+            sp = self.medidas[clave]
             if not sp.hasFocus():
                 sp.blockSignals(True)
-                sp.setValue(v[clave])
+                sp.setValue(valor)
                 sp.blockSignals(False)
-        cuerpo = float(self.params["int_alto_cuerpo"])
-        self._alto_total = cuerpo + self._alto_tapas()
-        if not self.sp_alto_interior.hasFocus():
-            self.sp_alto_interior.blockSignals(True)
-            self.sp_alto_interior.setValue(self._alto_total)
-            self.sp_alto_interior.blockSignals(False)
-        self.lbl_exterior_nota.setText(f"Alto interior del cuerpo (del piso al cierre): {fmt(cuerpo)} mm")
-
-    def _exterior_editado(self, *_args) -> None:
-        if self.resultado is None:
-            return
-        quiero = [sp.value() for sp in self.ext_spins]
         v = self.resultado.valores
-        if all(abs(a - v[k]) < 0.05 for a, k in zip(quiero, ("ext_ancho", "ext_prof", "ext_alto"))):
-            return
-        self.poner_exterior(*quiero)
+        if self.medicion == "exterior":
+            p = self.params
+            alto = float(p["int_alto_cuerpo"]) + self._alto_tapas()
+            nota = (f"Por dentro: {fmt(p['int_ancho'])} × {fmt(p['int_prof'])} × {fmt(alto)} mm "
+                    f"(cuerpo {fmt(p['int_alto_cuerpo'])} + tapa {fmt(p['int_alto_tapa'])}).")
+        else:
+            nota = (f"Por fuera: {fmt(v['ext_ancho'])} × {fmt(v['ext_prof'])} × {fmt(v['ext_alto'])} mm, "
+                    "sin ruedas.")
+        self.lbl_medidas_nota.setText(nota)
 
     def poner_exterior(self, ancho: float, prof: float, alto: float) -> None:
         """Ajusta las medidas interiores para que el case tenga estas medidas exteriores."""
