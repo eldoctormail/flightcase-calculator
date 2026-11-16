@@ -8,8 +8,8 @@ que el generador de OpenSCAD no tiene, con las mismas convenciones:
 - Las posiciones de equipos, bloques de espuma y cajones se miden desde la esquina
   izquierda-delantera-inferior del espacio útil del cuerpo: x desde el costado izquierdo,
   y desde el frente del cuerpo (en un case frontal, desde el plano de cierre de la tapa
-  delantera), z desde el piso interior. Si hay forro de espuma, el espacio útil es el de
-  adentro del forro (las medidas interiores del proyecto ya son útiles).
+  delantera), z desde el piso interior. Si hay forro (espuma_esp o forro por cara), el
+  espacio útil es el de adentro del forro (las medidas interiores del proyecto ya son útiles).
 - Un valor que falta (o "c") en x o y centra la pieza en el cuerpo.
 
 Todo esto entra al resultado del taller como piezas adicionales (cortes de los cajones y
@@ -173,9 +173,15 @@ def espacio_util(ctx: Dict[str, Any]) -> Tuple[Caja, Caja, int, int]:
         mundo = lambda x, y, z: (x, Z - z, y)
     else:
         mundo = lambda x, y, z: (x, y, z)
-    a, b = (p + e, p + e, p + e), (X - p - e, Y - p - e, Z - p - e)
+    fo = ctx.get("forro")
+    if fo:      # forro por cara (forro.py): cada cara tiene su espesor
+        abajo = fo.get("base2" if ctx["dos_tapas"] else "piso", 0)
+        a = (p + fo.get("izq", 0), p + fo.get("frente", 0), p + abajo)
+        b = (X - p - fo.get("der", 0), Y - p - fo.get("trasera", 0), Z - p - fo.get("techo", 0))
+    else:
+        a, b = (p + e, p + e, p + e), (X - p - e, Y - p - e, Z - p - e)
     total = Caja.de(mundo(*a), mundo(*b))
-    z0c = zc2 if ctx["dos_tapas"] else p + e
+    z0c = zc2 if ctx["dos_tapas"] else a[2]
     cuerpo = Caja.de(mundo(a[0], a[1], z0c), mundo(b[0], b[1], zc))
     if hz:
         return total, cuerpo, 0, -1
