@@ -402,6 +402,9 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
     if esp_espuma > 0:
         lineas.insert(4, ("Espuma interior",
                           f"{fmt(esp_espuma)} mm (el interior indicado es el espacio útil)"))
+    if d.get("peso") is not None:
+        lineas.append(("Peso de un case", d["peso"].resumen() + (" (con valores estimados)"
+                                                                 if d["peso"].estimado > 0.005 else "")))
     lineas += [
         ("Placas", "; ".join(f"{n} de {m}" for m, n in contar_placas(placas).items())),
     ]
