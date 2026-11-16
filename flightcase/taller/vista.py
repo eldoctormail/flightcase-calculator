@@ -23,7 +23,8 @@ CATEGORIAS: Tuple[Tuple[str, str], ...] = (
     ("paneles", "Placas (paneles)"),
     ("perfiles", "Perfiles de aluminio"),
     ("herrajes", "Herrajes (esquineros, cierres, manijas)"),
-    ("ruedas", "Ruedas y pies"),
+    ("ruedas", "Ruedas, pies y patines"),
+    ("patas", "Patas de mesa"),
     ("bandejas", "Bandejas"),
     ("equipos", "Equipos y rack"),
     ("espuma", "Espuma"),
@@ -92,6 +93,10 @@ def _categoria(color: str, nombre: str, interior: bool) -> str:
         if color == "cajon" or n.startswith("cajón") or "corredera" in n:
             return "cajones"
         return "equipos"
+    if n.startswith("pata de mesa") or n.startswith("soporte de pata"):
+        return "patas"
+    if n == "patín":
+        return "ruedas"
     if color in ("base", "lid"):
         return "paneles"
     if color == "wall":

@@ -415,6 +415,71 @@
   ]
  },
  {
+  "seccion": "Ruedas: patines y patas de mesa",
+  "parametros": [
+   {
+    "nombre": "patines",
+    "etiqueta": "Patines bajo el piso",
+    "ayuda": "0 = sin patines; 2 o 3 listones atornillados bajo el piso para levantar el case con zorra o autoelevador sin que apoye la placa. Salen en la lista de corte con sus tornillos."
+   },
+   {
+    "nombre": "patin_ancho",
+    "etiqueta": "Ancho del patín",
+    "ayuda": "ancho de cada listón, en mm"
+   },
+   {
+    "nombre": "patin_alto",
+    "etiqueta": "Alto del patín",
+    "ayuda": "cuánto levanta el case del piso, en mm"
+   },
+   {
+    "nombre": "patin_material",
+    "etiqueta": "Material del patín",
+    "ayuda": "madera o plástico de los listones (pino, eucalipto, polietileno...). Se usa para la lista de corte y el peso."
+   },
+   {
+    "nombre": "patin_sentido",
+    "etiqueta": "Sentido de los patines",
+    "ayuda": "auto = a lo largo del lado más largo; ancho = de izquierda a derecha; largo = de adelante hacia atrás"
+   },
+   {
+    "nombre": "patin_retiro",
+    "etiqueta": "Retiro de los patines",
+    "ayuda": "distancia del borde del case al patín, en mm (-1 = automático, libre de los esquineros)"
+   },
+   {
+    "nombre": "patas_mesa",
+    "etiqueta": "Patas de mesa",
+    "ayuda": "0 = sin patas; 4 = patas de tubo que se enroscan en soportes. En la tapa: los soportes van por dentro del techo, se le ponen las patas y la tapa dada vuelta queda de mesa. En el cuerpo: los soportes van bajo el piso y el case queda parado sobre las patas."
+   },
+   {
+    "nombre": "patas_en",
+    "etiqueta": "Patas de mesa en",
+    "ayuda": "tapa = la tapa se usa de mesa; cuerpo = el case entero va sobre las patas"
+   },
+   {
+    "nombre": "pata_largo",
+    "etiqueta": "Largo de la pata",
+    "ayuda": "largo de cada pata, en mm"
+   },
+   {
+    "nombre": "pata_lado",
+    "etiqueta": "Lado del tubo de la pata",
+    "ayuda": "tubo cuadrado de la pata, en mm"
+   },
+   {
+    "nombre": "pata_soporte",
+    "etiqueta": "Placa del soporte",
+    "ayuda": "lado de la placa cuadrada del soporte, en mm (va remachada con 4 remaches)"
+   },
+   {
+    "nombre": "pata_retiro",
+    "etiqueta": "Retiro de los soportes",
+    "ayuda": "distancia del borde del case al soporte, en mm (-1 = automático, libre de los esquineros)"
+   }
+  ]
+ },
+ {
   "seccion": "Bandejas internas",
   "parametros": [
    {

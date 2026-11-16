@@ -42,6 +42,7 @@ HERRAJE_G_CATEGORIA = {
     "rueda_otra": 1000.0,
 }
 HERRAJE_G_NOMBRE: List[Tuple[str, float]] = [
+    ("pata de mesa", 1300.0), ("soporte de pata", 250.0),
     ("remache", 1.2), ("bulón", 25.0), ("bulon", 25.0), ("tornillo", 3.0), ("tuerca", 2.0), ("arandela", 1.0),
     ("esquinero bola", 140.0), ("esquinero", 90.0), ("cantonera", 90.0),
     ("cierre mariposa", 350.0), ("mariposa", 350.0), ("cierre", 200.0),
