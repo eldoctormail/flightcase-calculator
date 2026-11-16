@@ -337,7 +337,8 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
         u, vv, n = col["u"], col["v"], col["n"]
         o = _sum(col["o"], (0, 0, desplaz.get(grupo, 0.0)), _mul(n, -ex), (0, cl if cub else 0, 0))
         color = "resalte" if (cub and op.resaltar_cubierta) else k.color(paso_p, _GRUPO_COLOR.get(grupo, "base"))
-        k.caja(o, u, vv, n, p.ancho, p.alto, t, color, _GRUPO_CAPA.get(grupo, 30), p.nombre)
+        tp = col.get("esp", t)
+        k.caja(o, u, vv, n, p.ancho, p.alto, tp, color, _GRUPO_CAPA.get(grupo, 30), p.nombre)
         sol_panel = k.solidos[-1]
         fuera = _mul(n, -1)
         if col["id"] in op.etiquetas:
@@ -347,7 +348,7 @@ def malla_3d(res: ResultadoTaller, op: Optional[Opciones3D] = None) -> Malla3D:
             tam = max(min(min(p.ancho, p.alto) * 0.3, 60), 12)
             nf = k.girar(fuera)
             k.rotulos.append(Rotulo(op.etiquetas[col["id"]], k._p(centro, False), nf, tam, *_ejes_rotulo(nf)))
-            adentro = _sum(o, _mul(u, p.ancho / 2), _mul(vv, ly), _mul(n, t + 0.5))   # también del lado de adentro
+            adentro = _sum(o, _mul(u, p.ancho / 2), _mul(vv, ly), _mul(n, tp + 0.5))   # también del lado de adentro
             ni = k.girar(n)
             k.rotulos.append(Rotulo(op.etiquetas[col["id"]], k._p(adentro, False), ni, tam, *_ejes_rotulo(ni)))
         for c in calados.get(p.id, []):

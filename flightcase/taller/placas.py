@@ -154,10 +154,12 @@ def armar_placas(d: Dict[str, Any], piezas: List[Dict[str, Any]], rotar: bool = 
         mat = pz.get("material", material_principal)
         for _ in range(pz["cant"] * cantidad):
             por_material.setdefault(mat, []).append(dict(num=pz["num"], w=pz["w"], h=pz["h"], nombre_corto=corto))
+    from .planos.generar import medidas_placa
     pl = d["info"]["placa"]
-    L, A, kerf, margen = (float(x) for x in pl[:4])
+    kerf, margen = float(pl[2]), float(pl[3])
     placas, avisos = [], []
     for mat, sueltas in por_material.items():
+        L, A, _ref = medidas_placa(d, mat)
         pls, ne = optimizar(sueltas, L, A, kerf, margen, rotar=rotar)
         for p in pls:
             p["material"] = mat

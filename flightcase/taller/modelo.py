@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..paths import bundled_resource
+from . import materiales as _mat
 
 TRAMO_MINIMO = 30.0  # tramos de perfil más cortos se omiten (el esquinero llega al cierre)
 
@@ -265,7 +266,8 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
 
     # remache: el elegido o el más corto del catálogo que alcance
     _hib = sistema == "hibrido"
-    _rem_l_min = E_placa_esp + (hibrido_pared if _hib else E_angulo_esp) + 3
+    _general = _mat.MaterialPanel(E_placa_material, E_placa_esp, E_placa_largo, E_placa_ancho, ref_placa if ce(ref_placa) else "")
+    _rem_l_min = _mat.espesor_maximo(P, cat, _general) + (hibrido_pared if _hib else E_angulo_esp) + 3
     remaches_cat = [f["ref"] for f in cat.filas if f["categoria"] == "remache"]
     _rem_cands_d = [r for r in remaches_cat if cd(r, "d", 0) == remache_d and cd(r, "l", 0) >= _rem_l_min]
     _rem_cands = _rem_cands_d if _rem_cands_d else [r for r in remaches_cat if cd(r, "l", 0) >= _rem_l_min]
@@ -419,6 +421,11 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         filas_p.append([f"bandeja{i}", "cuerpo", b[0], b[1]])
     paneles = [Panel(p[0], nombre_panel(p[0]), p[1], p[2], p[3]) for p in filas_p]
     por_id = {p.id: p for p in paneles}
+    # material y espesor propios de algunos paneles (materiales.py): no está en flightcase.scad
+    _mat_pan = _mat.asignar(P, cat, paneles, _general)
+
+    def _esp_de(pid):
+        return _mat_pan[pid].esp if pid in _mat_pan else _t
     _panel_base = "cuerpo_izq" if _hz else ("cuerpo_frente" if _fr else ("base2" if _2t else "piso"))
 
     # ---- manijas ----
@@ -866,8 +873,13 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     L_pl = E_placa_largo - 2 * placa_margen
     A_pl = E_placa_ancho - 2 * placa_margen
     for p in paneles:
+        _m = _mat_pan.get(p.id, _general)
+        L_pl, A_pl = _m.largo - 2 * placa_margen, _m.ancho - 2 * placa_margen
         if not ((p.ancho <= L_pl and p.alto <= A_pl) or (p.alto <= L_pl and p.ancho <= A_pl)):
-            A.append(s("El panel ", p.nombre, " no entra en una placa de ", E_placa_largo, "x", E_placa_ancho, "."))
+            A.append(s("El panel ", p.nombre, " no entra en una placa de ", _m.largo, "x", _m.ancho, "."))
+    A += _mat.lista_avisos(_mat_pan, paneles, _t, _hib, cat, [ref_hibrido] if _hib else [ref_cierre_macho, ref_cierre_hembra], _general)
+    for _k in _mat.claves_desconocidas(P, paneles):
+        A.append(s("Material por panel: \"", _k, "\" no es un panel de este case; esa fila no se usa."))
     for p in perfiles:
         if p.largo > barra_largo - 2 * sierra_kerf:
             A.append(s("El tramo ", p.nombre, " de ", p.largo, " mm supera la barra."))
@@ -908,6 +920,7 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         if len(b) > 3:
             panelmat.append([f"bandeja{i}", _band_mat(b), _band_esp(b)])
         bandejas_out.append([f"bandeja{i}", b[2], bandeja_soportes])
+    panelmat += [[pid, m.material, m.esp, m.largo, m.ancho, m.ref] for pid, m in _mat_pan.items()]
 
     # ---- interiores (equipos, espuma, cajones, rack 19"): no están en flightcase.scad ----
     interior = None
@@ -955,6 +968,10 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     if _2t:
         _col("base2", (_ox, _oy, _hp), (1, 0, 0), (0, 1, 0), (0, 0, 1), "tapa2")
         _paredes("tapa2", z0_tapa2, "tapa2")
+    _desplaz = _mat.ajustar(paneles, colocaciones, calados, marcas, _esp_de, _t, dict(
+        hibrido=_hib, fe=_fe, fec=_fec, ce=_ce, dos_tapas=_2t, acceso=_acc)) if _mat_pan else {}
+    if _base and _panel_base in _desplaz:
+        _bo = [_bo[0] - _desplaz[_panel_base][0], _bo[1] - _desplaz[_panel_base][1]]
     _bc = (z_cierre2 + z_cierre) / 2
     geo = dict(
         colocaciones=colocaciones, espesor=_t, horizontal=_hz, frontal=_fr, dos_tapas=_2t,
@@ -999,7 +1016,7 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
                  "placa_largo": E_placa_largo, "placa_ancho": E_placa_ancho, "placa_esp": E_placa_esp,
                  "placa_material": E_placa_material, "placa_kerf": placa_kerf, "placa_margen": placa_margen,
                  "barra_largo": barra_largo, "sierra_kerf": sierra_kerf, "cantidad_cases": cantidad_cases,
-                 "remache_ref": E_remache_ref, "geo": geo, "interiores": interior, "manuales": manuales},
+                 "remache_ref": E_remache_ref, "materiales_paneles": _mat_pan, "geo": geo, "interiores": interior, "manuales": manuales},
     )
 
 

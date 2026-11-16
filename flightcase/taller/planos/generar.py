@@ -104,6 +104,9 @@ def parsear_datos(lineas):
             d["bandejas"][resto[0]] = dict(altura=float(resto[1]), soportes=int(float(resto[2])))
         elif tipo == "PANELMAT":
             d["panelmat"][resto[0]] = dict(material=resto[1], esp=float(resto[2]))
+            if len(resto) > 4:      # material por panel de la app: medida de la placa entera y ref
+                d["panelmat"][resto[0]].update(largo=float(resto[3]), ancho=float(resto[4]),
+                                               ref=resto[5] if len(resto) > 5 else "")
         elif tipo == "EXTRA":
             d["extras"].append(dict(nombre=resto[0], w=float(resto[1]), h=float(resto[2]),
                                     esp=float(resto[3]), cant=int(float(resto[4])), material=resto[5]))
@@ -375,6 +378,8 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
     lineas = [
         ("Sistema", "Ángulo de aluminio" if info["sistema"] == "angulo" else "Perfil híbrido"),
         ("Placa", material),
+        *[(f"Placa {m}", textwrap.shorten(", ".join(n), 70, placeholder="…"))
+          for m, n in otros_materiales(d).items()],
         ("Color", colores_case[0] if colores_case[0] == colores_case[1]
          else f"cuerpo {colores_case[0]}, tapa {colores_case[1]}"),
         ("Tipo", tipo_txt),
@@ -390,7 +395,7 @@ def generar_pdf(ruta, d, piezas, placas, barras, render_png, apilado_png=None, e
     ]
     ruedas_info = info.get("ruedas", ["0", "0"])
     if ruedas_info[0] == "4":
-        lineas.insert(7, ("Alto total con ruedas",
+        lineas.insert(7 + len(otros_materiales(d)), ("Alto total con ruedas",
                           f"{fmt(mundo[2] + float(ruedas_info[1]))} mm "
                           f"(ruedas de {fmt(float(ruedas_info[1]))} mm)"))
     esp_espuma = float(info.get("espuma", "0"))
@@ -818,17 +823,35 @@ def cantidad_cases(d):
         return 1
 
 
+def medidas_placa(d, mat):
+    """(largo, ancho, ref) de la placa entera de un material: la general o la de un panel."""
+    pl = d["info"]["placa"]
+    if mat != d["info"]["material"]:
+        for m in d.get("panelmat", {}).values():
+            if m["material"] == mat and "largo" in m:
+                return m["largo"], m["ancho"], m.get("ref", "")
+    return float(pl[0]), float(pl[1]), (pl[4] if len(pl) > 4 else "")
+
+
+def otros_materiales(d):
+    """Material -> nombres de los paneles de la caja que no usan la placa general."""
+    out = OrderedDict()
+    for pid, m in d.get("panelmat", {}).items():
+        if "largo" in m and pid in d["paneles"]:
+            out.setdefault(f"{m['material']}", []).append(d["paneles"][pid]["nombre"])
+    return out
+
+
 def lista_materiales(d, placas, barras):
     """Filas: ref, material, cant (texto), detalle. Todo para la cantidad total de cases."""
     info = d["info"]
     N = cantidad_cases(d)
     kerf = float(info["barra"][1])
     filas = []
-    ref_pl = info["placa"][4] if len(info["placa"]) > 4 else ""
     for mat, n in contar_placas(placas).items():
-        principal = mat == info["material"]
-        filas.append(dict(ref=ref_pl if principal else "", material=f"Placa {mat}", cant=str(n),
-                          detalle=f"{info['placa'][0]} x {info['placa'][1]} mm"))
+        L, A, ref = medidas_placa(d, mat)
+        filas.append(dict(ref=ref, material=f"Placa {mat}", cant=str(n),
+                          detalle=f"{L:g} x {A:g} mm"))
     for tipo, bs in barras.items():
         tramos = [p for p in d["perfiles"] if p["perfil"] == tipo]
         ref = tramos[0]["ref"] if tramos else ""
@@ -1022,10 +1045,10 @@ def main():
     pl = d["info"]["placa"]
     placas, no_entran = [], []
     for mat, sueltas in por_material.items():
-        pls, ne = acomodar_placas(sueltas, float(pl[0]), float(pl[1]), float(pl[2]),
-                                  float(pl[3]), rotar=not args.sin_rotar)
+        L, A, _ref = medidas_placa(d, mat)
+        pls, ne = acomodar_placas(sueltas, L, A, float(pl[2]), float(pl[3]), rotar=not args.sin_rotar)
         for p in pls:
-            p.update(material=mat, L=float(pl[0]), A=float(pl[1]))
+            p.update(material=mat, L=L, A=A)
         placas += pls
         no_entran += ne
     for p in no_entran:

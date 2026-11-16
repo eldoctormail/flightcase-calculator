@@ -111,6 +111,11 @@
     "nombre": "placa_material",
     "ayuda": "",
     "etiqueta": "Material de la placa"
+   },
+   {
+    "nombre": "paneles_material",
+    "ayuda": "Paneles con otra placa que la general (por ejemplo, el piso en fenólico de 12 o la tapa en abedul). Elegí un panel o un grupo entero (todo el cuerpo, toda la tapa) y la placa del catálogo, o escribí el espesor y el nombre del material. Las medidas de afuera no cambian: el panel conserva su cara exterior, los paneles que apoyan contra él se acortan lo necesario y el espesor de más se pierde hacia adentro. Las filas se aplican en orden: una fila de un panel corrige a la de su grupo.",
+    "etiqueta": "Material por panel"
    }
   ]
  },

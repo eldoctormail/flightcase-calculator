@@ -85,6 +85,8 @@ def armar_pasos(d, piezas):
     tipo_i = info.get("tipo", ["1", "vertical"])
     dos, hz = tipo_i[0] == "2", tipo_i[1] == "horizontal"
     nom = {pid: p["nombre"] for pid, p in d["paneles"].items()}
+    from .generar import otros_materiales
+    _otros_mat = otros_materiales(d)
 
     def may(t):
         return t[:1].upper() + t[1:]
@@ -154,6 +156,10 @@ def armar_pasos(d, piezas):
             "(ver planos).",
             "Controlá con cinta que cada panel mida lo indicado: un error de 1 mm en un panel "
             "se nota en todas las aristas.",
+            *([("No todos los paneles son de la misma placa: "
+                + "; ".join(f"{', '.join(n)} en {m}" for m, n in _otros_mat.items())
+                + ". Cortalos de su placa (cada material tiene su hoja de placas) y controlá el espesor "
+                "antes de remachar: el perfil tiene que abrazar cada panel sin forzarlo.")] if _otros_mat else []),
             f"Herramientas: sierra con disco para aluminio (cortes rectos y a 45°), remachadora, "
             f"mecha de {fmt(mecha)} mm para remaches de {fmt(rem_d)} mm, escuadra, cinta métrica, "
             f"prensas o sargentos" + (", mecha y llave para los bulones de ruedas" if ruedas else "")
