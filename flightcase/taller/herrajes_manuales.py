@@ -330,6 +330,11 @@ class Colocado:
     marcas: List[Any] = field(default_factory=list)     # Marca del modelo que generó
     calados: List[Any] = field(default_factory=list)    # Calado del modelo que generó
     avisos: List[str] = field(default_factory=list)
+    # modelo 3D (STEP) del artículo: nombre del archivo, centro y ejes a lo ancho y a lo alto
+    # de la pieza en coordenadas del panel
+    modelo: str = ""
+    modelo_centro: Tuple[float, float] = (0.0, 0.0)
+    modelo_ejes: Tuple[Tuple[float, float], Tuple[float, float]] = ((1.0, 0.0), (0.0, 1.0))
 
     @property
     def rect_vista(self) -> Rect:
@@ -466,6 +471,19 @@ def aplicar(P: Dict[str, Any], geo: Dict[str, Any], paneles: Sequence[Any], X: f
         else:
             categoria, nombre = "otro", f.ref or "Pieza"
         forma, w0, h0, datos = _medidas(cat, f, categoria)
+        modelo = ""
+        if categoria != "logo" and datos.get("modelo"):
+            from . import modelos3d, step_leer
+            try:
+                info = modelos3d.del_articulo(datos)
+            except (step_leer.ErrorStep, OSError) as e:
+                R.avisos.append(s(nombre, " (herraje a mano ", i + 1, "): no se pudo usar el modelo 3D: ", e,
+                                  ". Se dibuja simplificado."))
+                info = None
+            if info is not None:
+                modelo = str(datos["modelo"])
+                if forma == "superficie":       # la pieza mide lo que mide el modelo
+                    w0, h0 = info[2][0], info[2][1]
         lineas0: List[List[Tuple[float, float]]] = []
         if forma == "logo":
             lineas0, w0, h0, err = _logo(f, base)
@@ -551,6 +569,20 @@ def aplicar(P: Dict[str, Any], geo: Dict[str, Any], paneles: Sequence[Any], X: f
             if any(_solapa(huella, a) for a in cara.aluminio):
                 col.avisos.append(s(etiqueta, " pisa el aluminio (ángulo, perfil de cierre o esquinero): "
                                     "corrélo hacia el centro del panel."))
+        if modelo and col.panel:
+            pc = cara.panel(col.panel)
+            c0 = cara.cara_a_panel(pc, *cara.a_cara(col.x, col.y))
+
+            def en_panel(dx: float, dy: float) -> Tuple[float, float]:
+                q = cara.cara_a_panel(pc, *cara.a_cara(col.x + dx, col.y + dy))
+                return (q[0] - c0[0], q[1] - c0[1])
+            if forma == "junta":    # derecho sobre la junta, como los cierres de las reglas
+                ea, eb = en_panel(*_rotar(1, 0, cara.giro * 90 % 360)), en_panel(*_rotar(0, 1, cara.giro * 90 % 360))
+            else:
+                ea, eb = en_panel(*_rotar(1, 0, giro)), en_panel(*_rotar(0, 1, giro))
+            if f.espejo:
+                ea = (-ea[0], -ea[1])
+            col.modelo, col.modelo_centro, col.modelo_ejes = modelo, c0, (ea, eb)
         if forma == "logo":
             for l in lineas0:
                 pts = []

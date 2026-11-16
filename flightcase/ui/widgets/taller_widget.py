@@ -7,7 +7,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QBrush, QColor
+from PySide6.QtGui import QBrush, QColor, QImage, QPainter
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QLabel,
     QLineEdit,
+    QMenu,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -40,13 +41,14 @@ from PySide6.QtWidgets import (
 )
 
 from ...paths import bundled_resource
-from ...taller import estilos
+from ...taller import configuraciones, estilos
 from ...taller.modelo import ENTEROS, CatalogoTaller, ResultadoTaller, calcular, catalogo_actual, fmt, parametros_por_defecto
 from ...taller.scad import escribir_proyecto, leer_proyecto, literal, valor_literal
 
 # Opciones fijas de los parámetros de texto que las tienen
 OPCIONES: Dict[str, List[str]] = {
     "orientacion": ["vertical", "horizontal", "frontal"],
+    "medida_interior": ["placa", "metal"],
     "forma": ["caja", "inclinado", "funda", "plegable", "slam", "tabla"],
     "slam_caras": ["arriba", "frente", "frente_trasera", "arriba_frente"],
     "tapa_plana": ["slam", "lidmaker"],
@@ -576,6 +578,7 @@ class TallerWidget(QWidget):
     pantalla_inicio = None                 # la ventana pone acá su pantalla de inicio (botón «Nuevo…»)
     case_nuevo = Signal()                  # se empezó un case nuevo (botón o menú «Nuevo»)
     guardado = Signal(bool)                # se escribió el .scad (True = autoguardado)
+    mensaje = Signal(str)                  # aviso corto para la barra de estado de la ventana
 
     MAX_HISTORIAL = 200
 
@@ -762,6 +765,8 @@ class TallerWidget(QWidget):
 
         paginas: Dict[str, QVBoxLayout] = {}
         self._paginas: Dict[str, int] = {}
+        self._secciones_guardables = configuraciones.secciones()
+        self.botones_config: Dict[str, QToolButton] = {}
         self.secciones_de_grupo: Dict[str, List[str]] = {c: [] for c, _, _ in self.GRUPOS_LATERAL}
         for clave, _, _ in self.GRUPOS_LATERAL:
             pagina = QWidget()
@@ -783,7 +788,16 @@ class TallerWidget(QWidget):
                 cab = QLabel(titulo)
                 cab.setObjectName("tituloSeccion")
                 cab.setWordWrap(True)
-                paginas[grupo].addWidget(cab)
+                if titulo in self._secciones_guardables:
+                    fila_cab = QWidget()
+                    fc = QHBoxLayout(fila_cab)
+                    fc.setContentsMargins(0, 0, 0, 0)
+                    fc.setSpacing(4)
+                    fc.addWidget(cab, 1)
+                    fc.addWidget(self._boton_configuraciones(titulo), 0, Qt.AlignBottom)
+                    paginas[grupo].addWidget(fila_cab)
+                else:
+                    paginas[grupo].addWidget(cab)
             caja = QWidget()
             form = QFormLayout(caja)
             form.setContentsMargins(0, 0, 0, 6)
@@ -849,6 +863,7 @@ class TallerWidget(QWidget):
         self.barra_tapas = QHBoxLayout()            # Abrir/Ocultar de cada tapa, a mano sobre la vista
         self.barra_tapas.setSpacing(2)
         self.barra_3d.layout().addLayout(self.barra_tapas)
+        self._boton_foto()
         l3d.addWidget(self.barra_3d)
         l3d.addWidget(self.vista_3d, 1)
         from .panel_pieza import PanelPieza
@@ -1058,6 +1073,85 @@ class TallerWidget(QWidget):
             return
         estilos.borrar_propio(e.id)
         self._cargar_estilos()
+
+    # ------------------------------------------------ configuraciones por sección
+    def _boton_configuraciones(self, seccion: str) -> QToolButton:
+        b = QToolButton()
+        b.setObjectName("botonConfig")
+        b.setText("Guardar / cargar ▾")
+        b.setToolTip("Guarda los valores de esta sección con un nombre, o carga una configuración "
+                     "guardada antes (sólo cambia esta sección del case).")
+        b.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        menu = QMenu(b)
+        menu.aboutToShow.connect(lambda m=menu, s=seccion: self._llenar_menu_config(m, s))
+        b.setMenu(menu)
+        self.botones_config[seccion] = b
+        return b
+
+    def _llenar_menu_config(self, menu: QMenu, seccion: str) -> None:
+        menu.clear()
+        menu.addAction("Guardar esta sección…", lambda: self.guardar_configuracion(seccion))
+        menu.addSeparator()
+        lista = configuraciones.de_seccion(seccion)
+        if not lista:
+            menu.addAction("No hay configuraciones guardadas").setEnabled(False)
+            return
+        for c in lista:
+            a = menu.addAction(f"Cargar «{c.nombre}»", lambda i=c.id: self.cargar_configuracion(i))
+            a.setToolTip(", ".join(self._etiquetas.get(k, k) for k in c.params))
+        menu.setToolTipsVisible(True)
+        borrar = menu.addMenu("Borrar")
+        for c in lista:
+            borrar.addAction(c.nombre, lambda i=c.id: self.borrar_configuracion(i))
+
+    def guardar_configuracion(self, seccion: str, nombre: Optional[str] = None,
+                              con_contenido: Optional[bool] = None) -> Optional[str]:
+        """Guarda los valores de una sección con un nombre (pregunta lo que no se pasa)."""
+        self._leer_editores()
+        interactivo = nombre is None
+        if interactivo:
+            nombre, ok = QInputDialog.getText(self, "Guardar configuración",
+                                              f"Nombre para esta configuración de «{seccion}»:")
+            if not ok:
+                return None
+        nombre = (nombre or "").strip()
+        if not nombre:
+            return None
+        if interactivo and any(c.nombre.lower() == nombre.lower() for c in configuraciones.de_seccion(seccion)):
+            if QMessageBox.question(self, "Guardar configuración",
+                                    f"Ya hay una configuración «{nombre}» en esta sección. ¿Reemplazarla?") != QMessageBox.Yes:
+                return None
+        if con_contenido is None:
+            con_contenido = False
+            if configuraciones.tiene_contenido(seccion, self.params):
+                con_contenido = QMessageBox.question(
+                    self, "Guardar configuración",
+                    "Esta sección tiene listas cargadas en este case (equipos, cajones, bandejas…).\n"
+                    "¿Guardarlas también? Si no, se guardan sólo los ajustes.") == QMessageBox.Yes
+        c = configuraciones.guardar(nombre, seccion, self.params, con_contenido)
+        self.mensaje.emit(f"Configuración «{c.nombre}» guardada en «{seccion}».")
+        return c.id
+
+    def cargar_configuracion(self, id_conf: str) -> bool:
+        """Carga una configuración guardada: cambia sólo los valores de su sección (se puede deshacer)."""
+        c = configuraciones.buscar(id_conf)
+        if c is None:
+            return False
+        self._leer_editores()
+        self.params = configuraciones.aplicar(self.params, c, self.defectos)
+        self._cargar_en_editores()
+        self.recalcular()
+        self.mensaje.emit(f"Se cargó «{c.nombre}» en «{c.seccion}» (Deshacer la saca).")
+        return True
+
+    def borrar_configuracion(self, id_conf: str, confirmar: bool = True) -> bool:
+        c = configuraciones.buscar(id_conf)
+        if c is None:
+            return False
+        if confirmar and QMessageBox.question(self, "Borrar configuración",
+                                              f"¿Borrar la configuración «{c.nombre}»?") != QMessageBox.Yes:
+            return False
+        return configuraciones.borrar(id_conf)
 
     @staticmethod
     def _tabla(columnas: List[str]) -> QTableWidget:
@@ -1609,7 +1703,9 @@ class TallerWidget(QWidget):
         n_paneles = len(res.paneles)
         self.lbl_resumen.setText(
             f"<b>Exterior:</b> {fmt(v['ext_ancho'])} × {fmt(v['ext_prof'])} × {fmt(v['ext_alto'])} mm"
-            f" &nbsp;·&nbsp; <b>Sistema:</b> {res.info['sistema'][0]}"
+            + (f" &nbsp;·&nbsp; <b>Interior de metal a metal</b> (+{fmt(mi['suma']['int_ancho'])} mm de placa a placa)"
+               if (mi := v.get("medida_interior")) else "")
+            + f" &nbsp;·&nbsp; <b>Sistema:</b> {res.info['sistema'][0]}"
             f" &nbsp;·&nbsp; <b>Placa:</b> {v['placa_material']}"
             + (f" (+ {len(otros)} paneles en otra placa)" if (otros := v.get("materiales_paneles") or {}) else "") +
             f" &nbsp;·&nbsp; {n_paneles} paneles, {sum(p.cantidad for p in res.perfiles)} tramos de perfil"
@@ -2013,6 +2109,111 @@ class TallerWidget(QWidget):
         if self.isVisible():
             QMessageBox.information(self, "Exportar planos", f"Se guardaron los planos en:\n{ruta}")
         return ruta
+
+    # --- Foto de la vista 3D y hoja del case ---
+
+    def _boton_foto(self) -> None:
+        from PySide6.QtWidgets import QMenu, QToolButton
+        from .barra_3d import LADO, _icono
+        b = QToolButton(self.barra_3d)
+        b.setIcon(_icono("camera"))
+        b.setIconSize(QSize(LADO, LADO))
+        b.setAutoRaise(True)
+        b.setToolTip("Foto de la vista 3D: copiarla, guardarla como PNG sin fondo o sacar la hoja del case en PDF")
+        b.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        menu = QMenu(b)
+        menu.addAction("Copiar imagen", self.copiar_imagen_3d)
+        menu.addAction("Guardar imagen PNG (sin fondo)...", lambda: self.guardar_imagen_3d())
+        menu.addSeparator()
+        menu.addAction("Hoja del case (PDF): vista 3D y cada lado...", lambda: self.exportar_hoja())
+        b.setMenu(menu)
+        self.barra_3d.botones["foto"] = b
+        fila = self.barra_3d.layout()
+        fila.insertWidget(fila.count() - 2, b)     # antes del estirador y de los botones de las tapas
+
+    def _nombre_case(self) -> str:
+        return os.path.splitext(os.path.basename(self.ruta))[0] if self.ruta else "case"
+
+    def imagen_3d(self, transparente: bool = True):
+        """La vista 3D tal como se ve, sin fondo ni ayudas (QImage)."""
+        return self.vista_3d.capturar(transparente)
+
+    def copiar_imagen_3d(self) -> bool:
+        """Copia la vista 3D al portapapeles: como PNG transparente (Word, PowerPoint, Keynote, GIMP)
+        y como imagen sobre blanco para los programas que no entienden la transparencia."""
+        from PySide6.QtCore import QBuffer, QByteArray, QIODevice, QMimeData
+        img = self.imagen_3d(True)
+        if img.isNull():
+            return False
+        datos = QByteArray()
+        buf = QBuffer(datos)
+        buf.open(QIODevice.OpenModeFlag.WriteOnly)
+        img.save(buf, "PNG")
+        buf.close()
+        fondo = QImage(img.size(), QImage.Format.Format_RGB32)
+        fondo.fill(QColor("#ffffff"))
+        p = QPainter(fondo)
+        p.drawImage(0, 0, img)
+        p.end()
+        mime = QMimeData()
+        mime.setData("image/png", datos)
+        mime.setImageData(fondo)
+        QApplication.clipboard().setMimeData(mime)
+        self._avisar_estado("Vista 3D copiada: pegala en otro programa con Ctrl+V")
+        return True
+
+    def guardar_imagen_3d(self, ruta: Optional[str] = None) -> Optional[str]:
+        """Guarda la vista 3D como PNG con fondo transparente."""
+        img = self.imagen_3d(True)
+        if img.isNull():
+            QMessageBox.warning(self, "Guardar imagen", "No hay nada en la vista 3D para guardar.")
+            return None
+        if not ruta:
+            ruta, _ = QFileDialog.getSaveFileName(self, "Guardar la vista 3D", f"{self._nombre_case()}.png",
+                                                  "Imagen PNG (*.png)")
+            if not ruta:
+                return None
+            if not ruta.lower().endswith(".png"):
+                ruta += ".png"
+        if not img.save(ruta, "PNG"):
+            QMessageBox.critical(self, "Guardar imagen", f"No se pudo guardar la imagen en:\n{ruta}")
+            return None
+        self._avisar_estado(f"Imagen guardada en {ruta}")
+        return ruta
+
+    def exportar_hoja(self, ruta: Optional[str] = None) -> Optional[str]:
+        """Una hoja A4 en PDF con la vista 3D (como se ve ahora) y las seis vistas de los lados acotadas."""
+        from ...taller.hoja import generar_hoja
+        if self.resultado is None:
+            return None
+        nombre = self._nombre_case()
+        if not ruta:
+            ruta, _ = QFileDialog.getSaveFileName(self, "Hoja del case", f"Hoja - {nombre}.pdf", "PDF (*.pdf)")
+            if not ruta:
+                return None
+            if not ruta.lower().endswith(".pdf"):
+                ruta += ".pdf"
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            generar_hoja(self.resultado, ruta, nombre, self.imagen_3d(True),
+                         self.vista_3d.colores_placa or None)
+        except Exception as e:
+            QApplication.restoreOverrideCursor()
+            QMessageBox.critical(self, "Hoja del case", f"No se pudo generar la hoja:\n{e}")
+            return None
+        QApplication.restoreOverrideCursor()
+        if self.isVisible():
+            QMessageBox.information(self, "Hoja del case", f"Se guardó la hoja en:\n{ruta}")
+        return ruta
+
+    def _avisar_estado(self, texto: str) -> None:
+        """Aviso corto junto al botón de la cámara (la ventana no tiene barra de estado)."""
+        from PySide6.QtCore import QPoint
+        from PySide6.QtWidgets import QToolTip
+        self.ultimo_aviso = texto
+        b = self.barra_3d.botones.get("foto")
+        if b is not None and b.isVisible():
+            QToolTip.showText(b.mapToGlobal(QPoint(0, b.height())), texto, b, b.rect(), 3000)
 
     def exportar_step(self, ruta: Optional[str] = None):
         """Modelo 3D del case armado (.step) para abrir en Fusion, SolidWorks o FreeCAD."""

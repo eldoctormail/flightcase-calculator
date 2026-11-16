@@ -206,14 +206,21 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
     # ---- fórmulas (formulas.py): medidas calculadas a partir de otras; no está en flightcase.scad ----
     from . import formulas as _formulas
     _fx = _formulas.aplicar(P, parametros_por_defecto(), ENTEROS)
+    cat = catalogo or catalogo_actual()
     # ---- piezas sueltas (piezas.py): la placa de un panel elegido en el 3D va como material por panel ----
     _pan_pz = [[c.pieza, c.ref, 0, ""] for c in _piezas.cambios(P).values()
                if _piezas.tipo_de(c.pieza) == "panel" and c.ref]
     if _pan_pz:
         P["paneles_material"] = list(P.get("paneles_material") or []) + _pan_pz
-    res = _calcular(P, catalogo or catalogo_actual())
+    # ---- medida interior de metal a metal (medida_interior.py); no está en flightcase.scad ----
+    from . import medida_interior as _mi
+    pedido = {k: P[k] for k in ("int_ancho", "int_prof", "int_alto_cuerpo", "int_alto_tapa")}
+    _aj = _mi.ajustar(P, cat)
+    res = _calcular(P, cat)
     res.valores["formulas"] = _fx
+    res.valores["medida_interior"] = dict(_aj, pedido=pedido) if _aj else None
     res.avisos[:0] = _fx.avisos
+    res.avisos += _mi.avisos_paso(P, cat)
     return res
 
 

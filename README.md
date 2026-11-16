@@ -9,6 +9,7 @@ Programa de escritorio (Python + PySide6 + OpenGL) para diseñar y fabricar flig
 ## Funciones
 
 - **Medidas interiores o exteriores** (sección Medidas): elegís si cargás las medidas por dentro o por fuera (sin ruedas), y las mismas casillas muestran Ancho y Largo, el Alto total con un **candado**, y el alto del cuerpo y de la tapa. Debajo se ve la otra medida. Al cargar exteriores se calculan las interiores con las paredes, el aluminio y la espuma del armado elegido. Con el candado cerrado, al cambiar el cuerpo o la tapa el otro se ajusta y el alto total queda igual; abierto, el alto total crece o se achica. El `.scad` sigue guardando las interiores.
+- **Interior de placa a placa o de metal a metal** (`medida_interior`): los perfiles de cierre y el perfil híbrido tienen una pata por dentro de la placa que se come un poco de la boca. De placa a placa (como siempre), la app avisa si un equipo no pasa entre las patas; de metal a metal, el case crece lo justo (la pata sale del catálogo, dato `pata_int`, o de `cierre_pata_int` / `hibrido_pata_int`). Con perfil híbrido crecen también los altos.
 - **Fórmulas** (Medidas → Fórmulas): medidas que se calculan a partir de otras, como en una planilla. Cada fila es un nombre y una fórmula: si el nombre es un parámetro del case (`int_alto_cuerpo`, `int_alto_tapa`, `ruedas`…) ese campo toma el valor y queda bloqueado (al pasar el mouse dice la fórmula); si no, es una variable propia para usar en las otras (`alto_equipo = 88`, `int_alto_cuerpo = alto_equipo + 2 * 15`). Se puede usar + − × ÷ y `^`, coma decimal, paréntesis, `min`, `max`, `round`, `ceil`, `floor`, `abs`, `sqrt`, comparaciones y `a if condición else b`. El orden de las filas no importa; si una fórmula tiene un error o se usa a sí misma en círculo, aparece un aviso y no se aplica. Debajo de la tabla se ve lo que dio cada una. Se guardan en el `.scad` como `formulas`.
 - **Editor del case**: todos los parámetros del generador, agrupados como en `flightcase.scad`, con su explicación al pasar el mouse. Paneles, perfiles, herrajes y avisos se recalculan al instante.
 - **Tipos de case** en siete grupos (Estándar, Broadcast, Clamshell, Apertura frontal, Racks, Tapas slam y Especiales), cada uno con su armado: dónde se parte la tapa, cómo se juntan los perfiles y qué medidas van atadas. Más tus estilos propios guardados.
@@ -202,6 +203,8 @@ Sale de `packaging/icono/icono.svg`. Si lo cambiás, regenerá el `.ico` (Window
 
 Arriba de la pestaña Taller, **Estilo de case** aplica una forma de armado sobre las medidas que ya cargaste, sin tocar el interior ni los herrajes puestos a mano: baúl con tapa suelta, con tapa abisagrada o con base de ruedas, case de mano con pies, clamshell de dos mitades, bisagra de piano, tapa arriba y abajo, racks 19" (tapa adelante, adelante y atrás, con tapas de acceso o con cubierta que sale entera), case acostado con tapas a los costados y case liviano con perfil híbrido. Los estilos con base de ruedas la calculan solos (10 mm más chica que la planta del cuerpo, fenólico de 18 mm). Con **Guardar como estilo…** guardás cómo está armado tu case (todo menos medidas e interior) para usarlo en otros proyectos; los estilos propios van a tu carpeta de datos y aparecen con ★.
 
+Si querés guardar **una sola parte** del armado, cada sección del panel (Placa, Ruedas, Cierres mariposa, Interior: equipos y espuma, Herrajes del catálogo…) tiene a la derecha del título un botón **Guardar / cargar ▾**. *Guardar esta sección…* guarda con un nombre los valores de esa sección y nada más; *Cargar «…»* los pone en el case que tengas abierto sin tocar el resto (se deshace con Ctrl+Z). Las medidas nunca entran, y las listas del case (equipos, cajones, bandejas, equipos del rack, piezas extra) sólo si decís que sí al guardar. Se guardan en tu carpeta de datos (`taller_configuraciones.json`).
+
 Los tipos de case vienen en siete grupos, con nombres en español:
 
 ![Tipos de case en la pantalla de inicio](captura-tipos-de-case.png)
@@ -223,6 +226,16 @@ Los tipos de case vienen en siete grupos, con nombres en español:
 - **Baúl para guitarras**: case parado con tapa adelante y cuatro guitarras de pie entre tabiques de espuma; las medidas de cada guitarra se ajustan en la tabla de equipos.
 
 En **Herrajes del catálogo FR Sistemas** cada herraje (placa, ángulo, perfiles de cierre, esquineros, cierres, manijas, ruedas, bisagras, topes, pies, espuma, remaches…) se elige de una lista con número y nombre, filtrada por tipo; se puede escribir parte del nombre para buscar. Los artículos con * tienen medidas estimadas. En **Otros accesorios → extras** se agregan, en una tabla, artículos del catálogo para la lista de compras (asas telescópicas, argollas, tornillería, carátulas de rack…) con su cantidad.
+
+### Foto de la vista 3D y hoja del case
+
+El botón de la **cámara** en la barra de la vista 3D saca una foto de la vista tal como se ve (ángulo, zoom, tapas abiertas o cajones afuera, cotas), sin el fondo, la grilla, los ejes ni el cubo de vistas:
+
+- **Copiar imagen** (`Ctrl+Shift+C`, también en **Editar**): queda en el portapapeles como PNG transparente y, para los programas que no entienden la transparencia, sobre blanco. Se pega con `Ctrl+V` en Word, PowerPoint, WhatsApp, etc.
+- **Guardar imagen PNG (sin fondo)** (`Ctrl+Alt+I`, también en **Archivo**): el mismo PNG con fondo transparente, recortado al case.
+- **Hoja del case (PDF)** (`Ctrl+Alt+H`, también en **Archivo**): una hoja A4 con la foto de la vista 3D, los datos del case (medidas exteriores, interiores y totales, placa, color y peso) y las seis vistas de los lados (frente, atrás, izquierda, derecha, arriba y abajo), todas a la misma escala y acotadas con la medida total, herrajes y ruedas incluidos. Para fabricar siguen estando los planos (`Ctrl+Shift+P`).
+
+OpenGL no entrega la transparencia, así que la foto se dibuja dos veces, sobre negro y sobre blanco, y de la diferencia sale cuánto tapa cada píxel (los bordes suavizados quedan bien sobre cualquier fondo). Si la placa de video no deja leer la imagen, se dibuja por software con el mismo ángulo.
 
 ### Exportar a STEP
 
@@ -262,5 +275,17 @@ Los conectores están en el catálogo, en la categoría **Conectores y energía*
 - **IEC C14** a presión (calado de 27,5 x 20 mm, sin tornillos), **IEC C13** con dos tornillos, **toma Schuko** de panel con cuatro tornillos y **pasacables** con cepillo.
 - Las medidas de los que no son D son aproximadas (quedan *sin verificar* en el catálogo): medí el tuyo y corregilas en **Catálogo…**, o agregá otros conectores con su forma, calado, brida, tornillos y fondo.
 - En la vista 3D se ven la brida, el frente del conector y el cuerpo que entra en el case (el *fondo*). Dos conectores pueden ir pegados; la app avisa si las bridas se pisan o si un conector cae sobre el aluminio.
+
+### Modelos 3D de los herrajes (STEP)
+
+![Conector BNC, jack y una pieza propia con su modelo STEP en el frente del case](captura-modelo-step.png)
+
+Muchos fabricantes dan el modelo 3D de cada herraje en STEP (`.step` / `.stp`). En **Catálogo…**, elegí el artículo (un cierre, una manija, un conector, un accesorio propio…) y tocá **Modelo 3D…**: la app copia el archivo a tu carpeta de datos (`modelos_3d/`) y lo deja en la columna *Modelo 3D*. Desde ahí, cada vez que pongas ese herraje con **Herrajes a mano**:
+
+- la **vista 3D** y los renders muestran la pieza real, con sus aristas, en vez de la caja simplificada;
+- el **STEP del case** lleva el modelo del fabricante tal cual, con sus caras curvas (no en triángulos), ubicado y con su unidad (también si viene en pulgadas);
+- un accesorio propio mide lo que mide su modelo (para las marcas, los avisos y los planos).
+
+*Frente del modelo* dice qué eje del modelo mira hacia afuera del case (vacío = `+Z`; si la pieza aparece de costado o al revés, probá con otro) y *Entra en la placa* cuántos milímetros quedan metidos en la madera (cierres embutidos, conectores). El STEP se lee sin librerías de CAD (planos, cilindros, conos, esferas, toros, superficies de revolución y de extrusión, B-splines y ensambles); los tests comparan los volúmenes con OpenCASCADE. Un herraje espejado va al STEP del case como superficies, porque un ensamble STEP no puede espejar una pieza.
 
 Los tests comparan el resultado con OpenSCAD: los datos de 18 proyectos y variantes (`tests/golden/taller`) y las listas y DXF de 3 proyectos (`tests/golden/taller_paquete`). Para regenerarlos: `python tools/generar_golden.py ruta/a/flightcase-generador`.

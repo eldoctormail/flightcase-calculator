@@ -17,7 +17,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
-from .geometria import COLORES, Malla3D, Opciones3D, Solido3D, malla_3d
+from .geometria import COLORES, Malla3D, ModeloPuesto, Opciones3D, Solido3D, malla_3d
 from .modelo import ResultadoTaller
 
 Vec = Tuple[float, float, float]
@@ -371,8 +371,10 @@ def _solido(w: _Escritor, c: Cuerpo) -> int:
     return w(f"SHELL_BASED_SURFACE_MODEL({_txt(c.nombre)},({w.ref(os_)}))")
 
 
-def texto_step(lista: Sequence[Cuerpo], titulo: str = "Flightcase", archivo: str = "case.step") -> str:
-    """Archivo STEP AP214 con un ensamble: una pieza por nombre, cada una con sus cuerpos y colores."""
+def texto_step(lista: Sequence[Cuerpo], titulo: str = "Flightcase", archivo: str = "case.step",
+               modelos: Sequence[ModeloPuesto] = (), avisos: Optional[List[str]] = None) -> str:
+    """Archivo STEP AP214 con un ensamble: una pieza por nombre, cada una con sus cuerpos y colores.
+    Los `modelos` (herrajes con su propio STEP) se copian enteros, con sus caras curvas."""
     w = _Escritor()
     # unidades: milímetros
     mm = w("( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) )")
@@ -441,6 +443,72 @@ def texto_step(lista: Sequence[Cuerpo], titulo: str = "Flightcase", archivo: str
         rr = w(f"( REPRESENTATION_RELATIONSHIP('','',#{rep},#{rep_raiz_idx}) "
                f"REPRESENTATION_RELATIONSHIP_WITH_TRANSFORMATION(#{idt}) SHAPE_REPRESENTATION_RELATIONSHIP() )")
         w(f"CONTEXT_DEPENDENT_SHAPE_REPRESENTATION(#{rr},#{pds})")
+    # herrajes con modelo STEP: sus sólidos tal cual, ubicados con una transformación
+    leidos: Dict[str, object] = {}
+    contextos: Dict[float, int] = {1.0: ctx}
+
+    def contexto(escala: float) -> int:
+        """Contexto con la unidad del modelo (mm por unidad)."""
+        clave = round(escala, 9)
+        if clave not in contextos:
+            si = {1000.0: "$,.METRE.", 10.0: ".CENTI.,.METRE.", 100.0: ".DECI.,.METRE.", 0.001: ".MICRO.,.METRE."}
+            if clave in si:
+                u = w(f"( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT({si[clave]}) )")
+            else:
+                dim = w("DIMENSIONAL_EXPONENTS(1.,0.,0.,0.,0.,0.,0.)")
+                lm = w(f"LENGTH_MEASURE_WITH_UNIT(LENGTH_MEASURE({_num(escala, 9)}),#{mm})")
+                u = w(f"( CONVERSION_BASED_UNIT('UNIDAD',#{lm}) LENGTH_UNIT() NAMED_UNIT(#{dim}) )")
+            un = w(f"UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE({_num(1e-3 / escala, 9)}),#{u},'distance_accuracy_value','confusion accuracy')")
+            contextos[clave] = w(f"( GEOMETRIC_REPRESENTATION_CONTEXT(3) GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((#{un})) "
+                                 f"GLOBAL_UNIT_ASSIGNED_CONTEXT((#{u},#{rad},#{sr})) REPRESENTATION_CONTEXT('Context','3D Context with UNIT and UNCERTAINTY') )")
+        return contextos[clave]
+
+    n_hijo = len(hijos_ejes)
+    for mp in modelos:
+        try:
+            if mp.ruta not in leidos:
+                from . import modelos3d, step_leer
+                leidos[mp.ruta] = (step_leer.leer(mp.ruta), modelos3d.cargar(mp.ruta).malla)
+            ms, malla = leidos[mp.ruta]  # type: ignore[misc]
+        except (OSError, ValueError) as e:
+            if avisos is not None:
+                avisos.append(f"{mp.nombre}: no se pudo copiar el modelo 3D al STEP ({e}).")
+            continue
+        import numpy as np
+        for sid, m_src in malla.solidos:
+            if sid not in ms.e:
+                continue
+            S = np.diag([malla.escala, malla.escala, malla.escala, 1.0])
+            T = np.asarray(mp.matriz) @ S @ np.asarray(m_src)
+            lin = T[:3, :3]
+            esc = float(np.cbrt(abs(np.linalg.det(lin))))
+            if esc <= 0:
+                continue
+            R = lin / esc
+            # copia de las entidades del sólido, con números nuevos
+            ids = ms.entidades_de(sid)
+            nuevos = {i: w("") for i in ids}
+            from .step_leer import renumerar
+            for i in ids:
+                w.lineas[nuevos[i] - 1] = renumerar(ms.texto_de(i), nuevos)
+            solido = nuevos[sid]
+            pd = producto(mp.nombre)
+            estilos.append(w(f"STYLED_ITEM('color',(#{estilo(mp.color)}),#{solido})"))
+            ej = ejes()
+            tipo = ("ADVANCED_BREP_SHAPE_REPRESENTATION" if ms.e[sid].tipo in ("MANIFOLD_SOLID_BREP", "BREP_WITH_VOIDS")
+                    else "SHAPE_REPRESENTATION")
+            rep = w(f"{tipo}({_txt(mp.nombre)},{w.refs([solido, ej])},#{contexto(esc)})")
+            w(f"SHAPE_DEFINITION_REPRESENTATION(#{w(f'PRODUCT_DEFINITION_SHAPE({chr(39)}{chr(39)},{chr(39)}{chr(39)},#{pd})')},#{rep})")
+            o_ = w(f"CARTESIAN_POINT('',{_vec(T[:3, 3])})")
+            en_raiz = w(f"AXIS2_PLACEMENT_3D('',#{o_},#{w.direccion(_unit(R[:, 2]))},#{w.direccion(_unit(R[:, 0]))})")
+            hijos_ejes.append(en_raiz)
+            n_hijo += 1
+            nauo = w(f"NEXT_ASSEMBLY_USAGE_OCCURRENCE('{n_hijo}',{_txt(mp.nombre)},'',#{pd_raiz},#{pd},$)")
+            pds = w(f"PRODUCT_DEFINITION_SHAPE('','',#{nauo})")
+            idt = w(f"ITEM_DEFINED_TRANSFORMATION('','',#{ej},#{en_raiz})")
+            rr = w(f"( REPRESENTATION_RELATIONSHIP('','',#{rep},#{rep_raiz_idx}) "
+                   f"REPRESENTATION_RELATIONSHIP_WITH_TRANSFORMATION(#{idt}) SHAPE_REPRESENTATION_RELATIONSHIP() )")
+            w(f"CONTEXT_DEPENDENT_SHAPE_REPRESENTATION(#{rr},#{pds})")
     w.lineas[rep_raiz_idx - 1] = f"SHAPE_REPRESENTATION({_txt(titulo)},{w.refs([ejes_raiz] + hijos_ejes)},#{ctx})"
     if estilos:
         w(f"MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION('',{w.refs(estilos)},#{ctx})")
@@ -473,7 +541,8 @@ def exportar_step(res: ResultadoTaller, ruta: str, titulo: Optional[str] = None,
     if abiertos:
         avisos.append("Quedaron como superficies (no sólidos): " + ", ".join(abiertos))
     titulo = titulo or os.path.splitext(os.path.basename(ruta))[0] or "Flightcase"
-    texto = texto_step(lista, titulo, os.path.basename(ruta))
-    with open(ruta, "w", encoding="ascii", newline="\n") as f:
+    texto = texto_step(lista, titulo, os.path.basename(ruta), malla.modelos, avisos)
+    with open(ruta, "w", encoding="ascii", errors="replace", newline="\n") as f:
         f.write(texto)
-    return ResultadoStep(ruta, len({c.nombre for c in lista}), len(lista), avisos)
+    nombres = {c.nombre for c in lista} | {m.nombre for m in malla.modelos}
+    return ResultadoStep(ruta, len(nombres), len(lista) + len(malla.modelos), avisos)
