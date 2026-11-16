@@ -1076,6 +1076,114 @@
   "verificado": true
  },
  {
+  "ref": "LBD-FEN6.5",
+  "categoria": "placa",
+  "nombre": "Fenólico 6,5 mm, hoja 2440 x 1220 (genérica)",
+  "datos": {
+   "tipo": "fenólico",
+   "esp": 6.5,
+   "largo": 2440,
+   "ancho": 1220
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-FEN9",
+  "categoria": "placa",
+  "nombre": "Fenólico 9 mm, hoja 2440 x 1220 (genérica)",
+  "datos": {
+   "tipo": "fenólico",
+   "esp": 9,
+   "largo": 2440,
+   "ancho": 1220
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-FEN12",
+  "categoria": "placa",
+  "nombre": "Fenólico 12 mm, hoja 2440 x 1220 (genérica)",
+  "datos": {
+   "tipo": "fenólico",
+   "esp": 12,
+   "largo": 2440,
+   "ancho": 1220
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-FEN15",
+  "categoria": "placa",
+  "nombre": "Fenólico 15 mm, hoja 2440 x 1220 (genérica)",
+  "datos": {
+   "tipo": "fenólico",
+   "esp": 15,
+   "largo": 2440,
+   "ancho": 1220
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-FEN18",
+  "categoria": "placa",
+  "nombre": "Fenólico 18 mm, hoja 2440 x 1220 (genérica)",
+  "datos": {
+   "tipo": "fenólico",
+   "esp": 18,
+   "largo": 2440,
+   "ancho": 1220
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-ABE9",
+  "categoria": "placa",
+  "nombre": "Multilaminado abedul 9 mm, hoja 2500 x 1250 (genérica)",
+  "datos": {
+   "tipo": "abedul",
+   "esp": 9,
+   "largo": 2500,
+   "ancho": 1250
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-ABE12",
+  "categoria": "placa",
+  "nombre": "Multilaminado abedul 12 mm, hoja 2500 x 1250 (genérica)",
+  "datos": {
+   "tipo": "abedul",
+   "esp": 12,
+   "largo": 2500,
+   "ancho": 1250
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-MDF9",
+  "categoria": "placa",
+  "nombre": "MDF 9 mm, hoja 2600 x 1830 (genérica)",
+  "datos": {
+   "tipo": "MDF",
+   "esp": 9,
+   "largo": 2600,
+   "ancho": 1830
+  },
+  "verificado": false
+ },
+ {
+  "ref": "LBD-PP4",
+  "categoria": "placa",
+  "nombre": "Polipropileno alveolar 4 mm, hoja 2000 x 1000 (genérica)",
+  "datos": {
+   "tipo": "polipropileno",
+   "esp": 4,
+   "largo": 2000,
+   "ancho": 1000
+  },
+  "verificado": false
+ },
+ {
   "ref": "05-004",
   "categoria": "extra",
   "nombre": "Plancha de aluminio gofrado 0,6 mm 1,25x2 m",

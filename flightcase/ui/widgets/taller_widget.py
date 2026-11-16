@@ -37,7 +37,7 @@ from PySide6.QtWidgets import (
 
 from ...paths import bundled_resource
 from ...taller import estilos
-from ...taller.modelo import CatalogoTaller, ResultadoTaller, calcular, fmt, parametros_por_defecto
+from ...taller.modelo import CatalogoTaller, ResultadoTaller, calcular, catalogo_actual, fmt, parametros_por_defecto
 from ...taller.scad import escribir_proyecto, leer_proyecto, literal, valor_literal
 
 # Opciones fijas de los parámetros de texto que las tienen
@@ -90,14 +90,11 @@ REF_CATEGORIAS: Dict[str, Optional[tuple]] = {
     "ref_riel": ("rack",), "ref_corredera": None,
 }
 SEPARADOR_REF = " — "
-_catalogo: Optional[CatalogoTaller] = None
 
 
 def catalogo() -> CatalogoTaller:
-    global _catalogo
-    if _catalogo is None:
-        _catalogo = CatalogoTaller()
-    return _catalogo
+    """El catálogo en uso, con los cambios del usuario (Editar → Catálogo)."""
+    return catalogo_actual()
 
 
 def etiqueta_ref(ref: str) -> str:
@@ -111,9 +108,14 @@ def ref_de_texto(texto: str) -> str:
 
 
 def _ayuda_articulo(fila: Dict[str, Any]) -> str:
-    datos = ", ".join(f"{k}: {fmt(v) if not isinstance(v, str) else v}" for k, v in fila.get("datos", {}).items())
+    from ...taller import catalogo as C
+    datos = C.resumen_datos(fila)
+    extra = "".join(f"\n{t}: {fila[k]}" for k, t in (("proveedor", "Proveedor"), ("nota", "Nota")) if fila.get(k))
+    if fila.get("origen") in ("propio", "modificado"):
+        extra += "\nDe tu catálogo" + (" (cambiado)" if fila["origen"] == "modificado" else "")
     nota = "" if fila.get("verificado", True) else "\nMedidas estimadas: verificalas con la pieza."
-    return f"{fila['nombre']} ({fila['categoria']})" + (f"\n{datos}" if datos else "") + nota
+    return f"{fila['nombre']} ({C.NOMBRES.get(fila['categoria'], fila['categoria'])})" + \
+        (f"\n{datos}" if datos else "") + extra + nota
 
 
 def _llenar_combo_catalogo(w: QComboBox, categorias: Optional[tuple], vacio: bool) -> None:
@@ -420,6 +422,20 @@ class _EditorTabla:
                                 f"Se guardaron {len(nuevos)} equipos en la biblioteca.{extra}")
         return len(nuevos)
 
+    def refrescar_etiquetas(self) -> None:
+        """«ref — nombre» de nuevo, con los nombres del catálogo actual."""
+        self.tabla.blockSignals(True)
+        try:
+            for c, (_, tipo, _r) in enumerate(self.columnas):
+                if tipo not in ("ref", "placa"):
+                    continue
+                for r in range(self.tabla.rowCount()):
+                    it = self.tabla.item(r, c)
+                    if it and it.text().strip():
+                        it.setText(etiqueta_ref(ref_de_texto(it.text())))
+        finally:
+            self.tabla.blockSignals(False)
+
     def _agregar(self) -> None:
         self.tabla.insertRow(self.tabla.rowCount())
 
@@ -555,6 +571,7 @@ class TallerWidget(QWidget):
         barra.addWidget(self.btn_rehacer)
         for texto, slot in (("Mis cases…", self.proyectos_pedidos.emit),
                             ("Nuevo", self.nuevo), ("Asistente…", lambda: self.asistente()),
+                            ("Catálogo…", lambda: self.editar_catalogo()),
                             ("Abrir .scad…", self.abrir),
                             ("Guardar .scad…", self.guardar), ("Planos PDF…", lambda: self.exportar_planos()),
                             ("Exportar paquete…", self.exportar),
@@ -1106,6 +1123,30 @@ class TallerWidget(QWidget):
         from .biblioteca_widget import BibliotecaDialog
         BibliotecaDialog(self).exec()
 
+    def editar_catalogo(self, categoria: str = "") -> None:
+        from .catalogo_widget import CatalogoDialog
+        dlg = CatalogoDialog(self, categoria)
+        dlg.exec()
+        if dlg.cambiado:
+            self.catalogo_cambiado()
+
+    def catalogo_cambiado(self) -> None:
+        """Se editó el catálogo: listas de herrajes y placas al día y el case recalculado."""
+        for nombre, ed in self.editores.items():
+            if isinstance(ed, _Editor) and isinstance(ed.widget, QComboBox) and nombre in REF_CATEGORIAS:
+                valor = ed.valor()
+                w = ed.widget
+                w.blockSignals(True)
+                w.clear()
+                _llenar_combo_catalogo(w, REF_CATEGORIAS[nombre], vacio=True)
+                w.blockSignals(False)
+                ed.poner(valor)
+            elif isinstance(ed, _EditorTabla):
+                ed.refrescar_etiquetas()
+        self.herrajes.catalogo_cambiado()
+        self.recalcular()
+
+        self.set_params({})
     def hay_cambios(self) -> bool:
         """True si el case cambió desde que se abrió, se guardó o se empezó."""
         self._leer_editores()
