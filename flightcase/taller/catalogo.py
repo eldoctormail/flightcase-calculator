@@ -39,10 +39,13 @@ CATEGORIAS: List[Tuple[str, str, List[Tuple[str, str, Any, str]]]] = [
         ("esp", "Espesor", "num", "Espesor real de la placa en mm (medilo: un fenólico «9 mm» suele dar 9,2)."),
         ("largo", "Largo hoja", "num", "Largo de la hoja entera en mm (el optimizador de cortes usa esta medida)."),
         ("ancho", "Ancho hoja", "num", "Ancho de la hoja entera en mm."),
+        ("densidad", "Densidad", "num", "kg/m³ de la placa, para el peso del case (fenólico ≈ 700, abedul ≈ 680, MDF ≈ 750)."),
+        ("peso_hoja", "Peso hoja (kg)", "num", "Si el proveedor da el peso de la hoja entera en kg, ponelo acá en vez de la densidad."),
     ]),
     ("angulo", "Perfiles ángulo", [
         ("ala", "Ala", "num", "Ala del ángulo de aluminio en mm (30 = 30x30)."),
         ("esp", "Espesor", "num", "Espesor de la chapa del ángulo en mm."),
+        ("peso_m", "Peso (g/m)", "num", "Gramos por metro de perfil, para el peso total del case (vacío = se estima)."),
     ]),
     ("hibrido", "Perfiles híbridos", [
         ("placa", "Para placa", "num", "Espesor de placa para el que está hecho el canal (mm)."),
@@ -51,13 +54,16 @@ CATEGORIAS: List[Tuple[str, str, List[Tuple[str, str, Any, str]]]] = [
         ("ala_corta", "Ala corta", "num", "mm"),
         ("ala_larga", "Ala larga", "num", "mm"),
         ("pared", "Pared", "num", "Espesor de pared del aluminio (mm)."),
+        ("peso_m", "Peso (g/m)", "num", "Gramos por metro de perfil, para el peso total del case (vacío = se estima)."),
     ]),
     ("tapa_m", "Perfil de tapa macho", [
         ("placa", "Para placa", "num", "Espesor de placa para el que está hecho (mm)."),
         ("canal", "Canal", "num", "Profundidad del canal (mm)."),
+        ("peso_m", "Peso (g/m)", "num", "Gramos por metro de perfil, para el peso total del case (vacío = se estima)."),
     ]),
     ("tapa_h", "Perfil de tapa hembra", [
         ("placa", "Para placa", "num", "Espesor de placa para el que está hecho (mm)."),
+        ("peso_m", "Peso (g/m)", "num", "Gramos por metro de perfil, para el peso total del case (vacío = se estima)."),
     ]),
     ("esquinero", "Esquineros", [
         ("pata", "Pata", "num", "Largo de cada pata desde la esquina (mm): cuánto se descuenta del perfil."),
@@ -121,10 +127,16 @@ CATEGORIAS: List[Tuple[str, str, List[Tuple[str, str, Any, str]]]] = [
     ]),
     ("espuma", "Espumas", [
         ("esp", "Espesor", "num", "Espesor de la plancha (mm)."),
+        ("densidad", "Densidad", "num", "kg/m³ de la espuma, para el peso del case (plastazote LD29 ≈ 29)."),
     ]),
     ("rack", "Rack", []),
     ("extra", "Accesorios", []),
 ]
+_CON_PESO = ("esquinero", "escuadra", "cierre", "bisagra", "tope", "manija", "rueda", "rueda_otra", "cazoleta",
+             "plato", "pie", "remache", "rack", "extra")
+for _c, _n, _m in CATEGORIAS:
+    if _c in _CON_PESO:
+        _m.append(("peso", "Peso (g)", "num", "Peso de una unidad en gramos, para el peso total del case (pesala o sacala de la ficha del proveedor)."))
 NOMBRES = {c: n for c, n, _ in CATEGORIAS}
 MEDIDAS = {c: m for c, _, m in CATEGORIAS}
 

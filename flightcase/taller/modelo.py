@@ -1155,7 +1155,7 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
         _hm.unir_herrajes(herrajes, manuales.herrajes, Herraje)
         A += manuales.avisos
 
-    return ResultadoTaller(
+    res = ResultadoTaller(
         info=info, paneles=paneles, calados=calados, marcas=marcas, perfiles=perfiles, extras=extras_p,
         herrajes=herrajes, panelmat=panelmat, bandejas=bandejas_out, avisos=A,
         valores={"ext_ancho": ext_ancho, "ext_prof": ext_prof, "ext_alto": ext_alto, "pared": pared,
@@ -1164,6 +1164,10 @@ def calcular(params: Optional[Dict[str, Any]] = None, catalogo: Optional[Catalog
                  "barra_largo": barra_largo, "sierra_kerf": sierra_kerf, "cantidad_cases": cantidad_cases,
                  "remache_ref": E_remache_ref, "materiales_paneles": _mat_pan, "geo": geo, "interiores": interior, "manuales": manuales},
     )
+    # ---- peso real (peso.py): no está en flightcase.scad ----
+    from . import peso as _peso
+    res.valores["peso"] = _peso.calcular(res, P, cat)
+    return res
 
 
 def interior_para_exterior(params: Optional[Dict[str, Any]], ancho: float, prof: float, alto: float,

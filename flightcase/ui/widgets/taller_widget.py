@@ -687,6 +687,16 @@ class TallerWidget(QWidget):
         self.tabla_interior = self._tabla(["Tipo", "Nombre", "Medidas", "Posición", "Nota"])
         li.addWidget(self.tabla_interior, 1)
         self.tabs.addTab(pagina_int, "Interior")
+        pagina_peso = QWidget()
+        lp = QVBoxLayout(pagina_peso)
+        lp.setContentsMargins(0, 0, 0, 0)
+        self.lbl_peso = QLabel()
+        self.lbl_peso.setWordWrap(True)
+        self.lbl_peso.setTextFormat(Qt.RichText)
+        lp.addWidget(self.lbl_peso)
+        self.tabla_peso = self._tabla(["Parte", "Qué", "Cantidad", "Peso unitario", "Total kg", "De dónde sale"])
+        lp.addWidget(self.tabla_peso, 1)
+        self.tabs.addTab(pagina_peso, "Peso")
         dl.addWidget(self.tabs, 1)
         self.lbl_avisos = QLabel()
         self.lbl_avisos.setWordWrap(True)
@@ -1049,7 +1059,9 @@ class TallerWidget(QWidget):
             f" &nbsp;·&nbsp; <b>Sistema:</b> {res.info['sistema'][0]}"
             f" &nbsp;·&nbsp; <b>Placa:</b> {v['placa_material']}"
             + (f" (+ {len(otros)} paneles en otra placa)" if (otros := v.get("materiales_paneles") or {}) else "") +
-            f" &nbsp;·&nbsp; {n_paneles} paneles, {sum(p.cantidad for p in res.perfiles)} tramos de perfil")
+            f" &nbsp;·&nbsp; {n_paneles} paneles, {sum(p.cantidad for p in res.perfiles)} tramos de perfil"
+            + (f" &nbsp;·&nbsp; <b>Peso:</b> {pc.resumen()}" if (pc := v.get("peso")) else ""))
+        self._mostrar_peso(v.get("peso"))
         calados: Dict[str, int] = {}
         for c in res.calados:
             calados[c.panel] = calados.get(c.panel, 0) + 1
@@ -1085,6 +1097,28 @@ class TallerWidget(QWidget):
         self.herrajes.set_resultado(res, self.params.get("herrajes_manuales", []), self.params.get("_carpeta", ""))
         self.vista_placas.set_resultado(res)
         self._actualizar_3d()
+
+    def _mostrar_peso(self, pc) -> None:
+        from ...taller import peso as _peso
+        if pc is None:
+            self.lbl_peso.setText("")
+            self._llenar(self.tabla_peso, [])
+            return
+        kg = _peso._kg
+        partes = " &nbsp;·&nbsp; ".join(f"{p}: {kg(t)} kg" for p, t in pc.partes.items())
+        txt = f"<b>Case vacío: {kg(pc.vacio)} kg</b>"
+        if pc.total > pc.vacio + 0.005:
+            txt += f" &nbsp;·&nbsp; <b>Con equipos: {kg(pc.total)} kg</b>"
+        txt += f"<br>{partes}"
+        if pc.estimado > 0.005:
+            txt += (f"<br><span style='color:#a15c00'>{kg(pc.estimado)} kg salen de valores estimados. "
+                    "Para el peso real, cargá la densidad de la placa, los g/m de los perfiles y el peso de "
+                    "cada herraje en el catálogo (Ctrl+K).</span>")
+        if pc.sin_dato:
+            txt += ("<br><span style='color:#a15c00'>Sin peso (no suman): "
+                    + ", ".join(dict.fromkeys(pc.sin_dato)) + ".</span>")
+        self.lbl_peso.setText(txt)
+        self._llenar(self.tabla_peso, _peso.filas_tabla(pc))
 
     def _actualizar_3d(self, *_args) -> None:
         res = self.resultado
