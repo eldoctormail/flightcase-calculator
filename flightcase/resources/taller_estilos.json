@@ -194,5 +194,41 @@
   "nombre": "Rack slam",
   "descripcion": "Rack 19\" parado con puertas planas adelante y atrás en marco de perfil slam (bisagra de piano y cierres slam) y rieles de rack a todo el alto, adelante y atrás.",
   "params": {"forma": "slam", "orientacion": "frontal", "slam_caras": "frente_trasera", "slam_hojas": 1, "slam_rack": true, "rack_traseros": true, "puerta_lado": "izq", "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "tapa_lidmaker",
+  "nombre": "Tapa lidmaker",
+  "descripcion": "Baúl con la tapa plana suelta arriba: apoya a ras en un marco de perfil lidmaker y la traban cierres mariposa en las paredes. Sin paredes de tapa ni bisagras, se saca entera para cargar. Ruedas abajo.",
+  "params": {"forma": "slam", "orientacion": "vertical", "slam_caras": "arriba", "tapa_plana": "lidmaker", "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "piso_basemaker",
+  "nombre": "Piso basemaker",
+  "descripcion": "Baúl con el piso encastrado en un marco de perfil basemaker, a ras de los cantos y sin ángulos abajo, y la tapa plana slam arriba con bisagra de piano. Ruedas atornilladas al piso.",
+  "params": {"forma": "slam", "orientacion": "vertical", "slam_caras": "arriba", "basemaker": true, "topes": 2, "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "lidmaker_basemaker",
+  "nombre": "Lidmaker y basemaker",
+  "descripcion": "Caja plana arriba y abajo: tapa suelta en marco lidmaker con cierres mariposa y piso en marco basemaker. Liviana y sin cantos salientes, se apila bien.",
+  "params": {"forma": "slam", "orientacion": "vertical", "slam_caras": "arriba", "tapa_plana": "lidmaker", "basemaker": true, "ruedas": 0, "manijas": true}
+ },
+ {
+  "id": "apertura_frontal_puerta_doble",
+  "nombre": "Apertura frontal con puerta doble",
+  "descripcion": "Case parado con dos puertas planas adelante que abren hacia los costados, en marco de perfil slam: una se traba con pasadores y la otra cierra sobre ella con cierres slam. Ruedas abajo.",
+  "params": {"forma": "slam", "orientacion": "frontal", "slam_caras": "frente", "slam_hojas": 2, "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "puertas_dobles_y_tapa",
+  "nombre": "Puertas dobles adelante y tapa arriba",
+  "descripcion": "Case parado con puerta doble adelante y una tapa plana arriba, todo en marco de perfil slam: se abre de frente y por arriba sin sacar nada. Ruedas abajo.",
+  "params": {"forma": "slam", "orientacion": "frontal", "slam_caras": "arriba_frente", "slam_hojas": 2, "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "tapa_adelante_y_arriba",
+  "nombre": "Tapa adelante y arriba",
+  "descripcion": "Case parado con una puerta plana adelante y una tapa plana arriba, en marco de perfil slam con bisagras de piano y cierres slam. Ruedas abajo.",
+  "params": {"forma": "slam", "orientacion": "frontal", "slam_caras": "arriba_frente", "slam_hojas": 1, "puerta_lado": "izq", "ruedas": 4, "manijas": true}
  }
 ]

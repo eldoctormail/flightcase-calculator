@@ -23,14 +23,16 @@ NEGRO = {"base": "#26282d", "wall": "#26282d", "lid": "#26282d"}   # como la pla
 
 FAMILIAS = (
     ("estandar", "Estándar", "Baúles de gira con tapa suelta, baja, 50/50 o abisagrada, plegables y cases de mano.",
-     ("baul_tapa_suelta", "baul_tapa_baja", "baul_50_50", "baul_bisagras", "baul_base_ruedas", "baul_plegable",
+     ("baul_tapa_suelta", "baul_tapa_baja", "baul_50_50", "tapa_lidmaker", "piso_basemaker", "lidmaker_basemaker",
+      "baul_bisagras", "baul_base_ruedas", "baul_plegable",
       "case_mano_pies", "tapa_piano", "hibrido_liviano")),
     ("broadcast", "Broadcast", "Cases de producción parados, con rieles de rack y acceso por arriba a los cables.",
      ("broadcast_produccion", "broadcast_trasera_cerrada", "broadcast_trasera_cerrada_2")),
     ("clamshell", "Clamshell", "Dos mitades que se abren como un libro, hacia arriba o hacia los costados, "
      "o una tapa en cada extremo.", ("clamshell", "clamshell_izq_der", "dos_tapas_vertical", "acostado_dos_tapas")),
     ("frontal", "Apertura frontal", "Cases parados que se abren de frente: tapa adelante, puertas o bandejas.",
-     ("apertura_frontal", "bandejas_euro")),
+     ("apertura_frontal", "apertura_frontal_puerta_doble", "puertas_dobles_y_tapa", "tapa_adelante_y_arriba",
+      "bandejas_euro")),
     ("racks", "Racks", "Racks 19\" medidos en unidades: tapa adelante, adelante y atrás, puertas, tapas de acceso, "
      "cubierta, inclinado para consola o funda abierta.",
      ("rack_una_tapa", "rack_dos_tapas", "rack_puertas", "rack_acceso_paneles", "rack_cubierta", "rack_inclinado",
@@ -56,6 +58,9 @@ CORTOS = {
     "rack_inclinado": "Para mezcladora", "rack_slam": "Slam",
     "baul_slam_hd": "Baúl HD", "tapa_slam_doble": "Doble", "tapa_slam_adelante": "Adelante",
     "tapas_slam_adelante_atras": "Adelante y atrás",
+    "tapa_lidmaker": "Lidmaker", "piso_basemaker": "Basemaker", "lidmaker_basemaker": "Lid + base",
+    "apertura_frontal_puerta_doble": "Puerta doble", "puertas_dobles_y_tapa": "Puertas y tapa",
+    "tapa_adelante_y_arriba": "Adelante y arriba",
 }
 
 

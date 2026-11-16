@@ -990,10 +990,18 @@ def _slam(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
     if c < t + 5:
         ar.A.append(s("El marco slam de ", c, " mm es angosto para tapar el canto de la placa de ", t,
                       " mm: con menos de ", t + 5, " mm la tapa no tiene dónde apoyar."))
+    modo = "lidmaker" if g("tapa_plana", "slam") == "lidmaker" else "slam"
+    if modo == "lidmaker" and abiertas != ("techo",):
+        ar.A.append("La tapa lidmaker va arriba, suelta y con cierres: en las otras caras queda como tapa slam.")
+    basemaker = bool(g("basemaker", False))
     ya = t if "frente" in abiertas else 0.0
     yb = Y - t if "trasera" in abiertas else Y
     # ---- paredes del cuerpo (las caras abiertas no llevan pared: va la tapa plana) ----
-    ar.panel("piso", "Piso", "cuerpo", X, yb - ya, (0.0, ya, 0.0), (1, 0, 0), (0, 1, 0), (0, 0, 1))
+    if basemaker:   # el piso va encastrado en un marco de perfil basemaker, a ras de los cantos
+        ar.panel("piso", "Piso (en el marco basemaker)", "cuerpo", X - 2 * c, yb - ya - 2 * c, (c, ya + c, 0.0),
+                 (1, 0, 0), (0, 1, 0), (0, 0, 1))
+    else:
+        ar.panel("piso", "Piso", "cuerpo", X, yb - ya, (0.0, ya, 0.0), (1, 0, 0), (0, 1, 0), (0, 0, 1))
     if "techo" not in abiertas:
         ar.panel("techo_fijo", "Techo", "cuerpo", X, yb - ya, (0.0, ya, Z), (1, 0, 0), (0, 1, 0), (0, 0, -1))
     if "frente" not in abiertas:
@@ -1009,6 +1017,10 @@ def _slam(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
               "techo": ((0.0, 0.0, Z), (1, 0, 0), (0, 1, 0), (0, 0, -1), X, Y)}
     nom_perfil = cat.nombre(g("slam_perfil_ref")) if cat.existe(g("slam_perfil_ref", "")) else "Perfil slam"
     ref_perfil = g("slam_perfil_ref", "")
+    ref_lm = g("lidmaker_ref", "")
+    nom_lm = cat.nombre(ref_lm) if cat.existe(ref_lm) else "Perfil lidmaker"
+    ref_bm = g("basemaker_ref", "")
+    nom_bm = cat.nombre(ref_bm) if cat.existe(ref_bm) else "Perfil basemaker"
     ref_cie = g("ref_slam", "")
     cie = dict(cat.fila(ref_cie)["datos"]) if cat.existe(ref_cie) else {}
     cw, ch = (cie.get("corte") or [60, 40])
@@ -1033,21 +1045,25 @@ def _slam(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
             ar.bloque(_sum(Q(a0, b0, 0), _mul(normal, 0.0)), eje, n, normal, L, ala, 1.5, "profile", "Perfil slam",
                       "cuerpo", F_AROS)
         nom_c = NOMBRE_CARA[cara]
-        ar.tramo(nom_perfil, s("Marco de la tapa de ", nom_c, ", lados largos (punta larga)"), max(A, B), 2, "45/45",
-                 ref_perfil)
-        ar.tramo(nom_perfil, s("Marco de la tapa de ", nom_c, ", lados cortos (punta larga)"), min(A, B), 2, "45/45",
-                 ref_perfil)
+        lm = modo == "lidmaker" and cara == "techo"
+        np_, rp_ = (nom_lm, ref_lm) if lm else (nom_perfil, ref_perfil)
+        ar.tramo(np_, s("Marco de la tapa de ", nom_c, ", lados largos (punta larga)"), max(A, B), 2, "45/45", rp_)
+        ar.tramo(np_, s("Marco de la tapa de ", nom_c, ", lados cortos (punta larga)"), min(A, B), 2, "45/45", rp_)
         # la tapa (una o dos hojas), a ras del marco
         ancho_l = A - 2 * c - 2 * gap
         alto_l = B - 2 * c - 2 * gap
         n_h = hojas if i == 0 else 1
         w_h = (ancho_l - gap * (n_h - 1)) / n_h
         # bisagra: en la trasera de la tapa de arriba; en las puertas, del lado elegido (dos hojas: en los dos)
+        if lm:
+            n_h, w_h = 1, ancho_l
         for k in range(n_h):
             a0 = c + gap + k * (w_h + gap)
             pid = s("tapa_", cara, "" if n_h == 1 else s("_", k + 1))
             nombre = s("Tapa de ", nom_c, "" if n_h == 1 else s(" (hoja ", k + 1, ")"))
             ar.panel(pid, nombre, "tapa", w_h, alto_l, Q(a0, c + gap), u, v, n, mueve=grupo, paso=F_TAPA)
+            if lm:      # tapa lidmaker: suelta, la traban cierres mariposa en las paredes (más abajo)
+                continue
             if cara == "techo":
                 bis_borde, cie_borde = "b1", "b0"        # bisagra atrás, cierres adelante
             elif n_h == 2:
@@ -1091,10 +1107,34 @@ def _slam(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
                 ar.bloque(Q(a0 + px - w_c / 2, c + gap + py - h_c / 2, -1.5), u, v, fuera, w_c, h_c, 1.5, "cierre",
                           "Cierre slam", grupo, F_CIERRES)
                 n_cie_tot += 1
+    if modo == "lidmaker" and "techo" in abiertas:
+        # cierres mariposa en las paredes, bajo el marco lidmaker; el gancho va en el marco de la tapa
+        margen = g("cierre_margen", 100)
+        b_ = E.m_alto - E.m_sup
+        lat = g("cierres_laterales", "auto")
+        lat_si = True if lat == "si" else (False if lat == "no" else Y > 450)
+        paredes = [("cuerpo_frente", X, (0.0, 0.0, Z), (1, 0, 0), (0, 1, 0), lambda q: q),
+                   ("cuerpo_trasera", X, (X, Y, Z), (-1, 0, 0), (0, -1, 0), lambda q: q)]
+        if lat_si:
+            paredes += [("cuerpo_izq", Y, (0.0, Y, Z), (0, -1, 0), (1, 0, 0), lambda q: q - t),
+                        ("cuerpo_der", Y, (X, 0.0, Z), (0, 1, 0), (-1, 0, 0), lambda q: q - t)]
+        for pid, L, o_, u_, n_, fx in paredes:
+            for q in _pos_n(L, n_cierres(L), margen):
+                ar.marcas.append(Marca(pid, "cierre", fx(q), Z - 2 * t - c - b_, 0, 0, "c1"))
+                ar.cierre(_sum(o_, (0.0, 0.0, -c)), u_, (0, 0, 1), n_, q)
+                ar.gancho(_sum(o_, (0.0, 0.0, -c)), u_, (0, 0, 1), n_, q)
+        ar.calados_cierre()
+    if basemaker:
+        o, u, v, n, A, B = (0.0, ya, 0.0), (1, 0, 0), (0, 1, 0), (0, 0, 1), X, yb - ya
+        Qb = lambda a, b, h=0.0: _sum(o, _mul(u, a), _mul(v, b), _mul(n, h))
+        for a0, b0, aw, bh in ((0, 0, A, c), (0, B - c, A, c), (0, c, c, B - 2 * c), (A - c, c, c, B - 2 * c)):
+            ar.bloque(Qb(a0, b0), u, v, n, aw, bh, t, "profile", "Perfil basemaker", "cuerpo", F_AROS)
+        ar.tramo(nom_bm, "Marco del piso, lados largos (punta larga)", max(A, B), 2, "45/45", ref_bm)
+        ar.tramo(nom_bm, "Marco del piso, lados cortos (punta larga)", min(A, B), 2, "45/45", ref_bm)
     # ---- ángulos en las aristas que no son de una cara abierta, y esquineros ----
     ed = E.ed
     A_ = E.perfil_arista
-    ab = set(abiertas)
+    ab = set(abiertas) | ({"piso"} if basemaker else set())
     n_x = n_y = n_z = 0
     for y0, sy, cy in ((0.0, -1, "frente"), (Y, 1, "trasera")):
         for z0, sz, cz in ((0.0, -1, "piso"), (Z, 1, "techo")):
@@ -1120,8 +1160,9 @@ def _slam(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
                     "slam doble (o los dos tramos a inglete, uno sobre otro). Presentalos antes de remachar.")
     # ---- herrajes ----
     nom_p = cat.nombre(piano_ref) if cat.existe(piano_ref) else "Bisagra de piano"
-    ar.H.append([nom_p, len(piano_largos), "cortar a " + ", ".join(s(round(L, 1)) for L in piano_largos)
-                 + " mm, una por hoja", piano_ref])
+    if piano_largos:
+        ar.H.append([nom_p, len(piano_largos), "cortar a " + ", ".join(s(round(L, 1)) for L in piano_largos)
+                     + " mm, una por hoja", piano_ref])
     ar.remaches += sum(2 * (math.floor(L / 50) + 1) for L in piano_largos)
     if n_cie_tot:
         ar.H.append([cat.nombre(ref_cie) if cat.existe(ref_cie) else "Cierre slam embutido", n_cie_tot,
@@ -1144,8 +1185,12 @@ def _slam(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
     centros = {pid: ((Y - 2 * t) / 2, hm - g("manija_centro_desde_arriba", 80)) for pid in ("cuerpo_izq", "cuerpo_der")}
     ar.manijas_en(["cuerpo_izq", "cuerpo_der"], centros)
     margen = E.pata + g("rueda_margen", 10)
-    ar.ruedas_abajo("piso", X, yb - ya, (0.0, ya, 0.0), (1, 0, 0), (0, 1, 0), margen)
-    ar.pies_abajo("piso", X, yb - ya, (0.0, ya, 0.0), (1, 0, 0), (0, 1, 0), margen)
+    if basemaker:
+        ar.ruedas_abajo("piso", X - 2 * c, yb - ya - 2 * c, (c, ya + c, 0.0), (1, 0, 0), (0, 1, 0), max(margen - c, 5))
+        ar.pies_abajo("piso", X - 2 * c, yb - ya - 2 * c, (c, ya + c, 0.0), (1, 0, 0), (0, 1, 0), max(margen - c, 5))
+    else:
+        ar.ruedas_abajo("piso", X, yb - ya, (0.0, ya, 0.0), (1, 0, 0), (0, 1, 0), margen)
+        ar.pies_abajo("piso", X, yb - ya, (0.0, ya, 0.0), (1, 0, 0), (0, 1, 0), margen)
     # ---- interior ----
     from . import interiores as _int
     interior = None
@@ -1170,7 +1215,7 @@ def _slam(P: Dict[str, Any], cat: CatalogoTaller) -> ResultadoTaller:
     else:
         valores = {"ext_ancho": X, "ext_prof": Y, "ext_alto": Z}
         ext, inte = (X, Y, Z, 0), (W, D, Hi, 0)
-    info_extra = {"slam": [caras_txt, fmt(hojas), fmt(n_cie_tot), fmt(c)]}
+    info_extra = {"slam": [caras_txt, fmt(hojas), fmt(n_cie_tot), fmt(c), modo, fmt(1 if basemaker else 0)]}
     det = ", ".join(NOMBRE_CARA[cara] for cara in abiertas)
     res = ar.resultado("slam", info_extra, ext, inte, (X, Y, Z), valores, geo, interior,
                        s("tapas ", det), n_esq=n_esq)
@@ -1324,33 +1369,49 @@ def _pasos_slam(d, info, nom, per, tramos, her, camara) -> List[Dict[str, Any]]:
                if pid in d["paneles"]]
     tapas = [pid for pid in d["paneles"] if pid.startswith("tapa_")]
     b, c, pa = her("bisagra de piano"), her("cierre slam"), her("pasador")
+    lm = len(info["slam"]) > 4 and info["slam"][4] == "lidmaker" and "techo" in caras
+    bm = len(info["slam"]) > 5 and info["slam"][5] == "1"
+    mar = her("cierre mariposa")
+    perfil = "perfil lidmaker" if lm else "perfil slam"
     pasos = [
         dict(titulo="Armar la caja", vista="f_cuerpo", camara=camara, defs={"paso": F_CUERPO},
              texto=["Es una caja cerrada salvo en " + " y ".join(NOMBRE_CARA[k] for k in caras) + ": ahí va la tapa plana.",
                     "Paredes: " + ", ".join(nom(p) for p in paredes) + ". Prensá la caja en escuadra y medí las "
                     "diagonales de cada boca abierta: tienen que dar iguales (± 1 mm) o la tapa no asienta."]),
-        dict(titulo="Marcos slam, aristas y esquineros", vista="f_esq", camara=camara, defs={"paso": F_ESQ},
-             texto=[f"Marco de cada boca: perfil slam a inglete 45° ({tramos(per('Marco de la tapa'))}, medidos en la "
+        dict(titulo=("Marcos lidmaker" if lm else "Marcos slam") + (", basemaker" if bm else "")
+             + ", aristas y esquineros", vista="f_esq", camara=camara, defs={"paso": F_ESQ},
+             texto=[f"Marco de cada boca: {perfil} a inglete 45° ({tramos(per('Marco de la tapa'))}, medidos en la "
                     "punta larga). Armalo sobre la mesa, controlá las diagonales y remachalo sobre los cantos.",
+                    (f"Piso: va encastrado en el marco de perfil basemaker ({tramos(per('Marco del piso'))}), a ras "
+                     "de los cantos. Armá el marco en escuadra, calzá el piso y remachá las paredes sobre el ala."
+                     if bm else ""),
                     f"El resto de las aristas lleva ángulo ({tramos(per('Aristas'))}) y las ocho puntas, esquineros."]),
-        dict(titulo="Tapas planas y bisagras de piano", vista="f_tapa", camara=camara, defs={"paso": F_TAPA},
+        dict(titulo="Tapas planas" + ("" if lm and not b else " y bisagras de piano"), vista="f_tapa", camara=camara, defs={"paso": F_TAPA},
              texto=["Tapas: " + ", ".join(nom(p) for p in tapas) + ". Apoyan a ras dentro del marco, con 3 mm de luz "
                     "alrededor (y entre las hojas).",
                     (f"{b['nota'][:1].upper()}{b['nota'][1:]}: remachala primero en el marco y después en la tapa, con "
                      "la tapa calzada en su lugar." if b else "")]
              + ([f"Puerta doble: la hoja 1 lleva el tope donde cierra la hoja 2 ({tramos(per('Tope entre las hojas'))}) "
                  f"y {pa['cant'] if pa else 2} pasadores embutidos que la traban arriba y abajo."] if hojas == 2 else [])),
-        dict(titulo="Cierres slam", vista="f_cierres", camara=camara, defs={"paso": F_CIERRES},
-             texto=[(f"{c['cant']} cierres slam embutidos en las tapas ({c['nota']})." if c else ""),
+        (dict(titulo="Cierres mariposa", vista="f_cierres", camara=camara, defs={"paso": F_CIERRES},
+              texto=[(f"{mar['cant']} cierres mariposa en las paredes, justo bajo el marco lidmaker; el gancho va en "
+                      "el marco de la tapa." if mar else ""),
+                     "Calá las paredes con su DXF, apoyá la tapa en su lugar y marcá el gancho con el cierre "
+                     "tensado. La tapa sale entera: no lleva bisagras."]) if lm and not c else
+         dict(titulo="Cierres slam", vista="f_cierres", camara=camara, defs={"paso": F_CIERRES},
+             texto=[(f"{c['cant']} " + ("cierre slam embutido" if c["cant"] == 1 else "cierres slam embutidos")
+                     + f" en las tapas ({c['nota']})." if c else ""),
                     "Calá la tapa con su DXF, presentá el cierre y, con la tapa cerrada, marcá el contragancho en el "
-                    "marco. Probá que trabe solo al bajar la tapa antes de remachar."]),
+                    "marco. Probá que trabe solo al bajar la tapa antes de remachar."])),
         dict(titulo="Manijas" + (", ruedas y pies" if info.get("ruedas", ["0"])[0] == "4" or her("pie") else ""),
              vista="f_ruedas", camara="0,0,0,110,0,32,0", defs={"paso": F_RUEDAS},
              texto=["Las manijas embutidas entran por la cara de afuera; remachá el reborde."]
              + (["Ruedas con freno del lado del frente. Bulones con arandela y tuerca autofrenante."]
                 if info.get("ruedas", ["0"])[0] == "4" else [])),
         dict(titulo="Case terminado", vista="final", texto=[
-            "Revisá que todos los remaches estén firmes y que cada tapa cierre sola al bajarla, sin forzar."]),
+            "Revisá que todos los remaches estén firmes y que "
+            + ("la tapa asiente pareja en el marco y los cierres la ajusten sin juego." if lm and not c else
+               "cada tapa cierre sola al bajarla, sin forzar.")]),
     ]
     for p in pasos:
         p["texto"] = [t for t in p["texto"] if t]

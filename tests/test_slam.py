@@ -62,3 +62,43 @@ def test_puerta_doble_traba_con_pasadores():
 def test_caras_que_no_existen_avisan():
     res = calcular(dict(parametros_por_defecto(), forma="slam", slam_caras="abajo"))
     assert any("slam_caras" in a for a in res.avisos)
+
+
+FRONTALES = ["apertura_frontal_puerta_doble", "puertas_dobles_y_tapa", "tapa_adelante_y_arriba"]
+
+
+@pytest.mark.parametrize("eid", FRONTALES + ["tapa_lidmaker", "piso_basemaker", "lidmaker_basemaker"])
+def test_estilos_de_tapa_plana_completos(eid):
+    est = estilos.buscar(eid)
+    res = calcular(_con(eid))
+    assert res.valores["forma"] == "slam"
+    m = malla_3d(res, Opciones3D())
+    av = []
+    assert all(c.cerrado for c in cuerpos(m, av)) and not av
+    malla_3d(res, Opciones3D(abrir_tapa=200, explotar=50))
+    pasos = formas.pasos_instructivo(datos(res), [])
+    assert pasos[-1]["titulo"] == "Case terminado"
+    hojas = est.params.get("slam_hojas", 1)
+    tapas = [p for p in res.paneles if p.id.startswith("tapa_")]
+    assert len(tapas) == hojas + (1 if est.params["slam_caras"] == "arriba_frente" else 0)
+
+
+def test_tapa_lidmaker_es_suelta_con_cierres_mariposa():
+    res = calcular(_con("tapa_lidmaker"))
+    nombres = {h.nombre: h.cantidad for h in res.herrajes}
+    assert not any("piano" in n.lower() or n.startswith("Cierre slam") for n in nombres)
+    assert nombres["Cierre mariposa"] >= 4
+    assert any(p.nombre.lower().startswith("perfil lindmaker") or "lidmaker" in p.nombre.lower() for p in res.perfiles)
+    assert {m.panel for m in res.marcas if m.tipo == "cierre"} <= {"cuerpo_frente", "cuerpo_trasera",
+                                                                     "cuerpo_izq", "cuerpo_der"}
+    assert res.info["slam"][4] == "lidmaker"
+
+
+def test_piso_basemaker_encastrado_en_su_marco():
+    res = calcular(_con("piso_basemaker"))
+    t, c = res.valores["pared"], 20
+    piso = res.panel("piso")
+    assert piso.ancho == pytest.approx(res.valores["ext_ancho"] - 2 * c)
+    assert any(p.descripcion.startswith("Marco del piso") for p in res.perfiles)
+    assert not any(p.descripcion.startswith("Aristas") and "piso" in p.descripcion.lower() for p in res.perfiles)
+    assert res.info["slam"][5] == "1" and t > 0

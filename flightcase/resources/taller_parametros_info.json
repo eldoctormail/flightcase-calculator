@@ -186,6 +186,26 @@
     "nombre": "slam_rack",
     "etiqueta": "Rieles de rack",
     "ayuda": "en un case parado: rieles de 19\" a todo el alto"
+   },
+   {
+    "nombre": "tapa_plana",
+    "etiqueta": "Tapa plana de arriba",
+    "ayuda": "slam = abisagrada con cierres slam; lidmaker = suelta, apoya en un marco de perfil lidmaker y la traban cierres mariposa en las paredes"
+   },
+   {
+    "nombre": "basemaker",
+    "etiqueta": "Piso basemaker",
+    "ayuda": "el piso va encastrado en un marco de perfil basemaker, a ras de los cantos, en vez de ángulos"
+   },
+   {
+    "nombre": "lidmaker_ref",
+    "etiqueta": "Perfil lidmaker",
+    "ayuda": "referencia del catálogo para el marco de la tapa lidmaker"
+   },
+   {
+    "nombre": "basemaker_ref",
+    "etiqueta": "Perfil basemaker",
+    "ayuda": "referencia del catálogo para el marco del piso basemaker (vacío = sin referencia)"
    }
   ]
  },
