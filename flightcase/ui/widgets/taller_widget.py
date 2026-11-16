@@ -1104,7 +1104,6 @@ class TallerWidget(QWidget):
             sp.setRange(0, 10000)
             sp.setDecimals(1)
             sp.setKeyboardTracking(False)
-            sp.setSuffix(" mm")
             sp.setObjectName("medida")
             sp.valueChanged.connect(lambda val, c=clave: self._medida_editada(c, val))
             fila, col, ancho = lugar[clave]
@@ -1115,6 +1114,7 @@ class TallerWidget(QWidget):
                 linea = QHBoxLayout()
                 linea.setSpacing(6)
                 linea.addWidget(sp, 1)
+                linea.addWidget(QLabel("mm"))
                 self.btn_candado = QToolButton()
                 self.btn_candado.setObjectName("candado")
                 self.btn_candado.setCheckable(True)
@@ -1125,7 +1125,7 @@ class TallerWidget(QWidget):
                 g.addLayout(linea, fila + 1, col, 1, ancho)
                 self._poner_icono_candado()
             else:
-                g.addWidget(sp, fila + 1, col, 1, ancho)
+                g.addWidget(self._con_mm(sp), fila + 1, col, 1, ancho)
             self.medidas[clave] = sp
         g.setColumnStretch(0, 1)
         g.setColumnStretch(1, 1)
