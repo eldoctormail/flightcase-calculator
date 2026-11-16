@@ -671,7 +671,6 @@ QLabel#familiaPrevia {
   color: #3b82f6;
   font-size: 8pt;
   font-weight: 600;
-  letter-spacing: 1px;
 }
 
 QLabel#nombrePrevia {
@@ -686,6 +685,7 @@ QFrame#lineaPrevia {
 QFrame#pieInicio {
   background-color: #0f1626;
   border-top: 1px solid #1f2a42;
+}
 
 /* ---------------------------------------------------------------- sección de medidas */
 
