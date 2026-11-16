@@ -509,6 +509,7 @@ class TallerWidget(QWidget):
     proyectos_pedidos = Signal()         # botón «Mis cases…»
     historial_cambiado = Signal()          # cambió lo que se puede deshacer o rehacer
     case_nuevo = Signal()                  # se empezó un case nuevo (botón o menú «Nuevo»)
+    guardado = Signal(bool)                # se escribió el .scad (True = autoguardado)
 
     MAX_HISTORIAL = 200
 
@@ -527,6 +528,7 @@ class TallerWidget(QWidget):
         self._deshacer: List[str] = []       # fotos del case (JSON) antes de cada cambio
         self._rehacer: List[str] = []
         self._foto_actual: Optional[str] = None
+        self._respaldados: set = set()        # cases con copia fechada desde que se abrieron
         self._etiquetas = {p["nombre"]: p.get("etiqueta") or p["nombre"]
                            for sec in secciones_parametros() for p in sec["parametros"]}
         self._etiquetas.update(int_alto_cuerpo="Alto interior", herrajes_manuales="Herrajes a mano")
@@ -931,6 +933,7 @@ class TallerWidget(QWidget):
         self.recalcular()
         self._leer_editores()
         self._foto_guardada = self._foto()   # recién abierto (o nuevo): sin cambios
+        self._respaldados.clear()            # la primera vez que se guarde, queda copia de cómo estaba
 
     # ------------------------------------------------------------ historial
     def _foto(self) -> str:
@@ -1131,38 +1134,79 @@ class TallerWidget(QWidget):
         self.case_nuevo.emit()
         return True
 
-    def abrir(self, ruta: Optional[str] = None) -> None:
+    def _es_el_abierto(self, ruta: Optional[str]) -> bool:
+        return bool(ruta and self.ruta) and \
+            os.path.normcase(os.path.abspath(ruta)) == os.path.normcase(os.path.abspath(self.ruta))
+
+    def abrir(self, ruta: Optional[str] = None, preguntar: bool = True) -> bool:
         if not ruta:
             ruta, _ = QFileDialog.getOpenFileName(self, "Abrir proyecto del taller", "",
                                                   "Proyecto OpenSCAD (*.scad)")
         if not ruta:
-            return
+            return False
+        if preguntar and not self._es_el_abierto(ruta) and not self.confirmar_cambios("Abrir case", "abrir otro"):
+            return False
         try:
             self.set_params(leer_proyecto(ruta), ruta)
         except Exception as e:
             QMessageBox.critical(self, "Abrir proyecto", f"No se pudo leer {os.path.basename(ruta)}:\n{e}")
+            return False
+        return True
+
+    def cargar_con_cambios(self, scad: str, ruta: Optional[str], carpeta: str = "") -> None:
+        """Pone en la ventana el contenido de `scad` (una versión anterior o una copia de
+        recuperación) como cambios sin guardar del case `ruta`: hasta que se guarde, el
+        archivo queda como estaba."""
+        params = leer_proyecto(scad)
+        if ruta and not os.path.isfile(ruta):
+            carpeta, ruta = carpeta or os.path.dirname(os.path.abspath(ruta)), None
+        self.set_params(params, ruta)
+        if not ruta and carpeta:
+            self.params["_carpeta"] = carpeta
+            self.recalcular()
+        self._foto_guardada = None
 
     def texto_proyecto(self) -> str:
         self._leer_editores()
         titulo = os.path.splitext(os.path.basename(self.ruta))[0] if self.ruta else ""
         return escribir_proyecto(self.params, self.defectos, titulo)
 
-    def guardar(self, ruta: Optional[str] = None) -> None:
+    def guardar(self, ruta: Optional[str] = None, automatico: bool = False) -> bool:
+        """Escribe el .scad. Antes, lo que había en el archivo queda como versión fechada
+        (ver taller/versiones.py). `automatico`: sin diálogos (el autoguardado)."""
         if not ruta:
+            if automatico:
+                return False
             ruta, _ = QFileDialog.getSaveFileName(self, "Guardar proyecto del taller",
                                                   self.ruta or self._ruta_sugerida(), "Proyecto OpenSCAD (*.scad)")
         if not ruta:
-            return
+            return False
         if not ruta.lower().endswith(".scad"):
             ruta += ".scad"
+        from ...taller import versiones
+        carpeta_antes = self.params.get("_carpeta", "")
         self._mudar_logos(os.path.dirname(os.path.abspath(ruta)))
+        texto = self.texto_proyecto()
+        clave = os.path.normcase(os.path.abspath(ruta))
+        try:
+            versiones.respaldar(ruta, forzar=clave not in self._respaldados)
+            tmp = ruta + ".guardando"
+            with open(tmp, "w", encoding="utf-8") as f:     # si se corta a la mitad, el case no queda roto
+                f.write(texto)
+            os.replace(tmp, ruta)
+        except OSError as e:
+            self.params["_carpeta"] = carpeta_antes
+            if not automatico:
+                QMessageBox.critical(self, "Guardar case", f"No se pudo guardar {os.path.basename(ruta)}:\n{e}")
+            return False
+        self._respaldados.add(clave)
         self.herrajes.carpeta = self.params["_carpeta"]
-        with open(ruta, "w", encoding="utf-8") as f:
-            f.write(self.texto_proyecto())
         self.ruta = ruta
         self.lbl_archivo.setText(os.path.basename(ruta))
         self._foto_guardada = self._foto()
         self.ruta_cambiada.emit(ruta)
+        self.guardado.emit(automatico)
+        return True
 
     @staticmethod
     def _ruta_sugerida() -> str:

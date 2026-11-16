@@ -292,4 +292,9 @@ def renombrar(ruta: str, nombre: str) -> str:
     if nuevo_texto != texto:
         Path(nueva).write_text(nuevo_texto, encoding="utf-8")
     _mover_cache(ruta, nueva)
+    from . import versiones
+    try:
+        versiones.mover(ruta, nueva)        # las versiones anteriores siguen al case
+    except OSError:
+        pass
     return nueva
