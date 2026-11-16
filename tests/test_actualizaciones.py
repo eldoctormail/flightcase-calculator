@@ -32,6 +32,8 @@ def test_comparar_versiones():
     assert not act.es_mas_nueva("0.3.0", "0.3")          # iguales
     assert not act.es_mas_nueva("0.2.5", "0.3.0")
     assert act.es_mas_nueva("0.4.0", "desconocida")
+    assert act.numeros("v.0.3.6") == (0, 3, 6)           # etiqueta escrita con punto
+    assert act.es_mas_nueva("v0.3.7", ".0.3.6") and not act.es_mas_nueva("v.0.3.6", "0.3.6")
 
 
 @pytest.mark.parametrize("sistema, maquina, url", [
@@ -46,12 +48,37 @@ def test_elige_el_instalador_de_cada_computadora(sistema, maquina, url):
     assert n.notas.startswith("## Novedades")
 
 
+def _github(monkeypatch, releases):
+    monkeypatch.setattr(act, "_abrir", lambda url, timeout: _Respuesta(json.dumps(releases).encode()))
+
+
 def test_buscar(monkeypatch):
-    monkeypatch.setattr(act, "_abrir", lambda url, timeout: _Respuesta(json.dumps(RELEASE).encode()))
-    assert act.buscar("0.3.0").version == "0.4.0"
-    assert act.buscar("0.4.0") is None                     # al día
-    monkeypatch.setattr(act, "_abrir", lambda url, timeout: _Respuesta(json.dumps({**RELEASE, "prerelease": True}).encode()))
-    assert act.buscar("0.3.0") is None                     # las de prueba no se ofrecen
+    _github(monkeypatch, [RELEASE])
+    assert act.buscar("0.3.0", sistema="win32").version == "0.4.0"
+    assert act.buscar("0.4.0", sistema="win32") is None    # al día
+    _github(monkeypatch, [{**RELEASE, "prerelease": True}])
+    assert act.buscar("0.3.0", sistema="win32") is None    # las de prueba no se ofrecen
+
+
+def test_buscar_saltea_la_version_que_todavia_no_tiene_instalador(monkeypatch):
+    """Recién publicada, la Release está vacía unos 20 min: se ofrece la anterior que sí tiene."""
+    vacia = {**RELEASE, "tag_name": "v0.5.0", "assets": []}
+    _github(monkeypatch, [vacia, RELEASE])
+    n = act.buscar("0.3.0", sistema="darwin", maquina="arm64")
+    assert n.version == "0.4.0" and n.instalable
+    assert act.buscar("0.4.0", sistema="darwin", maquina="arm64") is None   # no se manda a GitHub
+    subiendo = {**RELEASE, "tag_name": "v0.5.0", "assets": [{**a, "state": "starter"} for a in RELEASE["assets"]]}
+    _github(monkeypatch, [subiendo])
+    assert act.buscar("0.4.0", sistema="win32") is None    # instalador a medio subir
+    _github(monkeypatch, [vacia])
+    assert act.buscar("0.4.0", sistema="linux").version == "0.5.0"   # sin instalador posible: la página
+
+
+def test_buscar_entiende_etiquetas_con_punto(monkeypatch):
+    _github(monkeypatch, [{**RELEASE, "tag_name": "v.0.3.6"}])
+    n = act.buscar("0.3.0", sistema="win32")
+    assert n.version == "0.3.6"
+    assert act.buscar(".0.3.6", sistema="win32") is None   # la versión que quedó como «.0.3.6»
 
     def sin_red(url, timeout):
         raise OSError("sin conexión")
