@@ -47,7 +47,8 @@ from ...taller.scad import escribir_proyecto, leer_proyecto, literal, valor_lite
 # Opciones fijas de los parámetros de texto que las tienen
 OPCIONES: Dict[str, List[str]] = {
     "orientacion": ["vertical", "horizontal", "frontal"],
-    "forma": ["caja", "inclinado", "funda", "plegable"],
+    "forma": ["caja", "inclinado", "funda", "plegable", "slam"],
+    "slam_caras": ["arriba", "frente", "frente_trasera", "arriba_frente"],
     "puerta_lado": ["izq", "der"],
     "patin_sentido": ["auto", "ancho", "largo"],
     "patas_en": ["tapa", "cuerpo"],

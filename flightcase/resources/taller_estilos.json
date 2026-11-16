@@ -164,5 +164,35 @@
   "nombre": "Case con bandejas euro",
   "descripcion": "Case parado con la tapa adelante y bandejas que salen de frente sobre correderas, una cada 120 mm de alto (para cajas euro de 600 x 400 o repuestos). Ruedas abajo.",
   "params": {"orientacion": "frontal", "tapas": 1, "extremos_cubren": true, "ruedas": 4, "refuerzos": 1, "_cajones": 120}
+ },
+ {
+  "id": "baul_slam_hd",
+  "nombre": "Baúl HD con tapa slam",
+  "descripcion": "Baúl reforzado con la tapa plana arriba: apoya a ras en un marco de perfil slam, gira sobre una bisagra de piano atrás y cierra sola con cierres slam embutidos adelante. Sin paredes de tapa, así el equipo se carga desde arriba sin obstáculos. Ruedas abajo.",
+  "params": {"forma": "slam", "orientacion": "vertical", "slam_caras": "arriba", "slam_hojas": 1, "topes": 2, "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "tapa_slam_doble",
+  "nombre": "Tapa slam doble",
+  "descripcion": "Tapa plana arriba partida en dos hojas que abren hacia los costados, cada una con su bisagra de piano: una se traba con pasadores y la otra cierra sobre ella con cierres slam. Para cases anchos donde una sola tapa sería muy grande.",
+  "params": {"forma": "slam", "orientacion": "vertical", "slam_caras": "arriba", "slam_hojas": 2, "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "tapa_slam_adelante",
+  "nombre": "Tapa slam adelante",
+  "descripcion": "Case parado con una puerta plana adelante, en marco de perfil slam: gira sobre una bisagra de piano al costado y cierra sola con cierres slam. Sin tapa que sacar y guardar.",
+  "params": {"forma": "slam", "orientacion": "frontal", "slam_caras": "frente", "slam_hojas": 1, "puerta_lado": "izq", "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "tapas_slam_adelante_atras",
+  "nombre": "Tapas slam adelante y atrás",
+  "descripcion": "Case parado con puertas planas adelante y atrás, cada una en su marco slam con bisagra de piano y cierres slam: se llega al equipo y a las conexiones sin sacar tapas.",
+  "params": {"forma": "slam", "orientacion": "frontal", "slam_caras": "frente_trasera", "slam_hojas": 1, "puerta_lado": "izq", "ruedas": 4, "manijas": true}
+ },
+ {
+  "id": "rack_slam",
+  "nombre": "Rack slam",
+  "descripcion": "Rack 19\" parado con puertas planas adelante y atrás en marco de perfil slam (bisagra de piano y cierres slam) y rieles de rack a todo el alto, adelante y atrás.",
+  "params": {"forma": "slam", "orientacion": "frontal", "slam_caras": "frente_trasera", "slam_hojas": 1, "slam_rack": true, "rack_traseros": true, "puerta_lado": "izq", "ruedas": 4, "manijas": true}
  }
 ]

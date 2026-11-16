@@ -150,6 +150,46 @@
   ]
  },
  {
+  "seccion": "Tipo de case: tapas slam",
+  "parametros": [
+   {
+    "nombre": "slam_caras",
+    "etiqueta": "Caras con tapa slam",
+    "ayuda": "con forma = slam: arriba, frente, frente_trasera (adelante y atrás) o arriba_frente (arriba y adelante)"
+   },
+   {
+    "nombre": "slam_hojas",
+    "etiqueta": "Hojas",
+    "ayuda": "1 = una tapa o puerta; 2 = puerta doble que cierra al medio (en la primera cara)"
+   },
+   {
+    "nombre": "slam_borde",
+    "etiqueta": "Ancho del marco slam",
+    "ayuda": "lo que se ve del perfil slam alrededor de la tapa (mm)"
+   },
+   {
+    "nombre": "slam_ala",
+    "etiqueta": "Ala del perfil slam",
+    "ayuda": "lo que el perfil cubre de la pared de al lado (mm)"
+   },
+   {
+    "nombre": "slam_perfil_ref",
+    "etiqueta": "Perfil slam (catálogo)",
+    "ayuda": "vacío = «Perfil slam» genérico"
+   },
+   {
+    "nombre": "ref_slam",
+    "etiqueta": "Cierre slam (catálogo)",
+    "ayuda": "cierre embutido en la tapa que traba solo al cerrarla"
+   },
+   {
+    "nombre": "slam_rack",
+    "etiqueta": "Rieles de rack",
+    "ayuda": "en un case parado: rieles de 19\" a todo el alto"
+   }
+  ]
+ },
+ {
   "seccion": "Placa",
   "parametros": [
    {

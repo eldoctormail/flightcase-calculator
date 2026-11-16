@@ -34,8 +34,9 @@ FAMILIAS = (
     ("racks", "Racks", "Racks 19\" medidos en unidades: tapa adelante, adelante y atrás, puertas, tapas de acceso, "
      "cubierta, inclinado para consola o funda abierta.",
      ("rack_una_tapa", "rack_dos_tapas", "rack_puertas", "rack_acceso_paneles", "rack_cubierta", "rack_inclinado",
-      "funda_rack")),
-    ("slam", "Tapas slam", "Tapas que cierran solas al bajarlas, con cierres slam embutidos.", ()),
+      "rack_slam", "funda_rack")),
+    ("slam", "Tapas slam", "Tapas y puertas planas en marco de perfil slam, con bisagra de piano y cierres que "
+     "traban solos al cerrar.", ("baul_slam_hd", "tapa_slam_doble", "tapa_slam_adelante", "tapas_slam_adelante_atras")),
     ("especiales", "Especiales", "Armados para un uso puntual.", ()),
 )
 
@@ -52,7 +53,9 @@ CORTOS = {
     "apertura_frontal": "Tapa adelante", "bandejas_euro": "Bandejas euro",
     "rack_una_tapa": "Tapa adelante", "rack_dos_tapas": "Adelante y atrás", "rack_puertas": "Con puertas",
     "funda_rack": "Funda (sleeve)", "rack_acceso_paneles": "Tapas de acceso", "rack_cubierta": "Cubierta entera",
-    "rack_inclinado": "Para mezcladora",
+    "rack_inclinado": "Para mezcladora", "rack_slam": "Slam",
+    "baul_slam_hd": "Baúl HD", "tapa_slam_doble": "Doble", "tapa_slam_adelante": "Adelante",
+    "tapas_slam_adelante_atras": "Adelante y atrás",
 }
 
 

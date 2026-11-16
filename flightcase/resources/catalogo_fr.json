@@ -2080,5 +2080,33 @@
   },
   "verificado": false,
   "proveedor": "Genérico"
+ },
+ {
+  "ref": "CIE-SLAM-M",
+  "categoria": "cierre",
+  "nombre": "Cierre slam embutido mediano",
+  "datos": {
+   "tipo": "embutido",
+   "corte": [
+    60,
+    40
+   ],
+   "radio": 3,
+   "prof": 12,
+   "remaches": 4,
+   "peso": 180
+  },
+  "verificado": false,
+  "proveedor": "Genérico (medidas aproximadas)"
+ },
+ {
+  "ref": "PERFIL-SLAM",
+  "categoria": "extra",
+  "nombre": "Perfil slam (marco de tapa plana)",
+  "datos": {
+   "peso": 700
+  },
+  "verificado": false,
+  "proveedor": "Genérico"
  }
 ]
