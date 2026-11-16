@@ -233,6 +233,13 @@ QSpinBox::up-button, QSpinBox::down-button, QDoubleSpinBox::up-button, QDoubleSp
   width: 14px;
 }
 
+/* Lista desplegable debajo del combo: el modo «popup» de Qt con hoja de estilos se abre
+   encima del combo, recorta las listas cortas (Interiores / Exteriores quedaba tapado) y
+   no respeta la cantidad de filas visibles. */
+QComboBox {
+  combobox-popup: 0;
+}
+
 QComboBox::drop-down {
   border: none;
   width: 18px;
@@ -242,6 +249,10 @@ QComboBox QAbstractItemView {
   background-color: #182238;
   border: 1px solid #33456b;
   selection-background-color: #2f6fe4;
+}
+
+QComboBox QAbstractItemView::item {
+  min-height: 24px;
 }
 
 QCheckBox, QRadioButton {
