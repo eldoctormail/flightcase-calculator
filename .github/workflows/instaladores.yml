@@ -38,6 +38,7 @@ jobs:
         run: |
           if [[ "$GITHUB_REF" == refs/tags/[vV]* ]]; then V="${GITHUB_REF#refs/tags/}"; V="${V:1}"; else V="$(python -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")"; fi
           echo "APP_VERSION=$V" >> "$GITHUB_ENV"
+          echo "VERSION = \"$V\"" > flightcase/_version.py   # para «Acerca de»
 
       - name: Dependencias
         run: |

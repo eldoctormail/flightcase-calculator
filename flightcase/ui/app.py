@@ -6,7 +6,7 @@ import os
 import sys
 from typing import List, Optional
 
-from PySide6.QtCore import QEvent, QObject, QSettings, Qt
+from PySide6.QtCore import QEvent, QObject, QSettings, Qt, QTimer
 from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence, QSurfaceFormat
 from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMenu, QMessageBox, QStatusBar, QWidget
 
@@ -38,6 +38,7 @@ class FlightCaseMainWindow(QMainWindow):
         self.taller_widget.resultado_cambiado.connect(self._estado_taller)
         self.taller_widget.ruta_cambiada.connect(self._ruta_cambiada)
         self.taller_widget.proyectos_pedidos.connect(self.proyectos)
+        self.taller_widget.case_nuevo.connect(self._case_nuevo_creado)
         self._init_menus()
         QApplication.instance().installEventFilter(self)
         if restore_settings:
@@ -92,6 +93,10 @@ class FlightCaseMainWindow(QMainWindow):
                      "Tus equipos con sus medidas, para usarlos en la espuma o el rack de cualquier case")
         self.taller_widget.historial_cambiado.connect(self._actualizar_historial)
         self._actualizar_historial()
+
+        self.help_menu = barra.addMenu("A&yuda")
+        a = self._accion(self.help_menu, f"&Acerca de {TITULO}...", None, self.acerca_de, "Autor y versión")
+        a.setMenuRole(QAction.MenuRole.AboutRole)     # en Mac va al menú de la app
 
     def _actualizar_historial(self) -> None:
         t = self.taller_widget
@@ -166,7 +171,23 @@ class FlightCaseMainWindow(QMainWindow):
 
     def _taller_nuevo(self) -> None:
         self.taller_widget.nuevo()
+
+    def _case_nuevo_creado(self) -> None:
+        """Al empezar un case nuevo se avisa en la barra de estado (si no, parece que no pasó nada)."""
         self._actualizar()
+        self.status_bar.showMessage(
+            "Case nuevo con las medidas por defecto: cambialas a la izquierda, o usá el asistente (Ctrl+Shift+N).",
+            8000)
+        QTimer.singleShot(8000, self._actualizar)
+
+    def acerca_de(self) -> None:
+        from ..version import AUTOR, version
+        QMessageBox.about(
+            self, f"Acerca de {TITULO}",
+            f"<h3>{TITULO}</h3>"
+            f"<p>Versión {version()}</p>"
+            f"<p>Autor: {AUTOR}</p>"
+            "<p>Cases a medida con las reglas del taller: planos, DXF, instructivo de montaje y STEP.</p>")
 
     def _asistente(self) -> None:
         if self.taller_widget.asistente():

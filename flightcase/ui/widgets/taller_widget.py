@@ -508,6 +508,7 @@ class TallerWidget(QWidget):
     ruta_cambiada = Signal(str)          # se abrió o se guardó un .scad (vacío = case nuevo)
     proyectos_pedidos = Signal()         # botón «Mis cases…»
     historial_cambiado = Signal()          # cambió lo que se puede deshacer o rehacer
+    case_nuevo = Signal()                  # se empezó un case nuevo (botón o menú «Nuevo»)
 
     MAX_HISTORIAL = 200
 
@@ -532,6 +533,8 @@ class TallerWidget(QWidget):
         self._init_ui()
         self._cargar_en_editores()
         self.recalcular()
+        self._leer_editores()
+        self._foto_guardada = self._foto()
 
     # ------------------------------------------------------------------ UI
     def _init_ui(self) -> None:
@@ -926,6 +929,8 @@ class TallerWidget(QWidget):
         self._rehacer.clear()
         self._foto_actual = None
         self.recalcular()
+        self._leer_editores()
+        self._foto_guardada = self._foto()   # recién abierto (o nuevo): sin cambios
 
     # ------------------------------------------------------------ historial
     def _foto(self) -> str:
@@ -1098,8 +1103,26 @@ class TallerWidget(QWidget):
         from .biblioteca_widget import BibliotecaDialog
         BibliotecaDialog(self).exec()
 
-    def nuevo(self) -> None:
+    def hay_cambios(self) -> bool:
+        """True si el case cambió desde que se abrió, se guardó o se empezó."""
+        self._leer_editores()
+        return self._foto() != getattr(self, "_foto_guardada", None)
+
+    def nuevo(self, preguntar: bool = True) -> bool:
+        """Empieza un case con las medidas por defecto; si hay cambios sin guardar, pregunta antes."""
+        if preguntar and self.hay_cambios():
+            r = QMessageBox.question(
+                self, "Case nuevo", f"«{self.lbl_archivo.text()}» tiene cambios sin guardar.\n¿Guardarlos antes de empezar uno nuevo?",
+                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Save)
+            if r == QMessageBox.Cancel:
+                return False
+            if r == QMessageBox.Save:
+                self.guardar(self.ruta)
+                if self.hay_cambios():      # canceló el diálogo de guardar
+                    return False
         self.set_params({})
+        self.case_nuevo.emit()
+        return True
 
     def abrir(self, ruta: Optional[str] = None) -> None:
         if not ruta:
@@ -1131,6 +1154,7 @@ class TallerWidget(QWidget):
             f.write(self.texto_proyecto())
         self.ruta = ruta
         self.lbl_archivo.setText(os.path.basename(ruta))
+        self._foto_guardada = self._foto()
         self.ruta_cambiada.emit(ruta)
 
     @staticmethod
